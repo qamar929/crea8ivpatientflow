@@ -1,0 +1,1 @@
+CREATE TABLE IF NOT EXISTS WhatsAppAutomationLog (id VARCHAR(64) PRIMARY KEY, clinicId VARCHAR(64) NOT NULL, automationId VARCHAR(64) NOT NULL, clientId VARCHAR(64) NOT NULL, contextKey VARCHAR(180) NOT NULL, messageId VARCHAR(64), createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP, UNIQUE KEY UX_WhatsAppAutomationLog_Context (automationId, clientId, contextKey));

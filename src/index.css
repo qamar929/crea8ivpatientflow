@@ -1,0 +1,154 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --primary: #0f766e;
+  --secondary: #be3455;
+  --font-family: 'Inter', sans-serif;
+  --ink: #101828;
+  --surface: #ffffff;
+  --surface-soft: #f6f7f9;
+  --surface-tint: #edf7f5;
+  --line: rgba(16, 24, 40, 0.08);
+  --shadow-soft: 0 18px 48px rgba(16, 24, 40, 0.08);
+  --shadow-lift: 0 24px 70px rgba(16, 24, 40, 0.14);
+}
+
+* { box-sizing: border-box; }
+
+body {
+  font-family: var(--font-family);
+  -webkit-font-smoothing: antialiased;
+  background:
+    linear-gradient(180deg, #fbfcfd 0%, #f3f6f7 48%, #eef5f3 100%);
+  color: var(--ink);
+}
+
+/* Glass card utility — avoid @apply dark: inside @layer (Tailwind resolves it as media query) */
+@layer components {
+  .app-shell {
+    background:
+      linear-gradient(180deg, rgba(255,255,255,0.86), rgba(247,250,249,0.94)),
+      linear-gradient(115deg, rgba(15,118,110,0.08), rgba(190,52,85,0.05) 52%, rgba(16,24,40,0.04));
+  }
+
+  .glass {
+    @apply bg-white/80 backdrop-blur-xl;
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow-soft);
+  }
+
+  .glass-dark {
+    @apply bg-black/20 backdrop-blur-xl border border-white/10;
+  }
+
+  .luxury-card {
+    @apply bg-white/90 dark:bg-white/5 backdrop-blur-xl rounded-lg transition-all duration-200;
+    border: 1px solid var(--line);
+    box-shadow: var(--shadow-soft);
+  }
+
+  .luxury-card:hover {
+    box-shadow: var(--shadow-lift);
+    transform: translateY(-1px);
+  }
+
+  .brand-mark {
+    @apply inline-flex items-center justify-center rounded-lg text-white font-bold;
+    background:
+      linear-gradient(135deg, rgba(255,255,255,0.16), rgba(255,255,255,0)),
+      linear-gradient(135deg, var(--primary), var(--secondary));
+    box-shadow: 0 14px 34px color-mix(in srgb, var(--primary) 26%, transparent);
+  }
+
+  .premium-input {
+    @apply border text-sm transition-all outline-none;
+    border-color: var(--line);
+    background: rgba(255,255,255,0.82);
+  }
+
+  .premium-input:focus {
+    border-color: color-mix(in srgb, var(--primary) 55%, white);
+    box-shadow: 0 0 0 4px color-mix(in srgb, var(--primary) 13%, transparent);
+  }
+
+  .glow-primary {
+    box-shadow: 0 0 20px color-mix(in srgb, var(--primary) 30%, transparent);
+  }
+  .card-hover {
+    @apply transition-all duration-200;
+  }
+}
+
+/* Dark mode overrides for glass — must use explicit selectors, not @apply dark: */
+.dark .glass {
+  background-color: rgba(15, 23, 42, 0.64);
+  border-color: rgba(255, 255, 255, 0.1);
+}
+
+.dark .app-shell {
+  background:
+    linear-gradient(180deg, #0b1117 0%, #101820 52%, #0d1518 100%);
+}
+
+.dark .luxury-card {
+  border-color: rgba(255,255,255,0.08);
+  box-shadow: 0 18px 48px rgba(0,0,0,0.24);
+}
+
+.dark .premium-input {
+  background: rgba(255,255,255,0.06);
+  border-color: rgba(255,255,255,0.1);
+  color: #f8fafc;
+}
+
+/* Scrollbar */
+::-webkit-scrollbar { width: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: rgba(99,102,241,0.3); border-radius: 10px; }
+.dark ::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); }
+
+/* react-big-calendar overrides */
+.rbc-calendar { font-family: var(--font-family); }
+.rbc-header {
+  padding: 8px 0; font-weight: 600; font-size: 0.75rem;
+  text-transform: uppercase; letter-spacing: 0.05em;
+  color: #64748b; border-bottom: 1px solid #e2e8f0;
+}
+.dark .rbc-header { color: #94a3b8; border-color: rgba(255,255,255,0.1); }
+.rbc-event { border-radius: 8px !important; border: none !important; font-size: 0.72rem; padding: 2px 6px !important; }
+.rbc-today { background-color: rgba(99,102,241,0.06) !important; }
+.dark .rbc-today { background-color: rgba(99,102,241,0.15) !important; }
+.rbc-toolbar button {
+  color: #374151; border: 1px solid #e5e7eb; border-radius: 10px;
+  padding: 6px 14px; font-size: 0.875rem;
+}
+.dark .rbc-toolbar button { color: #d1d5db; border-color: rgba(255,255,255,0.1); }
+.rbc-toolbar button:hover { background-color: #f3f4f6; }
+.dark .rbc-toolbar button:hover { background-color: rgba(255,255,255,0.08); }
+.rbc-toolbar button.rbc-active { background: var(--primary) !important; color: white !important; border-color: var(--primary) !important; }
+
+@media print {
+  body * { visibility: hidden; }
+  .printable-invoice, .printable-invoice * { visibility: visible; }
+  .printable-invoice { position: absolute; inset: 0; width: 100%; background: white; padding: 24px; }
+  .no-print { display: none !important; }
+}
+
+.public-input {
+  width: 100%;
+  margin-top: 0.35rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  background: #fff;
+  padding: 0.65rem 0.75rem;
+  font-size: 0.8rem;
+  color: #0f172a;
+  outline: none;
+}
+.public-input:focus { border-color: #0f766e; box-shadow: 0 0 0 3px rgba(15,118,110,.12); }
+@keyframes publicOfferScroll { from { transform: translateX(0); } to { transform: translateX(-50%); } }
+.public-offer-track { animation: publicOfferScroll 32s linear infinite; }
+.public-offer-track:hover { animation-play-state: paused; }

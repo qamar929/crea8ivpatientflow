@@ -1,0 +1,384 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Clinic {
+  id             String   @id @default(uuid())
+  name           String
+  tagline        String?
+  logo           String?
+  address        String?
+  phone          String?
+  whatsapp       String?
+  email          String?
+  website        String?
+  registrationNo String?
+  invoicePrefix  String   @default("INV")
+  invoiceFooter  String?
+  paymentTerms   String?
+  mission         String?
+  vision          String?
+  servicesOverview String?
+  primaryColor   String   @default("#6366f1")
+  secondaryColor String   @default("#8b5cf6")
+  font           String   @default("Inter")
+  specialties    String   @default("dental")
+  createdAt      DateTime @default(now())
+
+  branches     Branch[]
+  staff        Staff[]
+  clients      Client[]
+  services     Service[]
+  appointments Appointment[]
+  packages     Package[]
+  invoices     Invoice[]
+  inventory    InventoryItem[]
+  campaigns    Campaign[]
+  users        User[]
+  auditLogs    AuditLog[]
+}
+
+model Branch {
+  id        String   @id @default(uuid())
+  clinicId  String
+  name      String
+  address   String?
+  phone     String?
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+
+  clinic       Clinic        @relation(fields: [clinicId], references: [id])
+  appointments Appointment[]
+  staff        Staff[]
+}
+
+model User {
+  id           String    @id @default(uuid())
+  clinicId     String
+  name         String
+  email        String    @unique
+  password     String
+  role         String    @default("receptionist")
+  ledgerMode   String    @default("actual")
+  staffId      String?
+  isActive     Boolean   @default(true)
+  twoFAEnabled Boolean   @default(false)
+  lastLogin    DateTime?
+  createdAt    DateTime  @default(now())
+
+  clinic        Clinic         @relation(fields: [clinicId], references: [id])
+  refreshTokens RefreshToken[]
+  auditLogs     AuditLog[]
+}
+
+model RefreshToken {
+  id        String   @id @default(uuid())
+  token     String   @unique
+  userId    String
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id])
+}
+
+model Staff {
+  id             String   @id @default(uuid())
+  clinicId       String
+  branchId       String?
+  name           String
+  role           String
+  designation    String?
+  specialty      String
+  phone          String?
+  email          String?
+  avatar         String?
+  avatarColor    String   @default("#6366f1")
+  qualifications String?
+  experience     String?
+  bio            String?
+  workingDays    String   @default("Mon,Tue,Wed,Thu,Fri")
+  workingHours   String   @default("09:00-17:00")
+  status         String   @default("active")
+  rating         Float    @default(5.0)
+  compensationType String @default("commission")
+  fixedSalary    Float    @default(0)
+  commissionRate Float    @default(0)
+  treatmentCommissionRates String @default("{}")
+  portalRole     String?
+  loginEmail     String?
+  inviteStatus   String   @default("ready")
+  lastInviteSent DateTime?
+  createdAt      DateTime @default(now())
+
+  clinic       Clinic        @relation(fields: [clinicId], references: [id])
+  branch       Branch?       @relation(fields: [branchId], references: [id])
+  appointments Appointment[]
+}
+
+model Client {
+  id                 String   @id @default(uuid())
+  clinicId           String
+  patientNo          String?
+  name               String
+  phone              String?
+  email              String?
+  dob                String?
+  gender             String?
+  specialty          String   @default("[]")
+  medicalHistory     String   @default("[]")
+  loyaltyPoints      Int      @default(0)
+  loyaltyTier        String   @default("Bronze")
+  totalSpent         Float    @default(0)
+  outstandingBalance Float    @default(0)
+  latestInvoiceNo    String?
+  nextFollowUpDue    String?
+  lastVisit          String?
+  status             String   @default("active")
+  avatarColor        String   @default("#6366f1")
+  initials           String?
+  notes              String?
+  portalEmail        String?
+  portalPasswordHash String?
+  referredBy         String?
+  createdAt          DateTime @default(now())
+
+  clinic        Clinic          @relation(fields: [clinicId], references: [id])
+  appointments  Appointment[]
+  invoices      Invoice[]
+  packages      ClientPackage[]
+  feedback      Feedback[]
+  galleryItems  GalleryItem[]
+
+  @@unique([clinicId, patientNo])
+}
+
+model Service {
+  id          String   @id @default(uuid())
+  clinicId    String
+  name        String
+  specialty   String
+  category    String
+  price       Float
+  duration    Int
+  description String?
+  popular     Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  clinic       Clinic        @relation(fields: [clinicId], references: [id])
+  appointments Appointment[]
+  packageItems PackageItem[]
+}
+
+model Appointment {
+  id          String    @id @default(uuid())
+  clinicId    String
+  branchId    String?
+  clientId    String
+  staffId     String
+  serviceId   String?
+  date        String
+  startTime   String
+  endTime     String
+  duration    Int
+  status      String    @default("pending")
+  room        String?
+  notes       String?
+  price       Float
+  specialty   String
+  checkedIn   Boolean   @default(false)
+  checkinTime DateTime?
+  qrCode      String?
+  createdAt   DateTime  @default(now())
+
+  clinic   Clinic    @relation(fields: [clinicId], references: [id])
+  branch   Branch?   @relation(fields: [branchId], references: [id])
+  client   Client    @relation(fields: [clientId], references: [id])
+  staff    Staff     @relation(fields: [staffId], references: [id])
+  service  Service?  @relation(fields: [serviceId], references: [id])
+  invoice  Invoice?
+  feedback Feedback?
+}
+
+model Package {
+  id          String   @id @default(uuid())
+  clinicId    String
+  name        String
+  description String?
+  totalPrice  Float
+  validity    Int
+  specialty   String
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  clinic         Clinic          @relation(fields: [clinicId], references: [id])
+  items          PackageItem[]
+  clientPackages ClientPackage[]
+}
+
+model PackageItem {
+  id        String @id @default(uuid())
+  packageId String
+  serviceId String
+  sessions  Int    @default(1)
+
+  package Package @relation(fields: [packageId], references: [id])
+  service Service @relation(fields: [serviceId], references: [id])
+}
+
+model ClientPackage {
+  id            String @id @default(uuid())
+  clientId      String
+  packageId     String
+  purchaseDate  String
+  expiryDate    String
+  totalSessions Int
+  usedSessions  Int    @default(0)
+  status        String @default("active")
+  amountPaid    Float
+
+  client  Client  @relation(fields: [clientId], references: [id])
+  package Package @relation(fields: [packageId], references: [id])
+}
+
+model Invoice {
+  id            String    @id @default(uuid())
+  clinicId      String
+  clientId      String
+  appointmentId String?   @unique
+  invoiceNo     String    @unique
+  items         String
+  subtotal      Float
+  previousBalance Float @default(0)
+  discount      Float     @default(0)
+  tax           Float     @default(0)
+  total         Float
+  grandTotal    Float     @default(0)
+  amountPaid    Float     @default(0)
+  balanceDue    Float     @default(0)
+  status        String    @default("pending")
+  paymentMethod String?
+  notes         String?
+  dueDate       String?
+  paidAt        DateTime?
+  createdAt     DateTime  @default(now())
+
+  clinic      Clinic       @relation(fields: [clinicId], references: [id])
+  client      Client       @relation(fields: [clientId], references: [id])
+  appointment Appointment? @relation(fields: [appointmentId], references: [id])
+}
+
+model InventoryItem {
+  id           String   @id @default(uuid())
+  clinicId     String
+  name         String
+  category     String
+  specialty    String?
+  quantity     Float
+  unit         String   @default("units")
+  reorderLevel Float    @default(10)
+  costPerUnit  Float
+  supplier     String?
+  expiryDate   String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+
+  clinic       Clinic                 @relation(fields: [clinicId], references: [id])
+  transactions InventoryTransaction[]
+}
+
+model InventoryTransaction {
+  id        String   @id @default(uuid())
+  itemId    String
+  type      String
+  quantity  Float
+  reason    String?
+  createdAt DateTime @default(now())
+
+  item InventoryItem @relation(fields: [itemId], references: [id])
+}
+
+model Feedback {
+  id            String   @id @default(uuid())
+  clinicId      String?
+  clientId      String
+  appointmentId String?  @unique
+  staffRating   Int
+  serviceRating Int
+  overallRating Int
+  comment       String?
+  wouldRecommend Boolean @default(true)
+  isPublic      Boolean  @default(false)
+  staffId       String?
+  createdAt     DateTime @default(now())
+
+  client      Client       @relation(fields: [clientId], references: [id])
+  appointment Appointment? @relation(fields: [appointmentId], references: [id])
+}
+
+model GalleryItem {
+  id            String   @id @default(uuid())
+  clientId      String
+  appointmentId String?
+  type          String   @default("before")
+  imageUrl      String
+  service       String?
+  notes         String?
+  isPrivate     Boolean  @default(true)
+  createdAt     DateTime @default(now())
+
+  client Client @relation(fields: [clientId], references: [id])
+}
+
+model Campaign {
+  id          String    @id @default(uuid())
+  clinicId    String
+  name        String
+  type        String
+  trigger     String
+  subject     String?
+  body        String
+  status      String    @default("draft")
+  sentCount   Int       @default(0)
+  openCount   Int       @default(0)
+  scheduledAt DateTime?
+  createdAt   DateTime  @default(now())
+
+  clinic Clinic @relation(fields: [clinicId], references: [id])
+}
+
+model AuditLog {
+  id        String   @id @default(uuid())
+  clinicId  String
+  userId    String?
+  action    String
+  entity    String
+  entityId  String?
+  oldData   String?
+  newData   String?
+  ip        String?
+  userAgent String?
+  createdAt DateTime @default(now())
+
+  clinic Clinic @relation(fields: [clinicId], references: [id])
+  user   User?  @relation(fields: [userId], references: [id])
+}
+
+model Notification {
+  id        String    @id @default(uuid())
+  clinicId  String?
+  userId    String?
+  clientId  String?
+  type      String
+  title     String
+  body      String
+  read      Boolean   @default(false)
+  channel   String    @default("push")
+  sentAt    DateTime?
+  createdAt DateTime  @default(now())
+}

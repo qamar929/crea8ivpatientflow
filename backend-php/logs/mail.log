@@ -1,0 +1,39 @@
+[2026-06-10 13:45:14] TO: owner@thesmileexpert.com
+SUBJECT: Reset your portal password
+<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;">
+  <h2 style="color:#0f766e;">Password Reset Request</h2>
+  <p>Hi Owner,</p>
+  <p>We received a request to reset your portal password. Click the button below to choose a new one. This link expires in 30 minutes and can be used once.</p>
+  <p style="margin:28px 0;">
+    <a href="http://localhost:5173/reset-password?token=fdd9319c384d5a5c2c26bc479e22eaca2a564ed27fd8b38ff476af1ea9c7a059" style="background:#0f766e;color:#ffffff;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;">Reset Password</a>
+  </p>
+  <p style="color:#64748b;font-size:13px;">If the button doesn't work, copy this link into your browser:<br>http://localhost:5173/reset-password?token=fdd9319c384d5a5c2c26bc479e22eaca2a564ed27fd8b38ff476af1ea9c7a059</p>
+  <p style="color:#64748b;font-size:13px;">If you didn't request this, you can safely ignore this email — your password will not change.</p>
+</div>
+------------------------------------------------------------
+[2026-06-10 13:47:28] TO: owner@thesmileexpert.com
+SUBJECT: Reset your portal password
+<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;">
+  <h2 style="color:#0f766e;">Password Reset Request</h2>
+  <p>Hi Owner,</p>
+  <p>We received a request to reset your portal password. Click the button below to choose a new one. This link expires in 30 minutes and can be used once.</p>
+  <p style="margin:28px 0;">
+    <a href="http://localhost:5173/reset-password?token=75e69cd458d286a5b6a228b03c3b223bda96107013688dde95c5eefd86e13a0f" style="background:#0f766e;color:#ffffff;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;">Reset Password</a>
+  </p>
+  <p style="color:#64748b;font-size:13px;">If the button doesn't work, copy this link into your browser:<br>http://localhost:5173/reset-password?token=75e69cd458d286a5b6a228b03c3b223bda96107013688dde95c5eefd86e13a0f</p>
+  <p style="color:#64748b;font-size:13px;">If you didn't request this, you can safely ignore this email — your password will not change.</p>
+</div>
+------------------------------------------------------------
+[2026-06-10 13:58:02] TO: ali@citydentalcare.pk
+SUBJECT: Your clinic portal is ready — set your password
+<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;">
+  <h2 style="color:#0f766e;">Password Reset Request</h2>
+  <p>Hi Dr Ali Raza,</p>
+  <p>We received a request to reset your portal password. Click the button below to choose a new one. This link expires in 4320 minutes and can be used once.</p>
+  <p style="margin:28px 0;">
+    <a href="http://localhost:5173/reset-password?token=9ade26011447aa349b0d71d4be186d5e49c0f67079335967454176f72cb9274d" style="background:#0f766e;color:#ffffff;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;">Reset Password</a>
+  </p>
+  <p style="color:#64748b;font-size:13px;">If the button doesn't work, copy this link into your browser:<br>http://localhost:5173/reset-password?token=9ade26011447aa349b0d71d4be186d5e49c0f67079335967454176f72cb9274d</p>
+  <p style="color:#64748b;font-size:13px;">If you didn't request this, you can safely ignore this email — your password will not change.</p>
+</div>
+------------------------------------------------------------

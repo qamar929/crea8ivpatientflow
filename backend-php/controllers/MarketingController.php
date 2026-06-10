@@ -1,0 +1,140 @@
+<?php
+require_once __DIR__ . '/../db.php';
+require_once __DIR__ . '/../helpers.php';
+
+class MarketingController {
+    public function list($input, $user) {
+        $db = DB::getConnection();
+        $stmt = $db->prepare("SELECT * FROM Campaign WHERE clinicId = ? ORDER BY createdAt DESC");
+        $stmt->execute([$user['clinicId']]);
+        $campaigns = $stmt->fetchAll();
+        send_json($campaigns);
+    }
+
+    public function getById($input, $user, $id) {
+        $db = DB::getConnection();
+        $stmt = $db->prepare("SELECT * FROM Campaign WHERE id = ? AND clinicId = ?");
+        $stmt->execute([$id, $user['clinicId']]);
+        $campaign = $stmt->fetch();
+        if (!$campaign) {
+            send_error('Campaign not found', 404);
+        }
+        send_json($campaign);
+    }
+
+    public function create($input, $user) {
+        $db = DB::getConnection();
+
+        $id = generate_uuid();
+        $name = $input['name'] ?? '';
+        if (empty($name)) {
+            send_error('Name is required', 400);
+        }
+
+        $type = $input['type'] ?? 'whatsapp';
+        $trigger = $input['trigger'] ?? 'manual';
+        $subject = $input['subject'] ?? null;
+        $body = $input['body'] ?? '';
+        $status = $input['status'] ?? 'draft';
+
+        $stmt = $db->prepare("INSERT INTO Campaign (id, clinicId, name, type, `trigger`, subject, body, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)");
+        $stmt->execute([
+            $id, $user['clinicId'], $name, $type, $trigger, $subject, $body, $status
+        ]);
+
+        $stmt = $db->prepare("SELECT * FROM Campaign WHERE id = ?");
+        $stmt->execute([$id]);
+        $campaign = $stmt->fetch();
+
+        send_json($campaign, 201);
+    }
+
+    public function update($input, $user, $id) {
+        $db = DB::getConnection();
+        $stmt = $db->prepare("SELECT id FROM Campaign WHERE id = ? AND clinicId = ?");
+        $stmt->execute([$id, $user['clinicId']]);
+        if (!$stmt->fetch()) {
+            send_error('Campaign not found', 404);
+        }
+
+        $fields = [];
+        $params = [];
+
+        $updatable = ['name', 'type', 'trigger', 'subject', 'body', 'status', 'sentCount', 'openCount', 'scheduledAt'];
+        foreach ($updatable as $key) {
+            if (isset($input[$key])) {
+                $fields[] = "`$key` = ?";
+                $params[] = $input[$key];
+            }
+        }
+
+        if (empty($fields)) {
+            send_error('No fields to update', 400);
+        }
+
+        $params[] = $id;
+        $params[] = $user['clinicId'];
+
+        $sql = "UPDATE Campaign SET " . implode(", ", $fields) . " WHERE id = ? AND clinicId = ?";
+        $stmt = $db->prepare($sql);
+        $stmt->execute($params);
+
+        send_json(['message' => 'Updated']);
+    }
+
+    public function remove($input, $user, $id) {
+        $db = DB::getConnection();
+        $stmt = $db->prepare("DELETE FROM Campaign WHERE id = ? AND clinicId = ?");
+        $stmt->execute([$id, $user['clinicId']]);
+        send_json(['message' => 'Deleted']);
+    }
+
+    public function send($input, $user, $id) {
+        $db = DB::getConnection();
+        
+        // Find Campaign
+        $stmt = $db->prepare("SELECT * FROM Campaign WHERE id = ? AND clinicId = ?");
+        $stmt->execute([$id, $user['clinicId']]);
+        $campaign = $stmt->fetch();
+        if (!$campaign) {
+            send_error('Campaign not found', 404);
+        }
+
+        // Find active clients
+        $stmtClients = $db->prepare("SELECT name, phone, email FROM Client WHERE clinicId = ? AND status = 'active'");
+        $stmtClients->execute([$user['clinicId']]);
+        $clients = $stmtClients->fetchAll();
+
+        $sentCount = 0;
+        foreach ($clients as $client) {
+            $personalizedBody = str_replace('{{name}}', $client['name'], $campaign['body']);
+            
+            if ($campaign['type'] === 'whatsapp' && !empty($client['phone'])) {
+                // Send Twilio WhatsApp message if configured
+                send_whatsapp_message($client['phone'], $personalizedBody);
+                $sentCount++;
+            } else if ($campaign['type'] === 'email' && !empty($client['email'])) {
+                // Send Email placeholder (could integrate mail() or PHPMailer later)
+                $subject = $campaign['subject'] ?? 'The Smile Expert Update';
+                $headers = "From: " . SMTP_USER . "\r\n" .
+                           "Reply-To: " . SMTP_USER . "\r\n" .
+                           "Content-Type: text/html; charset=UTF-8\r\n";
+                @mail($client['email'], $subject, $personalizedBody, $headers);
+                $sentCount++;
+            } else {
+                // Fallback / Log
+                error_log("Campaign sent to " . $client['name'] . ": " . substr($personalizedBody, 0, 50));
+                $sentCount++;
+            }
+        }
+
+        // Update Campaign status
+        $stmtUpdate = $db->prepare("UPDATE Campaign SET sentCount = sentCount + ?, status = 'completed' WHERE id = ?");
+        $stmtUpdate->execute([$sentCount, $id]);
+
+        send_json([
+            'message' => "Campaign sent to $sentCount clients",
+            'sentCount' => $sentCount
+        ]);
+    }
+}
