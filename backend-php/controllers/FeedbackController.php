@@ -3,6 +3,34 @@ require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../helpers.php';
 
 class FeedbackController {
+    private function assertClientInClinic($db, $clientId, $clinicId) {
+        $stmt = $db->prepare("SELECT id FROM Client WHERE id = ? AND clinicId = ? AND status != 'inactive'");
+        $stmt->execute([$clientId, $clinicId]);
+        if (!$stmt->fetch()) {
+            send_error('Client not found', 404);
+        }
+    }
+
+    private function assertStaffInClinic($db, $staffId, $clinicId) {
+        if (empty($staffId)) return;
+        $stmt = $db->prepare("SELECT id FROM Staff WHERE id = ? AND clinicId = ?");
+        $stmt->execute([$staffId, $clinicId]);
+        if (!$stmt->fetch()) {
+            send_error('Staff not found', 404);
+        }
+    }
+
+    private function appointmentStaff($db, $appointmentId, $clinicId) {
+        if (empty($appointmentId)) return null;
+        $stmt = $db->prepare("SELECT staffId FROM Appointment WHERE id = ? AND clinicId = ?");
+        $stmt->execute([$appointmentId, $clinicId]);
+        $staffId = $stmt->fetchColumn();
+        if ($staffId === false) {
+            send_error('Appointment not found', 404);
+        }
+        return $staffId ?: null;
+    }
+
     private function recalculateStaffRating($db, $staffId) {
         if (empty($staffId)) {
             return;
@@ -110,13 +138,13 @@ class FeedbackController {
         if (empty($clientId)) {
             send_error('clientId is required', 400);
         }
+        $this->assertClientInClinic($db, $clientId, $user['clinicId']);
 
         // If appointment provided, find staffId if not provided
         if (empty($staffId) && !empty($appointmentId)) {
-            $stmtAppt = $db->prepare("SELECT staffId FROM Appointment WHERE id = ?");
-            $stmtAppt->execute([$appointmentId]);
-            $staffId = $stmtAppt->fetchColumn() ?: null;
+            $staffId = $this->appointmentStaff($db, $appointmentId, $user['clinicId']);
         }
+        $this->assertStaffInClinic($db, $staffId, $user['clinicId']);
 
         try {
             $db->beginTransaction();
@@ -165,12 +193,14 @@ class FeedbackController {
         if (empty($clientId)) {
             send_error('clientId is required', 400);
         }
+        $this->assertClientInClinic($db, $clientId, $user['clinicId']);
 
         if (empty($staffId) && !empty($appointmentId)) {
-            $stmtAppt = $db->prepare("SELECT staffId FROM Appointment WHERE id = ? AND clinicId = ?");
-            $stmtAppt->execute([$appointmentId, $user['clinicId']]);
-            $staffId = $stmtAppt->fetchColumn() ?: null;
+            $staffId = $this->appointmentStaff($db, $appointmentId, $user['clinicId']);
+        } elseif (!empty($appointmentId)) {
+            $this->appointmentStaff($db, $appointmentId, $user['clinicId']);
         }
+        $this->assertStaffInClinic($db, $staffId, $user['clinicId']);
 
         try {
             $db->beginTransaction();

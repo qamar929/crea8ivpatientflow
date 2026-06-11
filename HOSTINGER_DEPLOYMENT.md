@@ -70,10 +70,10 @@ https://api.thesmilexperts.com/api/v1/health
 In Hostinger hPanel/phpMyAdmin:
 
 1. Create the MySQL database and user.
-2. Confirm `backend-php/config.php` matches the database credentials:
+2. Confirm the production `.env` matches the database credentials:
    - DB name: `u700603111_thesmilexperts`
    - DB user: `u700603111_thesmilexperts`
-   - DB password: `Thesmilexperts@2026`
+   - DB password: use the fresh hPanel password, not any value previously committed to git.
 3. Import `schema.sql`.
 4. Import these MySQL migration files from `migrations/`:
    - `2026-06-02-logo-branding.sql`

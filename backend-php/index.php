@@ -104,6 +104,9 @@ function require_active_tenant($user) {
     if (($user['role'] ?? '') === 'superadmin') {
         send_error('Platform admin tokens cannot access clinic routes', 403);
     }
+    if (($user['role'] ?? '') === 'client') {
+        send_error('Patient portal tokens cannot access clinic staff routes', 403);
+    }
     $clinicId = $user['clinicId'] ?? '';
     if ($clinicId === '') {
         send_error('Invalid token', 401);
@@ -121,6 +124,13 @@ function require_active_tenant($user) {
             'clinicStatus' => $status,
         ]);
     }
+
+    $stmt = $db->prepare("SELECT isActive FROM User WHERE id = ? AND clinicId = ?");
+    $stmt->execute([$user['id'] ?? '', $clinicId]);
+    $isActive = $stmt->fetchColumn();
+    if ($isActive === false || !intval($isActive)) {
+        send_error('User inactive', 401);
+    }
 }
 
 function require_superadmin($user) {
@@ -129,10 +139,45 @@ function require_superadmin($user) {
     }
 }
 
+function require_clinic_role($user, $roles) {
+    $roles = is_array($roles) ? $roles : [$roles];
+    if (!in_array(($user['role'] ?? ''), $roles, true)) {
+        send_error('Insufficient permissions', 403);
+    }
+}
+
+function require_client_portal($user) {
+    if (($user['role'] ?? '') !== 'client') {
+        send_error('Patient portal token required', 403);
+    }
+    $clinicId = $user['clinicId'] ?? '';
+    $clientId = $user['id'] ?? '';
+    if ($clinicId === '' || $clientId === '') {
+        send_error('Invalid token', 401);
+    }
+    $db = DB::getConnection();
+    $stmt = $db->prepare("SELECT status FROM Clinic WHERE id = ?");
+    $stmt->execute([$clinicId]);
+    $status = $stmt->fetchColumn();
+    if (!in_array($status, ['active', 'trial', 'grace'], true)) {
+        send_error('Clinic subscription is not active.', 402, [
+            'code' => 'subscription_inactive',
+            'clinicStatus' => $status ?: null,
+        ]);
+    }
+    $stmt = $db->prepare("SELECT status FROM Client WHERE id = ? AND clinicId = ?");
+    $stmt->execute([$clientId, $clinicId]);
+    $clientStatus = $stmt->fetchColumn();
+    if ($clientStatus === false || $clientStatus === 'inactive') {
+        send_error('Patient portal account inactive', 401);
+    }
+}
+
 // Routing rules table
 // format: [Method, Pattern, ControllerClass, ControllerAction, Guard]
 // Guard: false = public | true = tenant (auth + active clinic)
 //        'auth' = any authenticated user | 'admin' = superadmin only
+//        array = tenant + one of the listed clinic roles
 $routes = [
     // Health Check
     ['GET', '^api/v1/health$', 'StatusController', 'health', false],
@@ -176,10 +221,10 @@ $routes = [
     ['PUT', '^api/v1/admin/tickets/([^/]+)$', 'AdminController', 'updateTicket', 'admin'],
 
     // Self-service custom domain (clinic owner)
-    ['GET', '^api/v1/settings/domain$', 'DomainController', 'get', true],
-    ['PUT', '^api/v1/settings/domain$', 'DomainController', 'set', true],
-    ['POST', '^api/v1/settings/domain/verify$', 'DomainController', 'verify', true],
-    ['DELETE', '^api/v1/settings/domain$', 'DomainController', 'remove', true],
+    ['GET', '^api/v1/settings/domain$', 'DomainController', 'get', ['owner', 'manager']],
+    ['PUT', '^api/v1/settings/domain$', 'DomainController', 'set', ['owner', 'manager']],
+    ['POST', '^api/v1/settings/domain/verify$', 'DomainController', 'verify', ['owner', 'manager']],
+    ['DELETE', '^api/v1/settings/domain$', 'DomainController', 'remove', ['owner', 'manager']],
 
     // Clinic-side support tickets
     ['GET', '^api/v1/support/tickets$', 'SupportController', 'list', true],
@@ -188,166 +233,166 @@ $routes = [
     ['POST', '^api/v1/support/tickets/([^/]+)/reply$', 'SupportController', 'reply', true],
 
     // Dynamic Settings and Public Website Routes
-    ['GET', '^api/v1/settings/public-site$', 'PublicSiteController', 'getSettings', true],
-    ['PUT', '^api/v1/settings/public-site$', 'PublicSiteController', 'updateSettings', true],
+    ['GET', '^api/v1/settings/public-site$', 'PublicSiteController', 'getSettings', ['owner', 'manager']],
+    ['PUT', '^api/v1/settings/public-site$', 'PublicSiteController', 'updateSettings', ['owner', 'manager']],
     ['GET', '^api/v1/public/branding$', 'PublicSiteController', 'branding', false],
     ['GET', '^api/v1/public/site$', 'PublicSiteController', 'getSite', false],
     ['GET', '^api/v1/public/availability$', 'PublicSiteController', 'availability', false],
     ['POST', '^api/v1/public/book$', 'PublicSiteController', 'book', false],
 
     // Users Routes
-    ['GET', '^api/v1/users$', 'UserController', 'list', true],
-    ['POST', '^api/v1/users$', 'UserController', 'create', true],
-    ['POST', '^api/v1/users/([^/]+)/reset-password$', 'UserController', 'resetPassword', true],
-    ['PUT', '^api/v1/users/([^/]+)$', 'UserController', 'update', true],
-    ['DELETE', '^api/v1/users/([^/]+)$', 'UserController', 'remove', true],
+    ['GET', '^api/v1/users$', 'UserController', 'list', ['owner']],
+    ['POST', '^api/v1/users$', 'UserController', 'create', ['owner']],
+    ['POST', '^api/v1/users/([^/]+)/reset-password$', 'UserController', 'resetPassword', ['owner']],
+    ['PUT', '^api/v1/users/([^/]+)$', 'UserController', 'update', ['owner']],
+    ['DELETE', '^api/v1/users/([^/]+)$', 'UserController', 'remove', ['owner']],
 
     // Clients Routes
-    ['GET', '^api/v1/clients$', 'ClientController', 'list', true],
-    ['POST', '^api/v1/clients$', 'ClientController', 'create', true],
-    ['GET', '^api/v1/clients/([^/]+)/appointments$', 'ClientController', 'getAppointments', true],
-    ['GET', '^api/v1/clients/([^/]+)/packages$', 'ClientController', 'getPackages', true],
-    ['POST', '^api/v1/clients/([^/]+)/portal-credentials$', 'ClientController', 'generatePortalCredentials', true],
-    ['GET', '^api/v1/clients/([^/]+)$', 'ClientController', 'getById', true],
-    ['PUT', '^api/v1/clients/([^/]+)$', 'ClientController', 'update', true],
-    ['DELETE', '^api/v1/clients/([^/]+)$', 'ClientController', 'remove', true],
+    ['GET', '^api/v1/clients$', 'ClientController', 'list', ['owner', 'manager', 'doctor', 'therapist', 'accountant', 'receptionist', 'staff']],
+    ['POST', '^api/v1/clients$', 'ClientController', 'create', ['owner', 'manager', 'receptionist']],
+    ['GET', '^api/v1/clients/([^/]+)/appointments$', 'ClientController', 'getAppointments', ['owner', 'manager', 'doctor', 'therapist', 'receptionist']],
+    ['GET', '^api/v1/clients/([^/]+)/packages$', 'ClientController', 'getPackages', ['owner', 'manager', 'accountant', 'receptionist']],
+    ['POST', '^api/v1/clients/([^/]+)/portal-credentials$', 'ClientController', 'generatePortalCredentials', ['owner', 'manager', 'receptionist']],
+    ['GET', '^api/v1/clients/([^/]+)$', 'ClientController', 'getById', ['owner', 'manager', 'doctor', 'therapist', 'accountant', 'receptionist', 'staff']],
+    ['PUT', '^api/v1/clients/([^/]+)$', 'ClientController', 'update', ['owner', 'manager', 'doctor', 'therapist', 'receptionist']],
+    ['DELETE', '^api/v1/clients/([^/]+)$', 'ClientController', 'remove', ['owner', 'manager']],
 
     // Appointments Routes
-    ['GET', '^api/v1/appointments/today$', 'AppointmentController', 'getToday', true],
-    ['GET', '^api/v1/appointments/conflicts$', 'AppointmentController', 'getConflicts', true],
-    ['GET', '^api/v1/appointments$', 'AppointmentController', 'list', true],
-    ['POST', '^api/v1/appointments$', 'AppointmentController', 'create', true],
-    ['GET', '^api/v1/appointments/([^/]+)$', 'AppointmentController', 'getById', true],
-    ['PUT', '^api/v1/appointments/([^/]+)$', 'AppointmentController', 'update', true],
-    ['DELETE', '^api/v1/appointments/([^/]+)$', 'AppointmentController', 'cancel', true],
-    ['PUT', '^api/v1/appointments/([^/]+)/cancel$', 'AppointmentController', 'cancel', true],
-    ['PUT', '^api/v1/appointments/([^/]+)/checkin$', 'AppointmentController', 'checkIn', true],
+    ['GET', '^api/v1/appointments/today$', 'AppointmentController', 'getToday', ['owner', 'manager', 'doctor', 'therapist', 'receptionist', 'staff']],
+    ['GET', '^api/v1/appointments/conflicts$', 'AppointmentController', 'getConflicts', ['owner', 'manager', 'doctor', 'therapist', 'receptionist']],
+    ['GET', '^api/v1/appointments$', 'AppointmentController', 'list', ['owner', 'manager', 'doctor', 'therapist', 'receptionist', 'staff']],
+    ['POST', '^api/v1/appointments$', 'AppointmentController', 'create', ['owner', 'manager', 'doctor', 'therapist', 'receptionist']],
+    ['GET', '^api/v1/appointments/([^/]+)$', 'AppointmentController', 'getById', ['owner', 'manager', 'doctor', 'therapist', 'receptionist', 'staff']],
+    ['PUT', '^api/v1/appointments/([^/]+)$', 'AppointmentController', 'update', ['owner', 'manager', 'doctor', 'therapist', 'receptionist']],
+    ['DELETE', '^api/v1/appointments/([^/]+)$', 'AppointmentController', 'remove', ['owner', 'manager', 'doctor', 'therapist', 'receptionist']],
+    ['PUT', '^api/v1/appointments/([^/]+)/cancel$', 'AppointmentController', 'cancel', ['owner', 'manager', 'doctor', 'therapist', 'receptionist']],
+    ['PUT', '^api/v1/appointments/([^/]+)/checkin$', 'AppointmentController', 'checkIn', ['owner', 'manager', 'doctor', 'therapist', 'receptionist']],
 
     // Staff Routes
-    ['GET', '^api/v1/staff$', 'StaffController', 'list', true],
-    ['POST', '^api/v1/staff$', 'StaffController', 'create', true],
-    ['GET', '^api/v1/staff/([^/]+)/performance$', 'StaffController', 'getPerformance', true],
-    ['GET', '^api/v1/staff/([^/]+)$', 'StaffController', 'getById', true],
-    ['PUT', '^api/v1/staff/([^/]+)$', 'StaffController', 'update', true],
-    ['DELETE', '^api/v1/staff/([^/]+)$', 'StaffController', 'remove', true],
+    ['GET', '^api/v1/staff$', 'StaffController', 'list', ['owner', 'manager', 'doctor', 'therapist', 'receptionist', 'staff']],
+    ['POST', '^api/v1/staff$', 'StaffController', 'create', ['owner', 'manager']],
+    ['GET', '^api/v1/staff/([^/]+)/performance$', 'StaffController', 'getPerformance', ['owner', 'manager']],
+    ['GET', '^api/v1/staff/([^/]+)$', 'StaffController', 'getById', ['owner', 'manager', 'doctor', 'therapist', 'receptionist', 'staff']],
+    ['PUT', '^api/v1/staff/([^/]+)$', 'StaffController', 'update', ['owner', 'manager']],
+    ['DELETE', '^api/v1/staff/([^/]+)$', 'StaffController', 'remove', ['owner', 'manager']],
 
     // Services Routes
-    ['GET', '^api/v1/services$', 'ServiceController', 'list', true],
-    ['POST', '^api/v1/services$', 'ServiceController', 'create', true],
-    ['GET', '^api/v1/services/([^/]+)$', 'ServiceController', 'getById', true],
-    ['PUT', '^api/v1/services/([^/]+)$', 'ServiceController', 'update', true],
-    ['DELETE', '^api/v1/services/([^/]+)$', 'ServiceController', 'remove', true],
+    ['GET', '^api/v1/services$', 'ServiceController', 'list', ['owner', 'manager', 'doctor', 'therapist', 'receptionist', 'staff']],
+    ['POST', '^api/v1/services$', 'ServiceController', 'create', ['owner', 'manager']],
+    ['GET', '^api/v1/services/([^/]+)$', 'ServiceController', 'getById', ['owner', 'manager', 'doctor', 'therapist', 'receptionist', 'staff']],
+    ['PUT', '^api/v1/services/([^/]+)$', 'ServiceController', 'update', ['owner', 'manager']],
+    ['DELETE', '^api/v1/services/([^/]+)$', 'ServiceController', 'remove', ['owner', 'manager']],
 
     // Packages Routes
-    ['GET', '^api/v1/packages$', 'PackageController', 'list', true],
-    ['POST', '^api/v1/packages$', 'PackageController', 'create', true],
-    ['PUT', '^api/v1/packages/([^/]+)$', 'PackageController', 'update', true],
-    ['DELETE', '^api/v1/packages/([^/]+)$', 'PackageController', 'remove', true],
-    ['POST', '^api/v1/packages/([^/]+)/purchase$', 'PackageController', 'purchase', true],
-    ['GET', '^api/v1/packages/client/([^/]+)$', 'PackageController', 'getClientPackages', true],
+    ['GET', '^api/v1/packages$', 'PackageController', 'list', ['owner', 'manager', 'accountant', 'receptionist']],
+    ['POST', '^api/v1/packages$', 'PackageController', 'create', ['owner', 'manager']],
+    ['PUT', '^api/v1/packages/([^/]+)$', 'PackageController', 'update', ['owner', 'manager']],
+    ['DELETE', '^api/v1/packages/([^/]+)$', 'PackageController', 'remove', ['owner', 'manager']],
+    ['POST', '^api/v1/packages/([^/]+)/purchase$', 'PackageController', 'purchase', ['owner', 'manager', 'accountant', 'receptionist']],
+    ['GET', '^api/v1/packages/client/([^/]+)$', 'PackageController', 'getClientPackages', ['owner', 'manager', 'accountant', 'receptionist']],
 
     // Invoices Routes
-    ['GET', '^api/v1/invoices$', 'InvoiceController', 'list', true],
-    ['POST', '^api/v1/invoices$', 'InvoiceController', 'create', true],
-    ['PUT', '^api/v1/invoices/([^/]+)/paid$', 'InvoiceController', 'markPaid', true],
-    ['PUT', '^api/v1/invoices/([^/]+)/refund$', 'InvoiceController', 'refund', true],
-    ['GET', '^api/v1/invoices/([^/]+)/pdf$', 'InvoiceController', 'getPDF', true],
-    ['GET', '^api/v1/invoices/([^/]+)$', 'InvoiceController', 'getById', true],
-    ['PUT', '^api/v1/invoices/([^/]+)$', 'InvoiceController', 'update', true],
-    ['DELETE', '^api/v1/invoices/([^/]+)$', 'InvoiceController', 'remove', true],
+    ['GET', '^api/v1/invoices$', 'InvoiceController', 'list', ['owner', 'manager', 'accountant', 'receptionist']],
+    ['POST', '^api/v1/invoices$', 'InvoiceController', 'create', ['owner', 'manager', 'accountant', 'receptionist']],
+    ['PUT', '^api/v1/invoices/([^/]+)/paid$', 'InvoiceController', 'markPaid', ['owner', 'manager', 'accountant', 'receptionist']],
+    ['PUT', '^api/v1/invoices/([^/]+)/refund$', 'InvoiceController', 'refund', ['owner', 'manager', 'accountant']],
+    ['GET', '^api/v1/invoices/([^/]+)/pdf$', 'InvoiceController', 'getPDF', ['owner', 'manager', 'accountant', 'receptionist']],
+    ['GET', '^api/v1/invoices/([^/]+)$', 'InvoiceController', 'getById', ['owner', 'manager', 'accountant', 'receptionist']],
+    ['PUT', '^api/v1/invoices/([^/]+)$', 'InvoiceController', 'update', ['owner', 'manager', 'accountant']],
+    ['DELETE', '^api/v1/invoices/([^/]+)$', 'InvoiceController', 'remove', ['owner', 'manager']],
 
     // Inventory Routes
-    ['GET', '^api/v1/inventory/alerts/low-stock$', 'InventoryController', 'getLowStock', true],
-    ['GET', '^api/v1/inventory$', 'InventoryController', 'list', true],
-    ['POST', '^api/v1/inventory$', 'InventoryController', 'create', true],
-    ['GET', '^api/v1/inventory/([^/]+)$', 'InventoryController', 'getById', true],
-    ['PUT', '^api/v1/inventory/([^/]+)$', 'InventoryController', 'update', true],
-    ['POST', '^api/v1/inventory/([^/]+)/stock$', 'InventoryController', 'adjustStock', true],
+    ['GET', '^api/v1/inventory/alerts/low-stock$', 'InventoryController', 'getLowStock', ['owner', 'manager', 'doctor', 'therapist', 'receptionist', 'staff']],
+    ['GET', '^api/v1/inventory$', 'InventoryController', 'list', ['owner', 'manager', 'doctor', 'therapist', 'receptionist', 'staff']],
+    ['POST', '^api/v1/inventory$', 'InventoryController', 'create', ['owner', 'manager']],
+    ['GET', '^api/v1/inventory/([^/]+)$', 'InventoryController', 'getById', ['owner', 'manager', 'doctor', 'therapist', 'receptionist', 'staff']],
+    ['PUT', '^api/v1/inventory/([^/]+)$', 'InventoryController', 'update', ['owner', 'manager']],
+    ['POST', '^api/v1/inventory/([^/]+)/stock$', 'InventoryController', 'adjustStock', ['owner', 'manager', 'doctor', 'therapist', 'staff']],
 
     // Financials Routes
-    ['GET', '^api/v1/financials/summary$', 'FinancialController', 'getSummary', true],
-    ['GET', '^api/v1/financials/monthly$', 'FinancialController', 'getMonthly', true],
-    ['GET', '^api/v1/financials/transactions$', 'FinancialController', 'getTransactions', true],
+    ['GET', '^api/v1/financials/summary$', 'FinancialController', 'getSummary', ['owner', 'manager', 'accountant']],
+    ['GET', '^api/v1/financials/monthly$', 'FinancialController', 'getMonthly', ['owner', 'manager', 'accountant']],
+    ['GET', '^api/v1/financials/transactions$', 'FinancialController', 'getTransactions', ['owner', 'manager', 'accountant']],
 
     // AI Hub Routes
-    ['GET', '^api/v1/ai/overview$', 'AIHubController', 'overview', true],
-    ['PUT', '^api/v1/ai/providers/([^/]+)$', 'AIHubController', 'saveProvider', true],
+    ['GET', '^api/v1/ai/overview$', 'AIHubController', 'overview', ['owner', 'manager']],
+    ['PUT', '^api/v1/ai/providers/([^/]+)$', 'AIHubController', 'saveProvider', ['owner', 'manager']],
 
     // Meta Lead Center Routes
-    ['GET', '^api/v1/meta/settings$', 'MetaLeadController', 'settings', true],
-    ['PUT', '^api/v1/meta/settings$', 'MetaLeadController', 'saveSettings', true],
-    ['GET', '^api/v1/meta/leads$', 'MetaLeadController', 'list', true],
-    ['POST', '^api/v1/meta/leads$', 'MetaLeadController', 'create', true],
-    ['PUT', '^api/v1/meta/leads/([^/]+)$', 'MetaLeadController', 'update', true],
-    ['DELETE', '^api/v1/meta/leads/([^/]+)$', 'MetaLeadController', 'remove', true],
-    ['POST', '^api/v1/meta/leads/([^/]+)/convert$', 'MetaLeadController', 'convert', true],
+    ['GET', '^api/v1/meta/settings$', 'MetaLeadController', 'settings', ['owner', 'manager']],
+    ['PUT', '^api/v1/meta/settings$', 'MetaLeadController', 'saveSettings', ['owner', 'manager']],
+    ['GET', '^api/v1/meta/leads$', 'MetaLeadController', 'list', ['owner', 'manager', 'receptionist']],
+    ['POST', '^api/v1/meta/leads$', 'MetaLeadController', 'create', ['owner', 'manager', 'receptionist']],
+    ['PUT', '^api/v1/meta/leads/([^/]+)$', 'MetaLeadController', 'update', ['owner', 'manager', 'receptionist']],
+    ['DELETE', '^api/v1/meta/leads/([^/]+)$', 'MetaLeadController', 'remove', ['owner', 'manager']],
+    ['POST', '^api/v1/meta/leads/([^/]+)/convert$', 'MetaLeadController', 'convert', ['owner', 'manager', 'receptionist']],
 
     // Import/Migration Routes
-    ['GET', '^api/v1/import/jobs$', 'ImportController', 'list', true],
-    ['POST', '^api/v1/import/jobs$', 'ImportController', 'create', true],
-    ['PUT', '^api/v1/import/jobs/([^/]+)$', 'ImportController', 'update', true],
-    ['DELETE', '^api/v1/import/jobs/([^/]+)$', 'ImportController', 'remove', true],
+    ['GET', '^api/v1/import/jobs$', 'ImportController', 'list', ['owner', 'manager']],
+    ['POST', '^api/v1/import/jobs$', 'ImportController', 'create', ['owner', 'manager']],
+    ['PUT', '^api/v1/import/jobs/([^/]+)$', 'ImportController', 'update', ['owner', 'manager']],
+    ['DELETE', '^api/v1/import/jobs/([^/]+)$', 'ImportController', 'remove', ['owner', 'manager']],
 
     // Feedback Routes
-    ['GET', '^api/v1/feedback/summary$', 'FeedbackController', 'getSummary', true],
-    ['GET', '^api/v1/feedback$', 'FeedbackController', 'list', true],
-    ['POST', '^api/v1/feedback$', 'FeedbackController', 'create', true],
-    ['PUT', '^api/v1/feedback/([^/]+)$', 'FeedbackController', 'update', true],
-    ['DELETE', '^api/v1/feedback/([^/]+)$', 'FeedbackController', 'remove', true],
+    ['GET', '^api/v1/feedback/summary$', 'FeedbackController', 'getSummary', ['owner', 'manager', 'doctor', 'therapist', 'receptionist']],
+    ['GET', '^api/v1/feedback$', 'FeedbackController', 'list', ['owner', 'manager', 'doctor', 'therapist', 'receptionist']],
+    ['POST', '^api/v1/feedback$', 'FeedbackController', 'create', ['owner', 'manager', 'doctor', 'therapist', 'receptionist']],
+    ['PUT', '^api/v1/feedback/([^/]+)$', 'FeedbackController', 'update', ['owner', 'manager']],
+    ['DELETE', '^api/v1/feedback/([^/]+)$', 'FeedbackController', 'remove', ['owner', 'manager']],
 
     // Campaign/Marketing Routes
-    ['GET', '^api/v1/campaigns$', 'MarketingController', 'list', true],
-    ['POST', '^api/v1/campaigns$', 'MarketingController', 'create', true],
-    ['GET', '^api/v1/campaigns/([^/]+)$', 'MarketingController', 'getById', true],
-    ['PUT', '^api/v1/campaigns/([^/]+)$', 'MarketingController', 'update', true],
-    ['DELETE', '^api/v1/campaigns/([^/]+)$', 'MarketingController', 'remove', true],
-    ['POST', '^api/v1/campaigns/([^/]+)/send$', 'MarketingController', 'send', true],
+    ['GET', '^api/v1/campaigns$', 'MarketingController', 'list', ['owner', 'manager', 'receptionist']],
+    ['POST', '^api/v1/campaigns$', 'MarketingController', 'create', ['owner', 'manager']],
+    ['GET', '^api/v1/campaigns/([^/]+)$', 'MarketingController', 'getById', ['owner', 'manager', 'receptionist']],
+    ['PUT', '^api/v1/campaigns/([^/]+)$', 'MarketingController', 'update', ['owner', 'manager']],
+    ['DELETE', '^api/v1/campaigns/([^/]+)$', 'MarketingController', 'remove', ['owner', 'manager']],
+    ['POST', '^api/v1/campaigns/([^/]+)/send$', 'MarketingController', 'send', ['owner', 'manager']],
 
     // Gallery Routes
-    ['GET', '^api/v1/gallery/([^/]+)$', 'GalleryController', 'list', true],
-    ['POST', '^api/v1/gallery/([^/]+)$', 'GalleryController', 'upload', true],
-    ['DELETE', '^api/v1/gallery/([^/]+)$', 'GalleryController', 'remove', true],
+    ['GET', '^api/v1/gallery/([^/]+)$', 'GalleryController', 'list', ['owner', 'manager', 'doctor', 'therapist', 'receptionist']],
+    ['POST', '^api/v1/gallery/([^/]+)$', 'GalleryController', 'upload', ['owner', 'manager', 'doctor', 'therapist', 'receptionist']],
+    ['DELETE', '^api/v1/gallery/([^/]+)$', 'GalleryController', 'remove', ['owner', 'manager', 'doctor', 'therapist']],
 
     // Branches Routes
-    ['GET', '^api/v1/branches$', 'BranchController', 'list', true],
-    ['POST', '^api/v1/branches$', 'BranchController', 'create', true],
-    ['PUT', '^api/v1/branches/([^/]+)$', 'BranchController', 'update', true],
-    ['DELETE', '^api/v1/branches/([^/]+)$', 'BranchController', 'remove', true],
+    ['GET', '^api/v1/branches$', 'BranchController', 'list', ['owner', 'manager', 'doctor', 'therapist', 'receptionist', 'staff']],
+    ['POST', '^api/v1/branches$', 'BranchController', 'create', ['owner', 'manager']],
+    ['PUT', '^api/v1/branches/([^/]+)$', 'BranchController', 'update', ['owner', 'manager']],
+    ['DELETE', '^api/v1/branches/([^/]+)$', 'BranchController', 'remove', ['owner', 'manager']],
 
     // Audit Routes
-    ['GET', '^api/v1/audit$', 'AuditController', 'list', true],
+    ['GET', '^api/v1/audit$', 'AuditController', 'list', ['owner', 'manager']],
 
     // WhatsApp Patient Engagement Center
     ['GET', '^api/v1/whatsapp/webhook$', 'WhatsAppController', 'webhookVerify', false],
     ['POST', '^api/v1/whatsapp/webhook$', 'WhatsAppController', 'webhook', false],
-    ['GET', '^api/v1/whatsapp/dashboard$', 'WhatsAppController', 'dashboard', true],
-    ['GET', '^api/v1/whatsapp/health$', 'WhatsAppController', 'health', true],
-    ['POST', '^api/v1/whatsapp/test-message$', 'WhatsAppController', 'testMessage', true],
-    ['POST', '^api/v1/whatsapp/templates/sync$', 'WhatsAppController', 'syncTemplates', true],
-    ['GET', '^api/v1/whatsapp/diagnostics$', 'WhatsAppController', 'diagnostics', true],
-    ['POST', '^api/v1/whatsapp/queue/retry$', 'WhatsAppController', 'retryQueue', true],
-    ['GET', '^api/v1/whatsapp/media$', 'WhatsAppController', 'media', true],
-    ['GET', '^api/v1/whatsapp/branches$', 'WhatsAppController', 'branches', true],
-    ['PUT', '^api/v1/whatsapp/branches/([^/]+)$', 'WhatsAppController', 'updateBranch', true],
-    ['GET', '^api/v1/whatsapp/contacts$', 'WhatsAppController', 'contacts', true],
-    ['GET', '^api/v1/whatsapp/contacts/([^/]+)$', 'WhatsAppController', 'profile', true],
-    ['GET', '^api/v1/whatsapp/conversations/([^/]+)$', 'WhatsAppController', 'messages', true],
-    ['POST', '^api/v1/whatsapp/conversations/([^/]+)/messages$', 'WhatsAppController', 'send', true],
-    ['POST', '^api/v1/whatsapp/conversations/([^/]+)/templates$', 'WhatsAppController', 'sendTemplate', true],
-    ['PUT', '^api/v1/whatsapp/conversations/([^/]+)$', 'WhatsAppController', 'updateConversation', true],
-    ['PUT', '^api/v1/whatsapp/contacts/([^/]+)/consent$', 'WhatsAppController', 'updateConsent', true],
-    ['GET', '^api/v1/whatsapp/templates$', 'WhatsAppController', 'templates', true],
-    ['POST', '^api/v1/whatsapp/templates$', 'WhatsAppController', 'createTemplate', true],
-    ['GET', '^api/v1/whatsapp/automations$', 'WhatsAppController', 'automations', true],
-    ['POST', '^api/v1/whatsapp/automations$', 'WhatsAppController', 'createAutomation', true],
-    ['POST', '^api/v1/whatsapp/automations/run$', 'WhatsAppController', 'runAutomations', true],
-    ['PUT', '^api/v1/whatsapp/automations/([^/]+)/toggle$', 'WhatsAppController', 'toggleAutomation', true],
-    ['GET', '^api/v1/whatsapp/campaigns$', 'WhatsAppController', 'campaigns', true],
-    ['POST', '^api/v1/whatsapp/campaigns$', 'WhatsAppController', 'createCampaign', true],
-    ['POST', '^api/v1/whatsapp/campaigns/([^/]+)/launch$', 'WhatsAppController', 'launchCampaign', true],
-    ['GET', '^api/v1/whatsapp/segments$', 'WhatsAppController', 'segments', true],
-    ['GET', '^api/v1/whatsapp/settings$', 'WhatsAppController', 'settingsGet', true],
-    ['PUT', '^api/v1/whatsapp/settings$', 'WhatsAppController', 'settingsSave', true],
+    ['GET', '^api/v1/whatsapp/dashboard$', 'WhatsAppController', 'dashboard', ['owner', 'manager', 'receptionist']],
+    ['GET', '^api/v1/whatsapp/health$', 'WhatsAppController', 'health', ['owner', 'manager']],
+    ['POST', '^api/v1/whatsapp/test-message$', 'WhatsAppController', 'testMessage', ['owner', 'manager']],
+    ['POST', '^api/v1/whatsapp/templates/sync$', 'WhatsAppController', 'syncTemplates', ['owner', 'manager']],
+    ['GET', '^api/v1/whatsapp/diagnostics$', 'WhatsAppController', 'diagnostics', ['owner', 'manager']],
+    ['POST', '^api/v1/whatsapp/queue/retry$', 'WhatsAppController', 'retryQueue', ['owner', 'manager']],
+    ['GET', '^api/v1/whatsapp/media$', 'WhatsAppController', 'media', ['owner', 'manager', 'receptionist']],
+    ['GET', '^api/v1/whatsapp/branches$', 'WhatsAppController', 'branches', ['owner', 'manager', 'receptionist']],
+    ['PUT', '^api/v1/whatsapp/branches/([^/]+)$', 'WhatsAppController', 'updateBranch', ['owner', 'manager']],
+    ['GET', '^api/v1/whatsapp/contacts$', 'WhatsAppController', 'contacts', ['owner', 'manager', 'receptionist']],
+    ['GET', '^api/v1/whatsapp/contacts/([^/]+)$', 'WhatsAppController', 'profile', ['owner', 'manager', 'receptionist']],
+    ['GET', '^api/v1/whatsapp/conversations/([^/]+)$', 'WhatsAppController', 'messages', ['owner', 'manager', 'receptionist']],
+    ['POST', '^api/v1/whatsapp/conversations/([^/]+)/messages$', 'WhatsAppController', 'send', ['owner', 'manager', 'receptionist']],
+    ['POST', '^api/v1/whatsapp/conversations/([^/]+)/templates$', 'WhatsAppController', 'sendTemplate', ['owner', 'manager', 'receptionist']],
+    ['PUT', '^api/v1/whatsapp/conversations/([^/]+)$', 'WhatsAppController', 'updateConversation', ['owner', 'manager', 'receptionist']],
+    ['PUT', '^api/v1/whatsapp/contacts/([^/]+)/consent$', 'WhatsAppController', 'updateConsent', ['owner', 'manager', 'receptionist']],
+    ['GET', '^api/v1/whatsapp/templates$', 'WhatsAppController', 'templates', ['owner', 'manager']],
+    ['POST', '^api/v1/whatsapp/templates$', 'WhatsAppController', 'createTemplate', ['owner', 'manager']],
+    ['GET', '^api/v1/whatsapp/automations$', 'WhatsAppController', 'automations', ['owner', 'manager']],
+    ['POST', '^api/v1/whatsapp/automations$', 'WhatsAppController', 'createAutomation', ['owner', 'manager']],
+    ['POST', '^api/v1/whatsapp/automations/run$', 'WhatsAppController', 'runAutomations', ['owner', 'manager']],
+    ['PUT', '^api/v1/whatsapp/automations/([^/]+)/toggle$', 'WhatsAppController', 'toggleAutomation', ['owner', 'manager']],
+    ['GET', '^api/v1/whatsapp/campaigns$', 'WhatsAppController', 'campaigns', ['owner', 'manager']],
+    ['POST', '^api/v1/whatsapp/campaigns$', 'WhatsAppController', 'createCampaign', ['owner', 'manager']],
+    ['POST', '^api/v1/whatsapp/campaigns/([^/]+)/launch$', 'WhatsAppController', 'launchCampaign', ['owner', 'manager']],
+    ['GET', '^api/v1/whatsapp/segments$', 'WhatsAppController', 'segments', ['owner', 'manager']],
+    ['GET', '^api/v1/whatsapp/settings$', 'WhatsAppController', 'settingsGet', ['owner', 'manager']],
+    ['PUT', '^api/v1/whatsapp/settings$', 'WhatsAppController', 'settingsSave', ['owner', 'manager']],
 
     // Notifications Routes
     ['GET', '^api/v1/notifications$', 'NotificationController', 'list', true],
@@ -356,12 +401,12 @@ $routes = [
 
     // Patient Portal Client Routes
     ['POST', '^api/v1/portal/login$', 'PortalController', 'login', false],
-    ['GET', '^api/v1/portal/appointments$', 'PortalController', 'getMyAppointments', true],
-    ['POST', '^api/v1/portal/appointments$', 'PortalController', 'bookAppointment', true],
-    ['GET', '^api/v1/portal/invoices$', 'PortalController', 'getMyInvoices', true],
-    ['GET', '^api/v1/portal/invoices/([^/]+)/download$', 'PortalController', 'downloadInvoice', true],
-    ['GET', '^api/v1/portal/packages$', 'PortalController', 'getMyPackages', true],
-    ['POST', '^api/v1/portal/feedback$', 'PortalController', 'submitFeedback', true],
+    ['GET', '^api/v1/portal/appointments$', 'PortalController', 'getMyAppointments', 'client'],
+    ['POST', '^api/v1/portal/appointments$', 'PortalController', 'bookAppointment', 'client'],
+    ['GET', '^api/v1/portal/invoices$', 'PortalController', 'getMyInvoices', 'client'],
+    ['GET', '^api/v1/portal/invoices/([^/]+)/download$', 'PortalController', 'downloadInvoice', 'client'],
+    ['GET', '^api/v1/portal/packages$', 'PortalController', 'getMyPackages', 'client'],
+    ['POST', '^api/v1/portal/feedback$', 'PortalController', 'submitFeedback', 'client'],
 ];
 
 // Perform Route Match
@@ -379,6 +424,11 @@ foreach ($routes as $route) {
             $user = check_auth();
             if ($guard === 'admin') {
                 require_superadmin($user);
+            } elseif ($guard === 'client') {
+                require_client_portal($user);
+            } elseif (is_array($guard)) {
+                require_active_tenant($user);
+                require_clinic_role($user, $guard);
             } elseif ($guard === true) {
                 require_active_tenant($user);
             }

@@ -186,7 +186,7 @@ class PublicSiteController {
         if (!$staffId || !$date) send_error('staffId and date are required', 400);
 
         $db = DB::getConnection();
-        $clinic = $this->getClinic($db);
+        $clinic = $this->resolveClinicByRequest($db);
         $sql = "SELECT workingDays, workingHours FROM Staff WHERE id = ? AND clinicId = ? AND status = 'active'";
         $params = [$staffId, $clinic['id']];
         if ($branchId) { $sql .= " AND branchId = ?"; $params[] = $branchId; }
@@ -226,9 +226,10 @@ class PublicSiteController {
             if (empty($input[$required])) send_error("$required is required", 400);
         }
         if (!is_array($input['serviceIds'])) send_error('serviceIds must be an array', 400);
+        if (count($input['serviceIds']) === 0) send_error('At least one service is required', 400);
 
         $db = DB::getConnection();
-        $clinic = $this->getClinic($db);
+        $clinic = $this->resolveClinicByRequest($db);
         $serviceIds = array_values(array_unique($input['serviceIds']));
         $marks = implode(',', array_fill(0, count($serviceIds), '?'));
         $stmt = $db->prepare("SELECT * FROM Service WHERE clinicId = ? AND isActive = 1 AND id IN ($marks)");

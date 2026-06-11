@@ -19,6 +19,9 @@ class StaffController {
         if (!empty($status)) {
             $where[] = "status = ?";
             $params[] = $status;
+        } else {
+            // Hide soft-deleted (deactivated) staff from the default list
+            $where[] = "status != 'inactive'";
         }
         if (!empty($branchId)) {
             $where[] = "branchId = ?";

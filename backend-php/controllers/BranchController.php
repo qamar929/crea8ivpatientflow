@@ -10,8 +10,8 @@ class BranchController {
                        (SELECT COUNT(*) FROM Staff s WHERE s.branchId = b.id) as staffCount,
                        (SELECT COUNT(*) FROM Appointment a WHERE a.branchId = b.id) as appointmentCount
                 FROM Branch b
-                WHERE b.clinicId = ?";
-        
+                WHERE b.clinicId = ? AND (b.isActive IS NULL OR b.isActive = 1)";
+
         $stmt = $db->prepare($sql);
         $stmt->execute([$user['clinicId']]);
         $branches = $stmt->fetchAll();

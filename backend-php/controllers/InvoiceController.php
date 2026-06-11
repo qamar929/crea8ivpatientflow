@@ -4,6 +4,21 @@ require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../services/pdfService.php';
 
 class InvoiceController {
+    private function assertAppointmentInClinic($db, $appointmentId, $clinicId, $clientId = null) {
+        if (empty($appointmentId)) return;
+        $sql = "SELECT id FROM Appointment WHERE id = ? AND clinicId = ?";
+        $params = [$appointmentId, $clinicId];
+        if ($clientId !== null && $clientId !== '') {
+            $sql .= " AND clientId = ?";
+            $params[] = $clientId;
+        }
+        $stmt = $db->prepare($sql);
+        $stmt->execute($params);
+        if (!$stmt->fetch()) {
+            send_error('Appointment not found for this client/clinic', 400);
+        }
+    }
+
     private function generateInvoiceNo($prefix = 'INV') {
         $year = date('Y');
         $rand = rand(1000, 9999);
@@ -204,6 +219,9 @@ class InvoiceController {
         if (empty($clientId)) {
             send_error('clientId is required', 400);
         }
+        if ($amountPaid < 0 || $discount < 0 || $tax < 0) {
+            send_error('Amounts and percentages cannot be negative', 400);
+        }
 
         $db = DB::getConnection();
         
@@ -215,6 +233,7 @@ class InvoiceController {
         if (!$client) {
             send_error('Client not found', 404);
         }
+        $this->assertAppointmentInClinic($db, $appointmentId, $user['clinicId'], $clientId);
 
         // Find Clinic prefix
         $stmtClinic = $db->prepare("SELECT invoicePrefix FROM Clinic WHERE id = ?");
@@ -276,12 +295,19 @@ class InvoiceController {
         $notes = array_key_exists('notes', $input) ? $input['notes'] : $existing['notes'];
         $dueDate = array_key_exists('dueDate', $input) ? ($input['dueDate'] ?: null) : $existing['dueDate'];
         $status = $input['status'] ?? null;
+        if ($amountPaid < 0 || $discountPercent < 0 || $taxPercent < 0 || $previousBalance < 0) {
+            send_error('Amounts and percentages cannot be negative', 400);
+        }
+        if ($status !== null && !in_array($status, ['pending', 'partial', 'paid', 'refunded', 'cancelled'], true)) {
+            send_error('Invalid invoice status', 400);
+        }
 
         $stmtClient = $db->prepare("SELECT id FROM Client WHERE id = ? AND clinicId = ?");
         $stmtClient->execute([$clientId, $user['clinicId']]);
         if (!$stmtClient->fetch()) {
             send_error('Client not found', 404);
         }
+        $this->assertAppointmentInClinic($db, $appointmentId, $user['clinicId'], $clientId);
 
         $totals = $this->calculateTotals($items, $discountPercent, $taxPercent, $previousBalance, $amountPaid);
         $finalStatus = $status ?: $totals['status'];
@@ -338,6 +364,9 @@ class InvoiceController {
     public function markPaid($input, $user, $id) {
         $paymentMethod = $input['paymentMethod'] ?? null;
         $amountPaid = isset($input['amountPaid']) ? floatval($input['amountPaid']) : null;
+        if ($amountPaid !== null && $amountPaid < 0) {
+            send_error('amountPaid cannot be negative', 400);
+        }
 
         $db = DB::getConnection();
         

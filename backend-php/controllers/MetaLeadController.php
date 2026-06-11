@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../helpers.php';
+require_once __DIR__ . '/../services/metaWhatsAppService.php';
 
 class MetaLeadController {
     private function db() {
@@ -78,7 +79,7 @@ class MetaLeadController {
         $existing = $db->prepare("SELECT accessToken FROM MetaLeadSetting WHERE clinicId = ?");
         $existing->execute([$user['clinicId']]);
         $currentToken = $existing->fetchColumn();
-        $token = !empty($input['accessToken']) ? $input['accessToken'] : $currentToken;
+        $token = !empty($input['accessToken']) ? meta_encrypt_secret($input['accessToken']) : $currentToken;
         $sync = !empty($input['syncEnabled']) ? 1 : 0;
 
         $sql = DB_DRIVER === 'sqlite'

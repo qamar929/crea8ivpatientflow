@@ -4,6 +4,18 @@ require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../services/pdfService.php';
 
 class PortalController {
+    private function assertClinicRecord($db, $table, $id, $clinicId, $extraWhere = '') {
+        if ($id === null || $id === '') return;
+        $sql = "SELECT * FROM $table WHERE id = ? AND clinicId = ?" . $extraWhere;
+        $stmt = $db->prepare($sql);
+        $stmt->execute([$id, $clinicId]);
+        $row = $stmt->fetch();
+        if (!$row) {
+            send_error('Selected record is unavailable', 400);
+        }
+        return $row;
+    }
+
     public function login($input, $user) {
         $email = $input['email'] ?? '';
         $password = $input['password'] ?? '';
@@ -82,13 +94,32 @@ class PortalController {
         $startTime = $input['startTime'] ?? '';
         $endTime = $input['endTime'] ?? '';
         $duration = intval($input['duration'] ?? 0);
-        $price = floatval($input['price'] ?? 0);
+        $price = 0;
         $specialty = $input['specialty'] ?? '';
         $notes = $input['notes'] ?? null;
         $room = $input['room'] ?? null;
         
         if (empty($staffId) || empty($date) || empty($startTime) || empty($endTime)) {
             send_error('staffId, date, startTime, and endTime are required', 400);
+        }
+
+        $staff = $this->assertClinicRecord($db, 'Staff', $staffId, $user['clinicId'], " AND status = 'active'");
+        if (!empty($branchId)) {
+            $this->assertClinicRecord($db, 'Branch', $branchId, $user['clinicId'], " AND isActive = 1");
+        }
+        if (!empty($serviceId)) {
+            $service = $this->assertClinicRecord($db, 'Service', $serviceId, $user['clinicId'], " AND isActive = 1");
+            $duration = $duration > 0 ? $duration : intval($service['duration'] ?? 0);
+            $price = floatval($service['price'] ?? 0);
+            $specialty = $service['specialty'] ?: $specialty;
+        } else {
+            $specialty = $staff['specialty'] ?: $specialty ?: 'general';
+        }
+
+        $stmtConflict = $db->prepare("SELECT COUNT(*) FROM Appointment WHERE clinicId = ? AND staffId = ? AND date = ? AND status IN ('confirmed', 'pending') AND startTime < ? AND endTime > ?");
+        $stmtConflict->execute([$user['clinicId'], $staffId, $date, $endTime, $startTime]);
+        if (intval($stmtConflict->fetchColumn()) > 0) {
+            send_error('This slot has just been booked. Please choose another time.', 409);
         }
 
         $stmt = $db->prepare("INSERT INTO Appointment (id, clinicId, branchId, clientId, staffId, serviceId, date, startTime, endTime, duration, status, room, notes, price, specialty) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)");
@@ -187,9 +218,12 @@ class PortalController {
 
         $staffId = null;
         if (!empty($appointmentId)) {
-            $stmtAppt = $db->prepare("SELECT staffId FROM Appointment WHERE id = ?");
-            $stmtAppt->execute([$appointmentId]);
+            $stmtAppt = $db->prepare("SELECT staffId FROM Appointment WHERE id = ? AND clientId = ? AND clinicId = ?");
+            $stmtAppt->execute([$appointmentId, $user['id'], $user['clinicId']]);
             $staffId = $stmtAppt->fetchColumn() ?: null;
+            if ($staffId === null) {
+                send_error('Appointment not found', 404);
+            }
         }
 
         $stmt = $db->prepare("INSERT INTO Feedback (id, clinicId, clientId, appointmentId, staffRating, serviceRating, overallRating, comment, wouldRecommend, isPublic, staffId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");

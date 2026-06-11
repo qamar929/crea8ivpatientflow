@@ -4,6 +4,16 @@ require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../services/whatsappAutomationService.php';
 
 class AppointmentController {
+    private function assertClinicRecord($db, $table, $id, $clinicId, $extraWhere = '') {
+        if ($id === null || $id === '') return;
+        $sql = "SELECT id FROM $table WHERE id = ? AND clinicId = ?" . $extraWhere;
+        $stmt = $db->prepare($sql);
+        $stmt->execute([$id, $clinicId]);
+        if (!$stmt->fetch()) {
+            send_error('Related record not found for this clinic', 400);
+        }
+    }
+
     private function resolveSpecialty($db, $serviceId, $staffId, $fallback = '') {
         if (!empty($fallback)) return $fallback;
         if (!empty($serviceId)) {
@@ -195,6 +205,14 @@ class AppointmentController {
         if (empty($clientId) || empty($staffId) || empty($date) || empty($startTime) || empty($endTime)) {
             send_error('clientId, staffId, date, startTime, and endTime are required', 400);
         }
+        if (!in_array($status, ['pending', 'confirmed', 'completed', 'cancelled', 'no-show'], true)) {
+            send_error('Invalid appointment status', 400);
+        }
+
+        $this->assertClinicRecord($db, 'Client', $clientId, $user['clinicId'], " AND status != 'inactive'");
+        $this->assertClinicRecord($db, 'Staff', $staffId, $user['clinicId'], " AND status = 'active'");
+        $this->assertClinicRecord($db, 'Service', $serviceId, $user['clinicId'], " AND isActive = 1");
+        $this->assertClinicRecord($db, 'Branch', $branchId, $user['clinicId'], " AND isActive = 1");
 
         // Conflict check
         $conflicts = $this->checkConflict($db, $user['clinicId'], $staffId, $date, $startTime, $endTime);
@@ -203,8 +221,8 @@ class AppointmentController {
         }
 
         // Get Client name for QR code
-        $stmtClient = $db->prepare("SELECT name FROM Client WHERE id = ?");
-        $stmtClient->execute([$clientId]);
+        $stmtClient = $db->prepare("SELECT name FROM Client WHERE id = ? AND clinicId = ?");
+        $stmtClient->execute([$clientId, $user['clinicId']]);
         $clientName = $stmtClient->fetchColumn() ?: 'Client';
 
         $qrCode = generate_qr_data_url($id, $clientName, $date, $startTime);
@@ -235,9 +253,19 @@ class AppointmentController {
 
         $staffId = $input['staffId'] ?? $existing['staffId'];
         $serviceId = $input['serviceId'] ?? $existing['serviceId'];
+        $clientId = $input['clientId'] ?? $existing['clientId'];
+        $branchId = array_key_exists('branchId', $input) ? $input['branchId'] : $existing['branchId'];
         $date = $input['date'] ?? $existing['date'];
         $startTime = $input['startTime'] ?? $existing['startTime'];
         $endTime = $input['endTime'] ?? $existing['endTime'];
+
+        $this->assertClinicRecord($db, 'Client', $clientId, $user['clinicId'], " AND status != 'inactive'");
+        $this->assertClinicRecord($db, 'Staff', $staffId, $user['clinicId'], " AND status = 'active'");
+        $this->assertClinicRecord($db, 'Service', $serviceId, $user['clinicId'], " AND isActive = 1");
+        $this->assertClinicRecord($db, 'Branch', $branchId, $user['clinicId'], " AND isActive = 1");
+        if (isset($input['status']) && !in_array($input['status'], ['pending', 'confirmed', 'completed', 'cancelled', 'no-show'], true)) {
+            send_error('Invalid appointment status', 400);
+        }
 
         // If time details updated, run conflict check
         if (isset($input['staffId']) || isset($input['date']) || isset($input['startTime']) || isset($input['endTime'])) {
@@ -271,8 +299,8 @@ class AppointmentController {
         $stmt = $db->prepare($sql);
         $stmt->execute($params);
 
-        $stmt = $db->prepare("SELECT * FROM Appointment WHERE id = ?");
-        $stmt->execute([$id]);
+        $stmt = $db->prepare("SELECT * FROM Appointment WHERE id = ? AND clinicId = ?");
+        $stmt->execute([$id, $user['clinicId']]);
         $appt = $stmt->fetch();
 
         send_json($appt);
@@ -283,6 +311,18 @@ class AppointmentController {
         $stmt = $db->prepare("UPDATE Appointment SET status = 'cancelled' WHERE id = ? AND clinicId = ?");
         $stmt->execute([$id, $user['clinicId']]);
         send_json(['message' => 'Cancelled']);
+    }
+
+    // Permanently remove an appointment record (distinct from cancel, which
+    // keeps it with status='cancelled' for history).
+    public function remove($input, $user, $id) {
+        $db = DB::getConnection();
+        $stmt = $db->prepare("SELECT id FROM Appointment WHERE id = ? AND clinicId = ?");
+        $stmt->execute([$id, $user['clinicId']]);
+        if (!$stmt->fetch()) send_error('Appointment not found', 404);
+
+        $db->prepare("DELETE FROM Appointment WHERE id = ? AND clinicId = ?")->execute([$id, $user['clinicId']]);
+        send_json(['message' => 'Appointment deleted']);
     }
 
     public function checkIn($input, $user, $id) {
@@ -304,8 +344,8 @@ class AppointmentController {
         // Award loyalty points
         $points = floor(floatval($appt['price']) / 100);
         if ($points > 0) {
-            $stmt = $db->prepare("UPDATE Client SET loyaltyPoints = loyaltyPoints + ? WHERE id = ?");
-            $stmt->execute([$points, $appt['clientId']]);
+            $stmt = $db->prepare("UPDATE Client SET loyaltyPoints = loyaltyPoints + ? WHERE id = ? AND clinicId = ?");
+            $stmt->execute([$points, $appt['clientId'], $user['clinicId']]);
         }
 
         send_json(['message' => 'Checked in']);
@@ -367,6 +407,7 @@ class AppointmentController {
         }
 
         $db = DB::getConnection();
+        $this->assertClinicRecord($db, 'Staff', $staffId, $user['clinicId'], " AND status = 'active'");
         $conflicts = $this->checkConflict($db, $user['clinicId'], $staffId, $date, $startTime, $endTime);
         
         send_json([

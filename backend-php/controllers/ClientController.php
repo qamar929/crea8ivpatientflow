@@ -3,13 +3,21 @@ require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../helpers.php';
 
 class ClientController {
+    private function assertClientInClinic($db, $id, $clinicId) {
+        $stmt = $db->prepare("SELECT id FROM Client WHERE id = ? AND clinicId = ?");
+        $stmt->execute([$id, $clinicId]);
+        if (!$stmt->fetch()) {
+            send_error('Client not found', 404);
+        }
+    }
+
     public function list($input, $user) {
         $search = $_GET['search'] ?? '';
         $specialty = $_GET['specialty'] ?? '';
         $status = $_GET['status'] ?? '';
         $tier = $_GET['tier'] ?? '';
-        $page = isset($_GET['page']) ? intval($_GET['page']) : 1;
-        $limit = isset($_GET['limit']) ? intval($_GET['limit']) : 50;
+        $page = max(1, isset($_GET['page']) ? intval($_GET['page']) : 1);
+        $limit = min(100, max(1, isset($_GET['limit']) ? intval($_GET['limit']) : 50));
         $offset = ($page - 1) * $limit;
 
         $db = DB::getConnection();
@@ -31,6 +39,9 @@ class ClientController {
         if (!empty($status)) {
             $where[] = "status = ?";
             $params[] = $status;
+        } else {
+            // Hide soft-deleted (deactivated) patients from the default list
+            $where[] = "status != 'inactive'";
         }
         if (!empty($tier)) {
             $where[] = "loyaltyTier = ?";
@@ -119,11 +130,7 @@ class ClientController {
 
     public function update($input, $user, $id) {
         $db = DB::getConnection();
-        $stmt = $db->prepare("SELECT id FROM Client WHERE id = ? AND clinicId = ?");
-        $stmt->execute([$id, $user['clinicId']]);
-        if (!$stmt->fetch()) {
-            send_error('Client not found', 404);
-        }
+        $this->assertClientInClinic($db, $id, $user['clinicId']);
 
         $fields = [];
         $params = [];
@@ -166,11 +173,7 @@ class ClientController {
 
     public function remove($input, $user, $id) {
         $db = DB::getConnection();
-        $stmt = $db->prepare("SELECT id FROM Client WHERE id = ? AND clinicId = ?");
-        $stmt->execute([$id, $user['clinicId']]);
-        if (!$stmt->fetch()) {
-            send_error('Client not found', 404);
-        }
+        $this->assertClientInClinic($db, $id, $user['clinicId']);
 
         $stmt = $db->prepare("UPDATE Client SET status = 'inactive' WHERE id = ?");
         $stmt->execute([$id]);
@@ -180,6 +183,7 @@ class ClientController {
 
     public function getAppointments($input, $user, $id) {
         $db = DB::getConnection();
+        $this->assertClientInClinic($db, $id, $user['clinicId']);
         $stmt = $db->prepare("
             SELECT a.*, 
                    s.name as staffName, s.role as staffRole,
@@ -187,10 +191,10 @@ class ClientController {
             FROM Appointment a
             LEFT JOIN Staff s ON a.staffId = s.id
             LEFT JOIN Service srv ON a.serviceId = srv.id
-            WHERE a.clientId = ?
+            WHERE a.clientId = ? AND a.clinicId = ?
             ORDER BY a.date DESC, a.startTime DESC
         ");
-        $stmt->execute([$id]);
+        $stmt->execute([$id, $user['clinicId']]);
         $appointments = $stmt->fetchAll();
 
         // format to match prisma include structures
@@ -207,14 +211,15 @@ class ClientController {
 
     public function getPackages($input, $user, $id) {
         $db = DB::getConnection();
+        $this->assertClientInClinic($db, $id, $user['clinicId']);
         $stmt = $db->prepare("
             SELECT cp.*, 
                    p.name as packageName, p.description as packageDescription, p.totalPrice as packagePrice
             FROM ClientPackage cp
             LEFT JOIN Package p ON cp.packageId = p.id
-            WHERE cp.clientId = ?
+            WHERE cp.clientId = ? AND p.clinicId = ?
         ");
-        $stmt->execute([$id]);
+        $stmt->execute([$id, $user['clinicId']]);
         $packages = $stmt->fetchAll();
 
         $formatted = [];
@@ -239,15 +244,17 @@ class ClientController {
         if (empty($email) || empty($password)) {
             send_error('email and password are required', 400);
         }
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            send_error('A valid email address is required', 400);
+        }
+        if (strlen($password) < 10) {
+            send_error('Password must be at least 10 characters', 400);
+        }
 
         $hash = password_hash($password, PASSWORD_BCRYPT, ['cost' => 10]);
 
         $db = DB::getConnection();
-        $stmt = $db->prepare("SELECT id FROM Client WHERE id = ? AND clinicId = ?");
-        $stmt->execute([$id, $user['clinicId']]);
-        if (!$stmt->fetch()) {
-            send_error('Client not found', 404);
-        }
+        $this->assertClientInClinic($db, $id, $user['clinicId']);
 
         $stmt = $db->prepare("UPDATE Client SET portalEmail = ?, portalPasswordHash = ? WHERE id = ?");
         $stmt->execute([$email, $hash, $id]);

@@ -14,7 +14,7 @@ One app, one API, one MySQL database. Adding clinics never means new deployments
 
 ## 0. Before you touch the server
 
-- [ ] **Rotate the secrets that are in git history.** The old `JWT_SECRET`, `JWT_REFRESH_SECRET`, and the MySQL password (`Thesmilexperts@2026`) were committed earlier — treat them as burned. Fresh JWT secrets are already in `backend-php/.env.production.example`. Set a **new** MySQL password in hPanel.
+- [ ] **Rotate the secrets that are in git history.** The old `JWT_SECRET`, `JWT_REFRESH_SECRET`, and previous MySQL password were committed earlier — treat them as burned. Fresh JWT secrets are already in `backend-php/.env.production.example`. Set a **new** MySQL password in hPanel.
 - [ ] Decide the email sender (Hostinger mailbox `no-reply@crea8ivmedia.com` is simplest).
 
 ---
