@@ -4,29 +4,37 @@ import { syncBrandingMetadata } from '../utils/branding';
 
 const ClinicContext = createContext(null);
 
+// Platform brand shown on the shared/superadmin login at crea8ivmedia.com and
+// on any domain not claimed by a clinic. White-label clinic domains override
+// this via the /public/branding lookup below.
 const defaultClinicInfo = {
-  name: 'The Smile Expert',
-  tagline: 'Premium Dental Care Portal',
-  logo: 'SE',
-  address: 'Dental Clinic, Lahore, Pakistan',
-  phone: '+92 42 111 764 533',
-  whatsapp: '+92 300 764 5330',
-  email: 'care@thesmileexpert.com',
-  website: 'portal.thesmileexpert.com',
-  registrationNo: 'DENT-LHR-2026-001',
-  invoicePrefix: 'TSE',
-  invoiceFooter: 'Thank you for choosing The Smile Expert. Keep smiling with precise dental care and transparent billing.',
+  name: 'Crea8iv PatientFlow',
+  tagline: 'Clinic Management Platform',
+  logo: 'PF',
+  address: 'Crea8iv Media, Islamabad, Pakistan',
+  phone: '+92 310 5704555',
+  whatsapp: '+92 310 5704555',
+  email: 'info@crea8ivmedia.com',
+  website: 'crea8ivmedia.com',
+  registrationNo: '',
+  invoicePrefix: 'PF',
+  invoiceFooter: 'Powered by Crea8iv PatientFlow.',
   paymentTerms: 'Pending balances are shown on every invoice and should be cleared before the next appointment unless approved by admin.',
-  mission: 'Deliver premium, transparent, and patient-friendly dental care through organized digital operations.',
-  vision: 'To become the most trusted dental clinic experience for families, smile makeovers, implants, and preventive care.',
-  servicesOverview: 'Dental checkups, scaling, whitening, fillings, root canals, crowns, veneers, implants, aligners, extractions, and follow-up care.',
-  branches: ['The Smile Expert Main Branch'],
-  activeBranch: 'Main Dental Clinic',
+  mission: 'Help clinics run premium, transparent, patient-friendly operations through one digital platform.',
+  vision: 'To be the operating system modern clinics rely on every day.',
+  servicesOverview: 'Appointments, patient records, billing, inventory, staff, marketing and reporting — in one portal.',
+  branches: [],
+  activeBranch: '',
   specialties: ['dental'],
+  primaryColor: '#f97316',
+  secondaryColor: '#ea580c',
 };
 
 export function ClinicProvider({ children }) {
   const [activeSpecialty, setActiveSpecialty] = useState('all');
+  // True once /public/branding confirms a clinic owns this domain. While false
+  // (e.g. the platform domain crea8ivmedia.com) the portal shows PatientFlow.
+  const [clinicMatched, setClinicMatched] = useState(false);
   const [clinicInfo, setClinicInfo] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('clinic_branding') || 'null');
@@ -55,6 +63,7 @@ export function ClinicProvider({ children }) {
     fetchPublicApi(`/public/branding?domain=${encodeURIComponent(domain)}`)
       .then((data) => {
         if (data?.matched && data.clinic) {
+          setClinicMatched(true);
           setClinicInfo((current) => ({ ...current, ...data.clinic }));
         }
       })
@@ -70,7 +79,9 @@ export function ClinicProvider({ children }) {
     setActiveSpecialty,
     clinicInfo,
     updateClinicInfo,
-  }), [activeSpecialty, clinicInfo]);
+    clinicMatched,
+    isPlatform: !clinicMatched,
+  }), [activeSpecialty, clinicInfo, clinicMatched]);
 
   return (
     <ClinicContext.Provider value={value}>
