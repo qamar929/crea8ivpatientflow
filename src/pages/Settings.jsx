@@ -4,7 +4,7 @@ import { useClinic } from '../context/ClinicContext';
 import {
   Building2, Palette, Bell, Shield, Save, Check,
   ToggleLeft, ToggleRight, ChevronRight, FileText, MessageCircle,
-  Users as UsersIcon, KeyRound, Pencil, Trash2, Plus, AlertCircle,
+  Users as UsersIcon, KeyRound, Pencil, Trash2, Plus, AlertCircle, Eye, EyeOff,
 } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
@@ -62,6 +62,7 @@ function AccountManagement() {
   const [editForm, setEditForm] = useState({ name: '', email: '', role: 'receptionist', ledgerMode: 'actual' });
   // Reset form
   const [resetForm, setResetForm] = useState({ newPassword: '', confirm: '' });
+  const [showResetPass, setShowResetPass] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -268,7 +269,12 @@ function AccountManagement() {
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Password</label>
-            <input type="password" required minLength={6} value={addForm.password} onChange={(e) => setAddForm({ ...addForm, password: e.target.value })} className="w-full border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40" />
+            <div className="relative">
+              <input type={showResetPass ? 'text' : 'password'} required minLength={6} value={addForm.password} onChange={(e) => setAddForm({ ...addForm, password: e.target.value })} className="w-full border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] text-gray-900 dark:text-white rounded-lg px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40" />
+              <button type="button" onClick={() => setShowResetPass((v) => !v)} title={showResetPass ? 'Hide password' : 'Show password'} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                {showResetPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Role</label>
@@ -338,11 +344,16 @@ function AccountManagement() {
         <form onSubmit={handleReset} className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">New Password</label>
-            <input type="password" required minLength={6} value={resetForm.newPassword} onChange={(e) => setResetForm({ ...resetForm, newPassword: e.target.value })} className="w-full border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40" />
+            <div className="relative">
+              <input type={showResetPass ? 'text' : 'password'} required minLength={6} value={resetForm.newPassword} onChange={(e) => setResetForm({ ...resetForm, newPassword: e.target.value })} className="w-full border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] text-gray-900 dark:text-white rounded-lg px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40" />
+              <button type="button" onClick={() => setShowResetPass((v) => !v)} title={showResetPass ? 'Hide password' : 'Show password'} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                {showResetPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Confirm Password</label>
-            <input type="password" required minLength={6} value={resetForm.confirm} onChange={(e) => setResetForm({ ...resetForm, confirm: e.target.value })} className="w-full border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40" />
+            <input type={showResetPass ? 'text' : 'password'} required minLength={6} value={resetForm.confirm} onChange={(e) => setResetForm({ ...resetForm, confirm: e.target.value })} className="w-full border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40" />
           </div>
           {formError && (
             <div className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/40 rounded-lg px-3 py-2">{formError}</div>

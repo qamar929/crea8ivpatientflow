@@ -7,7 +7,7 @@ class BranchController {
         $db = DB::getConnection();
         
         $sql = "SELECT b.*,
-                       (SELECT COUNT(*) FROM Staff s WHERE s.branchId = b.id) as staffCount,
+                       (SELECT COUNT(*) FROM Staff s WHERE s.branchId = b.id AND s.status != 'inactive') as staffCount,
                        (SELECT COUNT(*) FROM Appointment a WHERE a.branchId = b.id) as appointmentCount
                 FROM Branch b
                 WHERE b.clinicId = ? AND (b.isActive IS NULL OR b.isActive = 1)";
