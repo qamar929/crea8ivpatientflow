@@ -1,6 +1,23 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { fetchPublicApi } from '../config/api';
+import { fetchApi, fetchPublicApi } from '../config/api';
 import { syncBrandingMetadata } from '../utils/branding';
+
+// A signed-in clinic user (not the platform superadmin) should always see
+// their own clinic's saved branding, regardless of which domain they use.
+function isClinicUserSession() {
+  if (localStorage.getItem('clinic_auth') !== 'true') return false;
+  try {
+    const role = JSON.parse(localStorage.getItem('clinic_user') || '{}').role || '';
+    return role !== '' && role !== 'superadmin';
+  } catch (_) {
+    return false;
+  }
+}
+
+// Drop null/undefined so sparse DB rows don't blank out sensible defaults.
+function compact(obj) {
+  return Object.fromEntries(Object.entries(obj || {}).filter(([, v]) => v !== null && v !== undefined));
+}
 
 const ClinicContext = createContext(null);
 
@@ -38,7 +55,11 @@ export function ClinicProvider({ children }) {
   const [clinicInfo, setClinicInfo] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('clinic_branding') || 'null');
-      if (!saved || saved.name !== defaultClinicInfo.name) return defaultClinicInfo;
+      // Trust the cache only when (a) a clinic user is signed in, or (b) this
+      // domain was previously confirmed as a white-label clinic domain.
+      // Otherwise (e.g. logged-out platform login) show the platform brand.
+      const trusted = saved && (isClinicUserSession() || saved._matchedDomain === window.location.hostname);
+      if (!trusted) return defaultClinicInfo;
       return { ...defaultClinicInfo, ...saved, specialties: ['dental'] };
     } catch (_) {
       return defaultClinicInfo;
@@ -64,7 +85,27 @@ export function ClinicProvider({ children }) {
       .then((data) => {
         if (data?.matched && data.clinic) {
           setClinicMatched(true);
-          setClinicInfo((current) => ({ ...current, ...data.clinic }));
+          setClinicInfo((current) => ({
+            ...current,
+            ...compact(data.clinic),
+            _matchedDomain: window.location.hostname,
+          }));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    // Signed-in clinic users: hydrate from the server-saved clinic settings
+    // (the Clinic table) so edits persist across logins on ANY domain —
+    // including the shared platform domain where /public/branding matches
+    // nothing. Roles without access to this endpoint just keep domain branding.
+    if (!isClinicUserSession()) return;
+    fetchApi('/settings/public-site')
+      .then((data) => {
+        if (data?.clinic) {
+          setClinicMatched(true);
+          setClinicInfo((current) => ({ ...current, ...compact(data.clinic) }));
         }
       })
       .catch(() => {});

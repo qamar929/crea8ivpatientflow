@@ -445,6 +445,39 @@ export default function Settings() {
   const [localServicesOverview, setLocalServicesOverview] = useState(clinicInfo.servicesOverview || '');
   const [logoError, setLogoError] = useState('');
 
+  useEffect(() => {
+    // The server (Clinic table) is the source of truth — seed the form from it
+    // so saved edits survive logout/login instead of falling back to cached or
+    // default branding.
+    let cancelled = false;
+    fetchApi('/settings/public-site')
+      .then(({ clinic }) => {
+        if (cancelled || !clinic) return;
+        const v = (x, fallback = '') => (x === null || x === undefined ? fallback : x);
+        if (clinic.name) { setLocalName(clinic.name); setClinicName(clinic.name); }
+        setLocalTagline(v(clinic.tagline));
+        if (clinic.logo) setLocalLogo(clinic.logo);
+        setLocalAddress(v(clinic.address));
+        setLocalPhone(v(clinic.phone));
+        setLocalEmail(v(clinic.email));
+        setLocalWhatsapp(v(clinic.whatsapp));
+        setLocalWebsite(v(clinic.website));
+        setLocalRegistrationNo(v(clinic.registrationNo));
+        if (clinic.invoicePrefix) setLocalInvoicePrefix(clinic.invoicePrefix);
+        setLocalInvoiceFooter(v(clinic.invoiceFooter));
+        setLocalPaymentTerms(v(clinic.paymentTerms));
+        setLocalMission(v(clinic.mission));
+        setLocalVision(v(clinic.vision));
+        setLocalServicesOverview(v(clinic.servicesOverview));
+        if (clinic.primaryColor) setLocalPrimary(clinic.primaryColor);
+        if (clinic.secondaryColor) setLocalSecondary(clinic.secondaryColor);
+        if (clinic.font) setLocalFont(clinic.font);
+      })
+      .catch(() => { /* roles without access keep context values */ });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   const [notifications, setNotifications] = useState({
     smsReminders: true,
     emailReminders: true,
