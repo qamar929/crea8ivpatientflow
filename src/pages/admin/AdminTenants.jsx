@@ -77,7 +77,7 @@ export default function AdminTenants() {
   };
 
   const markConnected = (t) => {
-    if (!window.confirm(`Confirm SSL is issued for ${t.customDomain} and mark it Connected? The clinic's portal will go live on this domain.`)) return;
+    if (!window.confirm(`Mark ${t.customDomain} as connected?\n\nOnly do this AFTER you have:\n1. Pointed its DNS to the server\n2. Issued an SSL certificate in hosting\n3. Deployed the portal to its folder\n\nThis flips the platform record to "connected".`)) return;
     run(t.id, () => fetchApi(`/admin/tenants/${t.id}/domain/ssl`, { method: 'PUT', body: JSON.stringify({ action: 'connect' }) }));
   };
 
@@ -173,9 +173,9 @@ export default function AdminTenants() {
                         <button onClick={() => setDomain(t)} title="Set white-label domain" className="inline-flex items-center gap-1 text-xs font-bold text-gray-500 hover:text-indigo-600">
                           <Globe className="w-4 h-4" /> Domain
                         </button>
-                        {t.domainStatus === 'awaiting_ssl' && (
-                          <button onClick={() => markConnected(t)} title="Mark SSL active / Connected" className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 hover:text-emerald-700">
-                            <ShieldCheck className="w-4 h-4" /> Activate SSL
+                        {t.customDomain && t.domainStatus && !['none', 'connected'].includes(t.domainStatus) && (
+                          <button onClick={() => markConnected(t)} title="Mark domain live/connected (after its DNS + SSL are set up in hosting)" className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 hover:text-emerald-700">
+                            <ShieldCheck className="w-4 h-4" /> Activate Domain
                           </button>
                         )}
                         <button onClick={() => setDeleteTenant(t)} title="Delete clinic permanently" className="inline-flex items-center gap-1 text-xs font-bold text-rose-500 hover:text-rose-700">
