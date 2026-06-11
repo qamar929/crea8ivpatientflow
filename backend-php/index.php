@@ -21,11 +21,15 @@ function cors_origin_allowed($origin) {
     // Legacy SaaS domain, kept during transition
     if ($host === 'crea8ivpatientflow.com' || str_ends_with($host, '.crea8ivpatientflow.com')) return true;
 
-    // White-label: any domain a clinic has registered as its customDomain
+    // White-label: any domain a clinic registered as its customDomain, OR the
+    // parent of that custom domain — so the clinic's main marketing site
+    // (e.g. thesmilexperts.com / www.) can embed its booking widget, which
+    // talks to the API as portal.thesmilexperts.com.
     try {
         $db = DB::getConnection();
-        $stmt = $db->prepare("SELECT 1 FROM Clinic WHERE customDomain IS NOT NULL AND LOWER(customDomain) = ? LIMIT 1");
-        $stmt->execute([strtolower($host)]);
+        $bare = preg_replace('/^www\./', '', strtolower($host));
+        $stmt = $db->prepare("SELECT 1 FROM Clinic WHERE customDomain IS NOT NULL AND (LOWER(customDomain) = ? OR LOWER(customDomain) LIKE ?) LIMIT 1");
+        $stmt->execute([$bare, '%.' . $bare]);
         if ($stmt->fetchColumn()) return true;
     } catch (Exception $e) {
         // DB unavailable: fall through to deny (headers still sent below)
