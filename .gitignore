@@ -7,3 +7,6 @@ dist/
 *.zip
 
 
+
+# Backup artifacts
+backend-php/backups/

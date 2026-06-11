@@ -98,8 +98,34 @@ Password resets and clinic set-password invites **depend on email**.
 
 ---
 
-## 8. First-week guardrails
+## 8. Cron jobs (hPanel → Advanced → Cron Jobs)
 
-- **Back up nightly** (DB dump + `uploads/`) off-server. This is the next task to build — do it before onboarding real patient data.
+Hostinger has **no `crontab` CLI** — add these in the hPanel UI. PHP CLI is `/usr/bin/php`.
+
+1. **Subscription check** — daily 09:00:
+   ```
+   /usr/bin/php /home/u700603111/domains/crea8ivmedia.com/public_html/app/cron/subscription-check.php
+   ```
+2. **Nightly backup** — daily 02:30:
+   ```
+   /usr/bin/php /home/u700603111/domains/crea8ivmedia.com/public_html/app/cron/backup.php
+   ```
+
+## 9. Backups
+
+`cron/backup.php` writes to `app/backups/` (gitignored, web-denied via its own `.htaccess`):
+- `db-YYYYMMDD-HHMMSS.sql.gz` — full mysqldump (`--single-transaction`, utf8mb4)
+- `uploads-YYYYMMDD-HHMMSS.tar.gz` — patient images etc.
+- Retention: last `BACKUP_RETENTION_DAYS` days (default 14). Logs to `logs/backup.log`.
+- Uses `proc_open` (this host disables `exec`/`shell_exec`/`system`).
+
+**Restore (DB):** `gunzip -c db-XXXX.sql.gz | mysql -u USER -p DB_NAME`
+**Restore (uploads):** `tar -xzf uploads-XXXX.tar.gz -C app/uploads/`
+
+**Off-site (do before real patient data):** local copies survive bad migrations but NOT server loss. Either set `BACKUP_REMOTE=user@host:/path` in `.env` (rsync, key auth) so the script pushes off-site, or pull `app/backups/` from another machine on a schedule.
+
+## 10. First-week guardrails
+
 - Watch `logs/` for errors (display_errors is OFF in production by design).
 - Keep `SSL_PROVIDER=manual` until volume justifies Cloudflare for SaaS; the abstraction means flipping it later needs no portal/app changes.
+- **Note: deployed as subfolders** (`/app`, `/clinic`, `/patientflow`) on one origin, not the subdomains above — so portal↔API is same-origin (no CORS). Per-clinic white-label domains need rework under this layout (see production-deployment memory).
