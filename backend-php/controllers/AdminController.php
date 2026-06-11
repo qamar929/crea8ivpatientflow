@@ -277,6 +277,58 @@ class AdminController {
         send_json(['message' => "Subscription extended by $months month(s)", 'expiresAt' => $newExpiry]);
     }
 
+    // Superadmin "manage clinic": mint a real owner session for the clinic so
+    // the platform admin can step in and configure everything (staff, services,
+    // branding, appointments) exactly as the owner would, then return to /admin.
+    public function impersonateTenant($input, $user, $id) {
+        $db = DB::getConnection();
+
+        $stmt = $db->prepare("SELECT id, name, status FROM Clinic WHERE id = ? AND id != 'platform'");
+        $stmt->execute([$id]);
+        $clinic = $stmt->fetch();
+        if (!$clinic) send_error('Tenant not found', 404);
+
+        // Prefer an active owner; fall back to any active user on the clinic.
+        $stmt = $db->prepare(
+            "SELECT * FROM User WHERE clinicId = ? AND isActive = 1
+             ORDER BY (role = 'owner') DESC, (role = 'manager') DESC, createdAt ASC LIMIT 1"
+        );
+        $stmt->execute([$id]);
+        $target = $stmt->fetch();
+        if (!$target) send_error('This clinic has no active user to sign in as. Create an owner first.', 400);
+
+        // Mirror AuthController::issueTokens so the session is indistinguishable
+        // from a normal login for the clinic portal.
+        $payload = [
+            'id' => $target['id'],
+            'clinicId' => $target['clinicId'],
+            'role' => $target['role'],
+            'name' => $target['name'],
+        ];
+        $accessToken = jwt_sign_access($payload);
+        $refreshToken = jwt_sign_refresh(['id' => $target['id'], 'jti' => bin2hex(random_bytes(8))]);
+        $expiresAt = date('Y-m-d H:i:s', time() + JWT_REFRESH_EXPIRES_IN);
+        $db->prepare("INSERT INTO RefreshToken (id, token, userId, expiresAt) VALUES (?, ?, ?, ?)")
+           ->execute([generate_uuid(), $refreshToken, $target['id'], $expiresAt]);
+
+        log_audit($id, $user['id'], 'tenant_impersonated', 'Clinic', $id, null,
+                  ['asUser' => $target['id'], 'asEmail' => $target['email']]);
+
+        send_json([
+            'accessToken' => $accessToken,
+            'refreshToken' => $refreshToken,
+            'user' => [
+                'id' => $target['id'],
+                'name' => $target['name'],
+                'email' => $target['email'],
+                'role' => $target['role'],
+                'ledgerMode' => $target['ledgerMode'] ?? 'actual',
+                'clinicId' => $target['clinicId'],
+            ],
+            'clinic' => ['id' => $clinic['id'], 'name' => $clinic['name']],
+        ]);
+    }
+
     // Normalize + validate a custom domain; returns the cleaned domain or sends an error.
     private function normalizeDomain($db, $domain, $excludeClinicId = null) {
         $domain = strtolower(trim($domain));

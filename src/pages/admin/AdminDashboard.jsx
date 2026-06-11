@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
+import { useNavigate, Link } from 'react-router-dom';
 import {
-  Loader2, TrendingUp, Building2, Users, Receipt, CalendarClock, AlertCircle,
+  Loader2, TrendingUp, Building2, Users, Receipt, CalendarClock, AlertCircle, Plus, ChevronRight, Bell,
 } from 'lucide-react';
 import { fetchApi } from '../../config/api';
 
@@ -29,6 +30,7 @@ function StatCard({ icon: Icon, label, value, tone = 'indigo' }) {
 export default function AdminDashboard() {
   const [stats, setStats] = useState(null);
   const [error, setError] = useState('');
+  const navigate = useNavigate();
 
   useEffect(() => {
     fetchApi('/admin/stats').then(setStats).catch((e) => setError(e.message));
@@ -46,13 +48,41 @@ export default function AdminDashboard() {
   }
 
   const c = stats.clinicCounts || {};
+  const expiringCount = (stats.expiringSoon || []).length;
+  const attention = [
+    stats.paymentsAwaitingReview > 0 && { label: `${stats.paymentsAwaitingReview} payment${stats.paymentsAwaitingReview === 1 ? '' : 's'} to review`, to: '/admin/payments' },
+    expiringCount > 0 && { label: `${expiringCount} subscription${expiringCount === 1 ? '' : 's'} expiring soon`, to: '/admin/tenants' },
+    c.suspended > 0 && { label: `${c.suspended} suspended clinic${c.suspended === 1 ? '' : 's'}`, to: '/admin/tenants' },
+    stats.openLeads > 0 && { label: `${stats.openLeads} open lead${stats.openLeads === 1 ? '' : 's'}`, to: '/admin/leads' },
+  ].filter(Boolean);
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="text-2xl font-black text-gray-950 dark:text-white">Platform Dashboard</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Revenue and tenant health at a glance.</p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-black text-gray-950 dark:text-white">Platform Dashboard</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Revenue and tenant health at a glance.</p>
+        </div>
+        <Link to="/admin/tenants" className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold shadow-sm transition-colors">
+          <Plus className="w-4 h-4" /> New Clinic
+        </Link>
       </div>
+
+      {attention.length > 0 && (
+        <div className="rounded-2xl border border-amber-200 dark:border-amber-500/30 bg-amber-50 dark:bg-amber-500/10 p-4">
+          <div className="flex items-center gap-2 mb-2">
+            <Bell className="w-4 h-4 text-amber-600" />
+            <h2 className="text-sm font-black text-amber-800 dark:text-amber-300">Needs attention</h2>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {attention.map((a) => (
+              <button key={a.label} onClick={() => navigate(a.to)} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg bg-white/80 dark:bg-white/10 text-xs font-bold text-amber-800 dark:text-amber-200 hover:bg-white">
+                {a.label} <ChevronRight className="w-3.5 h-3.5" />
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard icon={TrendingUp} label="Monthly Recurring Revenue" value={pkr(stats.mrrPKR)} tone="indigo" />
@@ -72,9 +102,11 @@ export default function AdminDashboard() {
           ) : (
             <ul className="divide-y divide-gray-100 dark:divide-white/5">
               {stats.expiringSoon.map((s) => (
-                <li key={s.clinicId} className="py-2.5 flex items-center justify-between">
-                  <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">{s.name}</span>
-                  <span className="text-xs font-bold text-amber-600">{String(s.expiresAt).slice(0, 10)}</span>
+                <li key={s.clinicId}>
+                  <button onClick={() => navigate('/admin/tenants')} className="w-full py-2.5 flex items-center justify-between text-left group">
+                    <span className="text-sm font-semibold text-gray-800 dark:text-gray-200 group-hover:text-indigo-600">{s.name}</span>
+                    <span className="flex items-center gap-1 text-xs font-bold text-amber-600">{String(s.expiresAt).slice(0, 10)} <ChevronRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100" /></span>
+                  </button>
                 </li>
               ))}
             </ul>
