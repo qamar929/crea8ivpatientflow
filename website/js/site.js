@@ -3,7 +3,7 @@
 const PF_API_URL = window.PF_API_URL || (
   location.hostname === 'localhost' || location.hostname === '127.0.0.1'
     ? 'http://localhost:4000/api/v1'
-    : 'https://app.crea8ivmedia.com/api/v1'
+    : 'https://crea8ivmedia.com/app/api/v1'
 );
 
 // Mobile nav

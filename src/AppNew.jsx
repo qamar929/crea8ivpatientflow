@@ -68,7 +68,7 @@ export default function AppNew() {
   return (
     <ThemeProvider>
       <ClinicProvider>
-        <BrowserRouter>
+        <BrowserRouter basename={import.meta.env.BASE_URL}>
           <Routes>
             <Route path="/public" element={<PublicSite />} />
             <Route path="/login" element={<Login />} />
