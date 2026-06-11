@@ -9,6 +9,7 @@ import {
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import Modal from '../components/ui/Modal';
+import ColorPicker from '../components/ui/ColorPicker';
 import ClinicLogoMark from '../components/branding/ClinicLogoMark';
 import PublicWebsiteEditor from '../components/settings/PublicWebsiteEditor';
 import CustomDomain from '../components/settings/CustomDomain';
@@ -375,16 +376,6 @@ function AccountManagement() {
   );
 }
 
-const PRESET_COLORS = [
-  { label: 'Clinic Teal', value: '#0f766e' },
-  { label: 'Signature Rose', value: '#be3455' },
-  { label: 'Medical Blue', value: '#2563eb' },
-  { label: 'Forest', value: '#15803d' },
-  { label: 'Plum', value: '#7e22ce' },
-  { label: 'Graphite', value: '#334155' },
-  { label: 'Cyan', value: '#0891b2' },
-  { label: 'Coral', value: '#e11d48' },
-];
 
 function SectionHeader({ icon: Icon, title, description }) {
   return (
@@ -698,51 +689,11 @@ export default function Settings() {
             <div className="text-xs text-gray-400 font-mono">{localPrimary}</div>
           </div>
 
-          {/* Primary color */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-2">Primary Color</label>
-            <div className="flex items-center gap-2 flex-wrap">
-              {PRESET_COLORS.map(c => (
-                <button
-                  key={c.value}
-                  onClick={() => setLocalPrimary(c.value)}
-                  title={c.label}
-                  className={`w-8 h-8 rounded-lg transition-all ${localPrimary === c.value ? 'ring-2 ring-offset-2 ring-gray-400 scale-110' : 'hover:scale-105'}`}
-                  style={{ background: c.value }}
-                />
-              ))}
-              <input
-                type="color"
-                value={localPrimary}
-                onChange={e => setLocalPrimary(e.target.value)}
-                className="w-8 h-8 rounded-lg cursor-pointer border-0 p-0"
-                title="Custom color"
-              />
-            </div>
-          </div>
+          {/* Primary color — precise hex + RGB picker */}
+          <ColorPicker label="Primary Color" value={localPrimary} onChange={setLocalPrimary} />
 
           {/* Secondary color */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-2">Accent Color</label>
-            <div className="flex items-center gap-2 flex-wrap">
-              {PRESET_COLORS.map(c => (
-                <button
-                  key={c.value}
-                  onClick={() => setLocalSecondary(c.value)}
-                  title={c.label}
-                  className={`w-8 h-8 rounded-lg transition-all ${localSecondary === c.value ? 'ring-2 ring-offset-2 ring-gray-400 scale-110' : 'hover:scale-105'}`}
-                  style={{ background: c.value }}
-                />
-              ))}
-              <input
-                type="color"
-                value={localSecondary}
-                onChange={e => setLocalSecondary(e.target.value)}
-                className="w-8 h-8 rounded-lg cursor-pointer border-0 p-0"
-                title="Custom color"
-              />
-            </div>
-          </div>
+          <ColorPicker label="Accent Color" value={localSecondary} onChange={setLocalSecondary} />
 
           {/* Font */}
           <div>

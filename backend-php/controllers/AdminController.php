@@ -277,6 +277,175 @@ class AdminController {
         send_json(['message' => "Subscription extended by $months month(s)", 'expiresAt' => $newExpiry]);
     }
 
+    // Normalize + validate a custom domain; returns the cleaned domain or sends an error.
+    private function normalizeDomain($db, $domain, $excludeClinicId = null) {
+        $domain = strtolower(trim($domain));
+        if ($domain === '') return null;
+        if (strpos($domain, '://') !== false) $domain = parse_url($domain, PHP_URL_HOST) ?: $domain;
+        $domain = preg_replace('/[\/:].*$/', '', $domain);
+        $domain = preg_replace('/^www\./', '', $domain);
+        if (!preg_match('/^(?=.{1,253}$)([a-z0-9](-?[a-z0-9])*\.)+[a-z]{2,}$/', $domain)) {
+            send_error('Enter a valid domain like portal.yourclinic.com', 400);
+        }
+        if ($domain === 'crea8ivmedia.com' || str_ends_with($domain, '.crea8ivmedia.com')) {
+            send_error('Platform domains cannot be used as a clinic custom domain', 400);
+        }
+        $sql = "SELECT id FROM Clinic WHERE LOWER(customDomain) = ?" . ($excludeClinicId ? " AND id != ?" : "");
+        $stmt = $db->prepare($sql);
+        $stmt->execute($excludeClinicId ? [$domain, $excludeClinicId] : [$domain]);
+        if ($stmt->fetch()) send_error('That domain is already assigned to another clinic', 409);
+        return $domain;
+    }
+
+    // Full clinic provisioning from the superadmin: clinic details + initial
+    // owner account (password set directly, or a set-password invite emailed)
+    // + optional custom domain + branding colors + initial status.
+    public function createTenant($input, $user) {
+        $db = DB::getConnection();
+
+        $name           = trim($input['name'] ?? '');
+        $email          = strtolower(trim($input['email'] ?? ''));
+        $phone          = trim($input['phone'] ?? '');
+        $clinicType     = in_array($input['clinicType'] ?? 'dental', ['dental','aesthetic','general','clinic','spa','salon'], true) ? $input['clinicType'] : 'dental';
+        $address        = trim($input['address'] ?? '');
+        $status         = in_array($input['status'] ?? 'trial', ['trial','active','pending'], true) ? $input['status'] : 'trial';
+        $primaryColor   = trim($input['primaryColor'] ?? '#0f766e');
+        $secondaryColor = trim($input['secondaryColor'] ?? '#14b8a6');
+
+        $owner          = is_array($input['owner'] ?? null) ? $input['owner'] : [];
+        $ownerName      = trim($owner['name'] ?? '');
+        $ownerEmail     = strtolower(trim($owner['email'] ?? $email));
+        $ownerPassword  = (string)($owner['password'] ?? '');
+
+        if ($name === '') send_error('Clinic name is required', 400);
+        if ($ownerEmail === '' || !filter_var($ownerEmail, FILTER_VALIDATE_EMAIL)) send_error('A valid owner email is required', 400);
+        if ($ownerName === '') $ownerName = $name . ' Owner';
+        if ($ownerPassword !== '' && strlen($ownerPassword) < 8) send_error('Owner password must be at least 8 characters', 400);
+
+        $stmt = $db->prepare("SELECT id FROM User WHERE email = ?");
+        $stmt->execute([$ownerEmail]);
+        if ($stmt->fetch()) send_error('A user with this email already exists', 409);
+
+        $customDomain = $this->normalizeDomain($db, $input['customDomain'] ?? '', null);
+
+        $sendInvite = ($ownerPassword === '');
+        $rawToken = null;
+
+        try {
+            $db->beginTransaction();
+
+            $clinicId = generate_uuid();
+            $slug = $this->slugify($db, $name);
+            $trialEndsAt = $status === 'trial'
+                ? date('Y-m-d H:i:s', strtotime('+' . max(1, (int)($input['trialDays'] ?? 14)) . ' days'))
+                : null;
+
+            $db->prepare("INSERT INTO Clinic (id, name, email, phone, address, status, clinicType, slug, primaryColor, secondaryColor, trialEndsAt, customDomain, domainStatus) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+               ->execute([$clinicId, $name, $email, $phone, $address, $status, $clinicType, $slug,
+                          $primaryColor, $secondaryColor, $trialEndsAt,
+                          $customDomain, $customDomain ? 'pending' : 'none']);
+
+            $ownerId = generate_uuid();
+            $hash = $sendInvite
+                ? password_hash(bin2hex(random_bytes(24)), PASSWORD_BCRYPT, ['cost' => 12])
+                : password_hash($ownerPassword, PASSWORD_BCRYPT, ['cost' => 12]);
+            $db->prepare("INSERT INTO User (id, clinicId, name, email, password, role) VALUES (?, ?, ?, ?, ?, 'owner')")
+               ->execute([$ownerId, $clinicId, $ownerName, $ownerEmail, $hash]);
+
+            if ($sendInvite) {
+                $rawToken = bin2hex(random_bytes(32));
+                $db->prepare("INSERT INTO PasswordReset (id, userId, tokenHash, expiresAt) VALUES (?, ?, ?, ?)")
+                   ->execute([generate_uuid(), $ownerId, hash('sha256', $rawToken),
+                              date('Y-m-d H:i:s', time() + 72 * 3600)]);
+            }
+
+            $db->commit();
+        } catch (Exception $e) {
+            $db->rollBack();
+            error_log('createTenant failed: ' . $e->getMessage());
+            send_error('Clinic creation failed', 500);
+        }
+
+        if ($sendInvite) {
+            $setupUrl = rtrim(CLIENT_URL, '/') . '/reset-password?token=' . $rawToken;
+            send_app_email($ownerEmail, 'Your clinic portal is ready — set your password',
+                           password_reset_email_html($ownerName, $setupUrl, 72 * 60));
+        }
+
+        log_audit($clinicId, $user['id'], 'tenant_created', 'Clinic', $clinicId, null,
+                  ['slug' => $slug, 'status' => $status, 'ownerEmail' => $ownerEmail, 'invite' => $sendInvite]);
+
+        send_json([
+            'message'  => $sendInvite
+                ? 'Clinic created. A set-password invite was emailed to the owner.'
+                : 'Clinic created. The owner can log in immediately with the password you set.',
+            'clinicId' => $clinicId,
+            'slug'     => $slug,
+            'ownerEmail' => $ownerEmail,
+        ], 201);
+    }
+
+    // Edit a clinic's core details + branding (superadmin).
+    public function updateTenant($input, $user, $id) {
+        $db = DB::getConnection();
+        $stmt = $db->prepare("SELECT id FROM Clinic WHERE id = ? AND id != 'platform'");
+        $stmt->execute([$id]);
+        if (!$stmt->fetch()) send_error('Tenant not found', 404);
+
+        $allowed = ['name','email','phone','address','clinicType','primaryColor','secondaryColor','tagline','website','whatsapp'];
+        $sets = []; $params = [];
+        foreach ($allowed as $f) {
+            if (array_key_exists($f, $input)) { $sets[] = "$f = ?"; $params[] = trim((string)$input[$f]); }
+        }
+        if (!$sets) send_error('No fields to update', 400);
+        $params[] = $id;
+        $db->prepare("UPDATE Clinic SET " . implode(', ', $sets) . " WHERE id = ?")->execute($params);
+
+        log_audit($id, $user['id'], 'tenant_updated', 'Clinic', $id, null, array_intersect_key($input, array_flip($allowed)));
+        send_json(['message' => 'Clinic updated']);
+    }
+
+    // Permanently delete a clinic and ALL of its data (superadmin). Destructive.
+    public function deleteTenant($input, $user, $id) {
+        if ($id === 'platform') send_error('The platform tenant cannot be deleted', 400);
+
+        $db = DB::getConnection();
+        $stmt = $db->prepare("SELECT name FROM Clinic WHERE id = ?");
+        $stmt->execute([$id]);
+        $clinic = $stmt->fetch();
+        if (!$clinic) send_error('Tenant not found', 404);
+
+        try {
+            $db->beginTransaction();
+
+            // Child rows that reference users/clients/packages/etc. of this clinic
+            $db->prepare("DELETE FROM RefreshToken WHERE userId IN (SELECT id FROM User WHERE clinicId = ?)")->execute([$id]);
+            $db->prepare("DELETE FROM PasswordReset WHERE userId IN (SELECT id FROM User WHERE clinicId = ?)")->execute([$id]);
+            $db->prepare("DELETE FROM SupportMessage WHERE ticketId IN (SELECT id FROM SupportTicket WHERE clinicId = ?)")->execute([$id]);
+            $db->prepare("DELETE FROM PackageItem WHERE packageId IN (SELECT id FROM Package WHERE clinicId = ?)")->execute([$id]);
+            $db->prepare("DELETE FROM ClientPackage WHERE clientId IN (SELECT id FROM Client WHERE clinicId = ?)")->execute([$id]);
+            $db->prepare("DELETE FROM InventoryTransaction WHERE itemId IN (SELECT id FROM InventoryItem WHERE clinicId = ?)")->execute([$id]);
+            $db->prepare("DELETE FROM GalleryItem WHERE clientId IN (SELECT id FROM Client WHERE clinicId = ?)")->execute([$id]);
+
+            // Tables that carry clinicId directly
+            foreach (['Appointment','Invoice','Feedback','Campaign','Notification','Payment','Subscription',
+                      'SupportTicket','RegistrationLead','InventoryItem','Package','Service','Staff','Client',
+                      'Branch','PublicSiteConfig','AuditLog','User'] as $t) {
+                $db->prepare("DELETE FROM $t WHERE clinicId = ?")->execute([$id]);
+            }
+            $db->prepare("DELETE FROM Clinic WHERE id = ?")->execute([$id]);
+
+            $db->commit();
+        } catch (Exception $e) {
+            $db->rollBack();
+            error_log('deleteTenant failed: ' . $e->getMessage());
+            send_error('Delete failed: ' . $e->getMessage(), 500);
+        }
+
+        log_audit('platform', $user['id'], 'tenant_deleted', 'Clinic', $id, ['name' => $clinic['name']], null);
+        send_json(['message' => 'Clinic "' . $clinic['name'] . '" and all of its data were permanently deleted']);
+    }
+
     // ------------------------------------------------------------------
     // Registration leads (sales pipeline)
     // ------------------------------------------------------------------
