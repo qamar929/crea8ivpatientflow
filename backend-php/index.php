@@ -45,7 +45,7 @@ if (cors_origin_allowed($request_origin)) {
     header('Access-Control-Allow-Origin: ' . CLIENT_URL);
 }
 header("Access-Control-Allow-Credentials: true");
-header("Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS");
+header("Access-Control-Allow-Methods: GET, POST, PUT, PATCH, DELETE, OPTIONS");
 header("Access-Control-Allow-Headers: Content-Type, Authorization, X-Requested-With");
 
 if ($_SERVER['REQUEST_METHOD'] === 'OPTIONS') {
@@ -250,6 +250,7 @@ $routes = [
     ['POST', '^api/v1/users$', 'UserController', 'create', ['owner']],
     ['POST', '^api/v1/users/([^/]+)/reset-password$', 'UserController', 'resetPassword', ['owner']],
     ['PUT', '^api/v1/users/([^/]+)$', 'UserController', 'update', ['owner']],
+    ['PATCH', '^api/v1/users/([^/]+)$', 'UserController', 'update', ['owner']],
     ['DELETE', '^api/v1/users/([^/]+)$', 'UserController', 'remove', ['owner']],
 
     // Clients Routes
