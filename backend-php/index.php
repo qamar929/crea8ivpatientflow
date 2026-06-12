@@ -75,7 +75,7 @@ $method = $_SERVER['REQUEST_METHOD'];
 
 // Parse input body
 $input = [];
-if ($method === 'POST' || $method === 'PUT') {
+if ($method === 'POST' || $method === 'PUT' || $method === 'PATCH') {
     $raw_input = file_get_contents('php://input');
     if (!empty($raw_input)) {
         $input = json_decode($raw_input, true) ?: [];
