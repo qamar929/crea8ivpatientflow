@@ -419,7 +419,7 @@ INSERT INTO `Branch` (`id`, `clinicId`, `name`, `address`, `phone`, `isActive`) 
 ('branch-smile-expert-main', 'clinic-smile-expert-001', 'The Smile Expert Main Branch', 'Dental Clinic, Lahore, Pakistan', '+92 42 111 764 533', 1);
 
 -- 3. Users
--- passwords are: owner123, reception123, staff123
+-- Demo hashes only. For production, create users through set-password invites.
 INSERT INTO `User` (`id`, `clinicId`, `name`, `email`, `password`, `role`, `ledgerMode`, `staffId`, `isActive`, `twoFAEnabled`) VALUES
 ('u001', 'clinic-smile-expert-001', 'Owner', 'owner@thesmileexpert.com', '$2a$12$8yjoCY6.jkDF0GXsQa84ROL9sgOW69v.7IMJiQqNOqUZZt6yRNLXe', 'owner', 'actual', 's001', 1, 0),
 ('u002', 'clinic-smile-expert-001', 'Reception Desk', 'reception@thesmileexpert.com', '$2a$12$Jtzc5HWi7dSkaKDXFQ1M6.pWr29l6v4b5v8PiANXq0QCtvffBCo.m', 'receptionist', 'actual', 's004', 1, 0),

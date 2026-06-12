@@ -14,8 +14,13 @@ class GalleryController {
         $db = DB::getConnection();
         $this->assertClientInClinic($db, $clientId, $user['clinicId']);
 
-        $stmt = $db->prepare("SELECT * FROM GalleryItem WHERE clientId = ? ORDER BY createdAt DESC");
-        $stmt->execute([$clientId]);
+        $stmt = $db->prepare(
+            "SELECT g.* FROM GalleryItem g
+             JOIN Client c ON c.id = g.clientId
+             WHERE g.clientId = ? AND c.clinicId = ?
+             ORDER BY g.createdAt DESC"
+        );
+        $stmt->execute([$clientId, $user['clinicId']]);
         $items = $stmt->fetchAll();
 
         foreach ($items as &$item) {
@@ -50,6 +55,13 @@ class GalleryController {
         $notes = $input['notes'] ?? null;
         $appointmentId = $input['appointmentId'] ?? null;
         $isPrivate = isset($input['isPrivate']) && $input['isPrivate'] === 'false' ? 0 : 1;
+        if ($appointmentId) {
+            $stmt = $db->prepare("SELECT id FROM Appointment WHERE id = ? AND clientId = ? AND clinicId = ?");
+            $stmt->execute([$appointmentId, $clientId, $user['clinicId']]);
+            if (!$stmt->fetch()) {
+                send_error('Appointment not found for this client', 400);
+            }
+        }
 
         // Per-clinic directory keeps one tenant's files out of another's folder
         $clinicId = $user['clinicId'];
@@ -74,8 +86,12 @@ class GalleryController {
             $id, $clientId, $appointmentId, $type, $imageUrl, $service, $notes, $isPrivate
         ]);
 
-        $stmt = $db->prepare("SELECT * FROM GalleryItem WHERE id = ?");
-        $stmt->execute([$id]);
+        $stmt = $db->prepare(
+            "SELECT g.* FROM GalleryItem g
+             JOIN Client c ON c.id = g.clientId
+             WHERE g.id = ? AND c.clinicId = ?"
+        );
+        $stmt->execute([$id, $user['clinicId']]);
         $item = $stmt->fetch();
         $item['isPrivate'] = !empty($item['isPrivate']);
 
@@ -105,8 +121,8 @@ class GalleryController {
             }
         }
 
-        $stmt = $db->prepare("DELETE FROM GalleryItem WHERE id = ?");
-        $stmt->execute([$id]);
+        $stmt = $db->prepare("DELETE FROM GalleryItem WHERE id = ? AND clientId IN (SELECT id FROM Client WHERE clinicId = ?)");
+        $stmt->execute([$id, $user['clinicId']]);
         send_json(['message' => 'Deleted']);
     }
 }

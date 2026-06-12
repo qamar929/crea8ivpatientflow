@@ -62,8 +62,8 @@ class ServiceController {
             $id, $user['clinicId'], $name, $specialty, $category, $price, $duration, $description, $popular, $isActive
         ]);
 
-        $stmt = $db->prepare("SELECT * FROM Service WHERE id = ?");
-        $stmt->execute([$id]);
+        $stmt = $db->prepare("SELECT * FROM Service WHERE id = ? AND clinicId = ?");
+        $stmt->execute([$id, $user['clinicId']]);
         $createdService = $stmt->fetch();
 
         send_json($createdService, 201);
@@ -110,8 +110,8 @@ class ServiceController {
             send_error('Service not found', 404);
         }
 
-        $stmt = $db->prepare("UPDATE Service SET isActive = 0 WHERE id = ?");
-        $stmt->execute([$id]);
+        $stmt = $db->prepare("UPDATE Service SET isActive = 0 WHERE id = ? AND clinicId = ?");
+        $stmt->execute([$id, $user['clinicId']]);
 
         send_json(['message' => 'Deactivated']);
     }

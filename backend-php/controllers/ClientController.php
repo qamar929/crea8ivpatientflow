@@ -26,8 +26,9 @@ class ClientController {
         $params = [$user['clinicId']];
 
         if (!empty($search)) {
-            $where[] = "(name LIKE ? OR phone LIKE ? OR email LIKE ?)";
+            $where[] = "(name LIKE ? OR phone LIKE ? OR email LIKE ? OR patientNo LIKE ?)";
             $searchParam = "%$search%";
+            $params[] = $searchParam;
             $params[] = $searchParam;
             $params[] = $searchParam;
             $params[] = $searchParam;
@@ -121,8 +122,8 @@ class ClientController {
         ]);
 
         // Get created client
-        $stmt = $db->prepare("SELECT * FROM Client WHERE id = ?");
-        $stmt->execute([$id]);
+        $stmt = $db->prepare("SELECT * FROM Client WHERE id = ? AND clinicId = ?");
+        $stmt->execute([$id, $user['clinicId']]);
         $client = $stmt->fetch();
 
         send_json($client, 201);
@@ -164,8 +165,8 @@ class ClientController {
         $stmt->execute($params);
 
         // Fetch updated client
-        $stmt = $db->prepare("SELECT * FROM Client WHERE id = ?");
-        $stmt->execute([$id]);
+        $stmt = $db->prepare("SELECT * FROM Client WHERE id = ? AND clinicId = ?");
+        $stmt->execute([$id, $user['clinicId']]);
         $client = $stmt->fetch();
 
         send_json($client);
@@ -175,8 +176,8 @@ class ClientController {
         $db = DB::getConnection();
         $this->assertClientInClinic($db, $id, $user['clinicId']);
 
-        $stmt = $db->prepare("UPDATE Client SET status = 'inactive' WHERE id = ?");
-        $stmt->execute([$id]);
+        $stmt = $db->prepare("UPDATE Client SET status = 'inactive' WHERE id = ? AND clinicId = ?");
+        $stmt->execute([$id, $user['clinicId']]);
 
         send_json(['message' => 'Client deactivated']);
     }
@@ -256,8 +257,8 @@ class ClientController {
         $db = DB::getConnection();
         $this->assertClientInClinic($db, $id, $user['clinicId']);
 
-        $stmt = $db->prepare("UPDATE Client SET portalEmail = ?, portalPasswordHash = ? WHERE id = ?");
-        $stmt->execute([$email, $hash, $id]);
+        $stmt = $db->prepare("UPDATE Client SET portalEmail = ?, portalPasswordHash = ? WHERE id = ? AND clinicId = ?");
+        $stmt->execute([$email, $hash, $id, $user['clinicId']]);
 
         send_json(['message' => 'Portal credentials set']);
     }

@@ -29,7 +29,7 @@ Scope: Transform the existing Smile Xperts clinic portal into a multi-tenant Saa
 | # | Finding | Severity | Where |
 |---|---|---|---|
 | 1 | Production DB password and JWT secrets hardcoded as fallbacks in committed code | 🔴 Critical | `backend-php/config.php` |
-| 2 | Demo users with plaintext passwords (`owner123` etc.) shipped inside the frontend JS bundle | 🔴 Critical | `src/config/roles.js` (`DEMO_USERS`) |
+| 2 | Historical demo credential references needed removal from production paths | ✅ Resolved in current React/PHP build | Frontend + seed docs |
 | 3 | **No forgot-password flow exists at all** — no route, no UI, no email | 🔴 Critical | Auth |
 | 4 | No rate limiting / brute-force lockout on login | 🔴 Critical | `index.php` |
 | 5 | `display_errors = 1` in production config — leaks stack traces and paths | 🔴 Critical | `config.php` |

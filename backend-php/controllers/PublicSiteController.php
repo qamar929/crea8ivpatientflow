@@ -17,13 +17,18 @@ class PublicSiteController {
     }
 
     // Which clinic owns this request? Resolve by the calling domain
-    // (?domain=, then Origin/Referer host), falling back to the oldest clinic.
-    private function resolveClinicByRequest($db) {
+    // (?domain=, then Origin/Referer host). Public booking endpoints must
+    // match a configured clinic domain so traffic never falls through to a
+    // different tenant by accident.
+    private function resolveClinicByRequest($db, $required = false) {
         $host = $_GET['domain'] ?? '';
         if ($host === '') {
             $host = $_SERVER['HTTP_ORIGIN'] ?? ($_SERVER['HTTP_REFERER'] ?? '');
         }
         $clinic = find_clinic_by_domain($db, $host);
+        if (!$clinic && $required) {
+            send_error('Clinic domain not recognized. Please open the clinic public site from its assigned domain.', 404);
+        }
         return $clinic ?: $this->getClinic($db);
     }
 
@@ -108,7 +113,7 @@ class PublicSiteController {
 
     public function getSite($input, $user = null) {
         $db = DB::getConnection();
-        $clinic = $this->resolveClinicByRequest($db);
+        $clinic = $this->resolveClinicByRequest($db, true);
         $config = $this->getConfig($db, $clinic);
 
         $stmt = $db->prepare("SELECT id, name, specialty, category, price, duration, description, popular FROM Service WHERE clinicId = ? AND isActive = 1 ORDER BY popular DESC, category ASC, name ASC");
@@ -184,9 +189,12 @@ class PublicSiteController {
         $duration = max(15, intval($_GET['duration'] ?? 30));
         $branchId = $_GET['branchId'] ?? '';
         if (!$staffId || !$date) send_error('staffId and date are required', 400);
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)) {
+            send_error('Invalid date format', 400);
+        }
 
         $db = DB::getConnection();
-        $clinic = $this->resolveClinicByRequest($db);
+        $clinic = $this->resolveClinicByRequest($db, true);
         $sql = "SELECT workingDays, workingHours FROM Staff WHERE id = ? AND clinicId = ? AND status = 'active'";
         $params = [$staffId, $clinic['id']];
         if ($branchId) { $sql .= " AND branchId = ?"; $params[] = $branchId; }
@@ -229,7 +237,7 @@ class PublicSiteController {
         if (count($input['serviceIds']) === 0) send_error('At least one service is required', 400);
 
         $db = DB::getConnection();
-        $clinic = $this->resolveClinicByRequest($db);
+        $clinic = $this->resolveClinicByRequest($db, true);
         $serviceIds = array_values(array_unique($input['serviceIds']));
         $marks = implode(',', array_fill(0, count($serviceIds), '?'));
         $stmt = $db->prepare("SELECT * FROM Service WHERE clinicId = ? AND isActive = 1 AND id IN ($marks)");
@@ -248,6 +256,12 @@ class PublicSiteController {
         $price = array_sum(array_map(function ($service) { return floatval($service['price']); }, $services));
         $date = $input['date'];
         $startTime = $input['startTime'];
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) || !preg_match('/^\d{2}:\d{2}$/', $startTime)) {
+            send_error('Invalid date or startTime format', 400);
+        }
+        if (strtotime("$date $startTime") <= time()) {
+            send_error('Please choose a future appointment slot.', 400);
+        }
         $endTime = date('H:i', strtotime("$date $startTime") + ($duration * 60));
 
         $stmt = $db->prepare("SELECT COUNT(*) FROM Appointment WHERE clinicId = ? AND staffId = ? AND date = ? AND status IN ('confirmed', 'pending') AND startTime < ? AND endTime > ?");

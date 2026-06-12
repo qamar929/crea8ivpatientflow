@@ -85,15 +85,9 @@ In Hostinger hPanel/phpMyAdmin:
 
 Important: `hostinger-go-live.sql` clears demo/old operational data. Run it only when you want the live database reset for The Smile Xperts.
 
-## Default Logins
+## Initial Logins
 
-Change these passwords after first login:
-
-```text
-Owner:     owner@thesmilexperts.com / owner123
-Reception: reception@thesmilexperts.com / reception123
-Staff:     staff@thesmilexperts.com / staff123
-```
+Do not keep shared/default passwords in production. Create the clinic owner through the superadmin portal and use the set-password invite flow, then let the owner create staff users with unique passwords.
 
 ## Go-Live Checks
 

@@ -68,10 +68,13 @@ async function main() {
   });
 
   const users = [
-    { name: 'Owner', email: 'owner@thesmileexpert.com', password: 'owner123', role: 'owner' },
-    { name: 'Reception Desk', email: 'reception@thesmileexpert.com', password: 'reception123', role: 'receptionist' },
-    { name: 'Dental Staff', email: 'staff@thesmileexpert.com', password: 'staff123', role: 'staff' },
+    { name: 'Owner', email: 'owner@thesmileexpert.com', password: process.env.SEED_OWNER_PASSWORD, role: 'owner' },
+    { name: 'Reception Desk', email: 'reception@thesmileexpert.com', password: process.env.SEED_RECEPTION_PASSWORD, role: 'receptionist' },
+    { name: 'Dental Staff', email: 'staff@thesmileexpert.com', password: process.env.SEED_STAFF_PASSWORD, role: 'staff' },
   ];
+  if (users.some((user) => !user.password || user.password.length < 10)) {
+    throw new Error('Set SEED_OWNER_PASSWORD, SEED_RECEPTION_PASSWORD, and SEED_STAFF_PASSWORD to strong values before seeding.');
+  }
   for (const user of users) {
     await prisma.user.create({
       data: {
@@ -233,9 +236,7 @@ async function main() {
   }
 
   console.log('Database seeded successfully.');
-  console.log('Owner: owner@thesmileexpert.com / owner123');
-  console.log('Reception: reception@thesmileexpert.com / reception123');
-  console.log('Staff: staff@thesmileexpert.com / staff123');
+  console.log('Seeded users: owner@thesmileexpert.com, reception@thesmileexpert.com, staff@thesmileexpert.com');
 }
 
 main().catch((error) => {

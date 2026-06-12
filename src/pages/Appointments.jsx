@@ -9,6 +9,7 @@ import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import Table from '../components/ui/Table';
+import PatientSearchSelect from '../components/ui/PatientSearchSelect';
 
 const localizer = momentLocalizer(moment);
 
@@ -172,10 +173,14 @@ function AppointmentFormModal({ isOpen, onClose, onSave, target, clients, staff,
       <div className="space-y-4">
         <div>
           <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Patient *</label>
-          <select className={inputCls} value={form.clientId} onChange={e => set('clientId', e.target.value)}>
-            <option value="">Select patient...</option>
-            {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+          <PatientSearchSelect
+            value={form.clientId}
+            onChange={(id) => set('clientId', id)}
+            initialLabel={target?.clientName || target?.client?.name || ''}
+            fallbackClients={clients}
+            inputClassName={inputCls}
+          />
+          <p className="mt-1 text-[11px] text-gray-400">Type a name, phone number, or patient # (e.g. PT-0042).</p>
         </div>
         <div>
           <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Treatment Service *</label>

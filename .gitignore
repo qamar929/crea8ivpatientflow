@@ -10,3 +10,4 @@ dist/
 
 # Backup artifacts
 backend-php/backups/
+backend-php/logs/*.log

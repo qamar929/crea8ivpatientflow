@@ -42,8 +42,8 @@ class MarketingController {
             $id, $user['clinicId'], $name, $type, $trigger, $subject, $body, $status
         ]);
 
-        $stmt = $db->prepare("SELECT * FROM Campaign WHERE id = ?");
-        $stmt->execute([$id]);
+        $stmt = $db->prepare("SELECT * FROM Campaign WHERE id = ? AND clinicId = ?");
+        $stmt->execute([$id, $user['clinicId']]);
         $campaign = $stmt->fetch();
 
         send_json($campaign, 201);
@@ -100,8 +100,15 @@ class MarketingController {
             send_error('Campaign not found', 404);
         }
 
-        // Find active clients
-        $stmtClients = $db->prepare("SELECT name, phone, email FROM Client WHERE clinicId = ? AND status = 'active'");
+        // Find active clients. WhatsApp marketing campaigns must respect the
+        // patient-level consent flag used by the WhatsApp center.
+        if ($campaign['type'] === 'whatsapp') {
+            $stmtClients = $db->prepare("SELECT name, phone, email FROM Client WHERE clinicId = ? AND status = 'active' AND whatsappMarketingOptIn = 1 AND phone IS NOT NULL");
+        } elseif ($campaign['type'] === 'email') {
+            $stmtClients = $db->prepare("SELECT name, phone, email FROM Client WHERE clinicId = ? AND status = 'active' AND email IS NOT NULL AND email != ''");
+        } else {
+            send_error('Unsupported campaign type', 400);
+        }
         $stmtClients->execute([$user['clinicId']]);
         $clients = $stmtClients->fetchAll();
 
@@ -121,16 +128,12 @@ class MarketingController {
                            "Content-Type: text/html; charset=UTF-8\r\n";
                 @mail($client['email'], $subject, $personalizedBody, $headers);
                 $sentCount++;
-            } else {
-                // Fallback / Log
-                error_log("Campaign sent to " . $client['name'] . ": " . substr($personalizedBody, 0, 50));
-                $sentCount++;
             }
         }
 
         // Update Campaign status
-        $stmtUpdate = $db->prepare("UPDATE Campaign SET sentCount = sentCount + ?, status = 'completed' WHERE id = ?");
-        $stmtUpdate->execute([$sentCount, $id]);
+        $stmtUpdate = $db->prepare("UPDATE Campaign SET sentCount = sentCount + ?, status = 'completed' WHERE id = ? AND clinicId = ?");
+        $stmtUpdate->execute([$sentCount, $id, $user['clinicId']]);
 
         send_json([
             'message' => "Campaign sent to $sentCount clients",

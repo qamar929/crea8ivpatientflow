@@ -108,8 +108,8 @@ class StaffController {
             $id, $user['clinicId'], $branchId, $name, $role, $designation, $specialty, $phone, $email, $avatar, $avatarColor, $qualifications, $experience, $bio, $workingDays, $workingHours, $status, $rating, $compensationType, $fixedSalary, $commissionRate, $treatmentCommissionRates, $portalRole, $loginEmail, $inviteStatus, $lastInviteSent
         ]);
 
-        $stmt = $db->prepare("SELECT * FROM Staff WHERE id = ?");
-        $stmt->execute([$id]);
+        $stmt = $db->prepare("SELECT * FROM Staff WHERE id = ? AND clinicId = ?");
+        $stmt->execute([$id, $user['clinicId']]);
         $createdStaff = $stmt->fetch();
 
         send_json($createdStaff, 201);
@@ -161,8 +161,8 @@ class StaffController {
             send_error('Staff member not found', 404);
         }
 
-        $stmt = $db->prepare("UPDATE Staff SET status = 'inactive' WHERE id = ?");
-        $stmt->execute([$id]);
+        $stmt = $db->prepare("UPDATE Staff SET status = 'inactive' WHERE id = ? AND clinicId = ?");
+        $stmt->execute([$id, $user['clinicId']]);
 
         send_json(['message' => 'Deactivated']);
     }
@@ -170,8 +170,8 @@ class StaffController {
     public function getPerformance($input, $user, $id) {
         $db = DB::getConnection();
         
-        $stmtCheck = $db->prepare("SELECT rating FROM Staff WHERE id = ?");
-        $stmtCheck->execute([$id]);
+        $stmtCheck = $db->prepare("SELECT rating FROM Staff WHERE id = ? AND clinicId = ?");
+        $stmtCheck->execute([$id, $user['clinicId']]);
         $rating = $stmtCheck->fetchColumn();
         if ($rating === false) {
             send_error('Staff member not found', 404);
@@ -180,13 +180,13 @@ class StaffController {
         $firstOfMonth = date('Y-m-01');
 
         // Total appointments count
-        $stmtAll = $db->prepare("SELECT COUNT(*) FROM Appointment WHERE staffId = ?");
-        $stmtAll->execute([$id]);
+        $stmtAll = $db->prepare("SELECT COUNT(*) FROM Appointment WHERE staffId = ? AND clinicId = ?");
+        $stmtAll->execute([$id, $user['clinicId']]);
         $allAppts = intval($stmtAll->fetchColumn());
 
         // Month appointments count
-        $stmtMonth = $db->prepare("SELECT COUNT(*) FROM Appointment WHERE staffId = ? AND date >= ?");
-        $stmtMonth->execute([$id, $firstOfMonth]);
+        $stmtMonth = $db->prepare("SELECT COUNT(*) FROM Appointment WHERE staffId = ? AND clinicId = ? AND date >= ?");
+        $stmtMonth->execute([$id, $user['clinicId'], $firstOfMonth]);
         $monthAppts = intval($stmtMonth->fetchColumn());
 
         // Total revenue
@@ -194,9 +194,9 @@ class StaffController {
             SELECT SUM(i.total) 
             FROM Invoice i 
             JOIN Appointment a ON i.appointmentId = a.id 
-            WHERE a.staffId = ?
+            WHERE a.staffId = ? AND a.clinicId = ?
         ");
-        $stmtRev->execute([$id]);
+        $stmtRev->execute([$id, $user['clinicId']]);
         $revenue = floatval($stmtRev->fetchColumn() ?: 0);
 
         send_json([
