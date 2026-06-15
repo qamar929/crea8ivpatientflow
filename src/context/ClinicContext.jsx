@@ -14,6 +14,14 @@ function isClinicUserSession() {
   }
 }
 
+function currentSessionClinicId() {
+  try {
+    return JSON.parse(localStorage.getItem('clinic_user') || '{}').clinicId || '';
+  } catch (_) {
+    return '';
+  }
+}
+
 // Drop null/undefined so sparse DB rows don't blank out sensible defaults.
 function compact(obj) {
   return Object.fromEntries(Object.entries(obj || {}).filter(([, v]) => v !== null && v !== undefined));
@@ -58,7 +66,11 @@ export function ClinicProvider({ children }) {
       // Trust the cache only when (a) a clinic user is signed in, or (b) this
       // domain was previously confirmed as a white-label clinic domain.
       // Otherwise (e.g. logged-out platform login) show the platform brand.
-      const trusted = saved && (isClinicUserSession() || saved._matchedDomain === window.location.hostname);
+      const sessionClinicId = currentSessionClinicId();
+      const trusted = saved && (
+        (isClinicUserSession() && saved._clinicId && saved._clinicId === sessionClinicId) ||
+        saved._matchedDomain === window.location.hostname
+      );
       if (!trusted) return defaultClinicInfo;
       return { ...defaultClinicInfo, ...saved, specialties: ['dental'] };
     } catch (_) {
@@ -105,7 +117,7 @@ export function ClinicProvider({ children }) {
       .then((data) => {
         if (data?.clinic) {
           setClinicMatched(true);
-          setClinicInfo((current) => ({ ...current, ...compact(data.clinic) }));
+          setClinicInfo((current) => ({ ...current, ...compact(data.clinic), _clinicId: data.clinic.id }));
         }
       })
       .catch(() => {});

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2, PlayCircle, PauseCircle, CalendarPlus, Globe, ShieldCheck, Plus, Pencil, Trash2, LogIn, Search, Copy, Check, X, Users as UsersIcon, Building2, CreditCard, Clock } from 'lucide-react';
+import { Loader2, PlayCircle, PauseCircle, CalendarPlus, Globe, ShieldCheck, Plus, Pencil, Trash2, LogIn, Search, Copy, Check, X, Users as UsersIcon, Building2, CreditCard, Clock, MessageCircle, Bot, KeyRound } from 'lucide-react';
 import { fetchApi } from '../../config/api';
 import Modal from '../../components/ui/Modal';
 import ColorPicker from '../../components/ui/ColorPicker';
@@ -398,6 +398,8 @@ function TenantDrawer({ id, onClose, onManage, onEdit }) {
               <Row label="Created">{data.createdAt ? String(data.createdAt).slice(0, 10) : '—'}</Row>
             </section>
 
+            <TenantAutomationControls tenantId={data.id} />
+
             {data.users?.length > 0 && (
               <section>
                 <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">Team ({data.users.length})</h3>
@@ -424,6 +426,143 @@ function TenantDrawer({ id, onClose, onManage, onEdit }) {
         )}
       </div>
     </div>
+  );
+}
+
+function TenantAutomationControls({ tenantId }) {
+  const [data, setData] = useState(null);
+  const [draft, setDraft] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+  const [notice, setNotice] = useState('');
+
+  useEffect(() => {
+    setData(null); setDraft(null); setErr(''); setNotice('');
+    fetchApi(`/admin/tenants/${tenantId}/automation`).then((res) => {
+      setData(res);
+      setDraft({
+        features: {
+          whatsappEnabled: !!Number(res.features?.whatsappEnabled),
+          whatsappMarketingEnabled: !!Number(res.features?.whatsappMarketingEnabled),
+          whatsappAutomationEnabled: !!Number(res.features?.whatsappAutomationEnabled),
+          aiEnabled: !!Number(res.features?.aiEnabled),
+          aiAutoReplyEnabled: !!Number(res.features?.aiAutoReplyEnabled),
+          aiHumanApprovalRequired: Number(res.features?.aiHumanApprovalRequired ?? 1) ? true : false,
+          monthlyAiTokenLimit: Number(res.features?.monthlyAiTokenLimit || 0),
+          monthlyWhatsAppLimit: Number(res.features?.monthlyWhatsAppLimit || 0),
+        },
+        whatsapp: {
+          phoneNumberId: res.whatsapp?.phoneNumberId || '',
+          businessAccountId: res.whatsapp?.businessAccountId || '',
+          accessToken: '',
+          webhookVerifyToken: '',
+          apiVersion: res.whatsapp?.apiVersion || 'v23.0',
+          simulationMode: Number(res.whatsapp?.simulationMode ?? 1) ? true : false,
+          quietHoursStart: res.whatsapp?.quietHoursStart || '21:00',
+          quietHoursEnd: res.whatsapp?.quietHoursEnd || '09:00',
+        },
+        platformAiProviders: (res.platformAiProviders || []).map((p) => ({ ...p, apiKey: '' })),
+      });
+    }).catch((e) => setErr(e.message));
+  }, [tenantId]);
+
+  const setFeature = (key, value) => setDraft((d) => ({ ...d, features: { ...d.features, [key]: value } }));
+  const setWhatsapp = (key, value) => setDraft((d) => ({ ...d, whatsapp: { ...d.whatsapp, [key]: value } }));
+  const setProvider = (idx, key, value) => setDraft((d) => ({
+    ...d,
+    platformAiProviders: d.platformAiProviders.map((p, i) => i === idx ? { ...p, [key]: value } : p),
+  }));
+
+  const save = async () => {
+    setSaving(true); setErr(''); setNotice('');
+    try {
+      const res = await fetchApi(`/admin/tenants/${tenantId}/automation`, { method: 'PUT', body: JSON.stringify(draft) });
+      setData(res);
+      setDraft((d) => ({
+        ...d,
+        whatsapp: { ...d.whatsapp, accessToken: '', webhookVerifyToken: '' },
+        platformAiProviders: d.platformAiProviders.map((p) => ({ ...p, apiKey: '' })),
+      }));
+      setNotice('Automation controls saved.');
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (!data || !draft) {
+    return <section className="rounded-xl border border-gray-200/70 p-4 text-sm text-gray-400 dark:border-white/10"><Loader2 className="mr-2 inline h-4 w-4 animate-spin" /> Loading automation controls…</section>;
+  }
+
+  return (
+    <section className="rounded-xl border border-gray-200/70 p-4 dark:border-white/10">
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-black text-gray-900 dark:text-white">Automation & AI</h3>
+          <p className="mt-1 text-xs text-gray-400">Superadmin controlled features, quotas and provider keys.</p>
+        </div>
+        <button onClick={save} disabled={saving} className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
+          {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Save
+        </button>
+      </div>
+      {err && <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{err}</div>}
+      {notice && <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">{notice}</div>}
+
+      <div className="mt-4 grid gap-3">
+        <div className="rounded-xl bg-gray-50 p-3 dark:bg-white/5">
+          <div className="mb-3 flex items-center gap-2 text-xs font-black uppercase tracking-wider text-gray-400"><MessageCircle className="h-4 w-4" /> WhatsApp package</div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {[
+              ['whatsappEnabled', 'Enable WhatsApp'],
+              ['whatsappMarketingEnabled', 'Marketing broadcasts'],
+              ['whatsappAutomationEnabled', 'Journeys / automations'],
+            ].map(([key, label]) => (
+              <label key={key} className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-bold dark:border-white/10 dark:bg-slate-900">
+                <input type="checkbox" checked={!!draft.features[key]} onChange={(e) => setFeature(key, e.target.checked)} /> {label}
+              </label>
+            ))}
+            <label className="text-xs font-semibold text-gray-500">Monthly message limit<input className={field} type="number" min="0" value={draft.features.monthlyWhatsAppLimit} onChange={(e) => setFeature('monthlyWhatsAppLimit', Number(e.target.value))} /></label>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <input className={field} placeholder="Phone Number ID" value={draft.whatsapp.phoneNumberId} onChange={(e) => setWhatsapp('phoneNumberId', e.target.value)} />
+            <input className={field} placeholder="WhatsApp Business Account ID" value={draft.whatsapp.businessAccountId} onChange={(e) => setWhatsapp('businessAccountId', e.target.value)} />
+            <input className={field} placeholder={data.whatsapp?.hasAccessToken ? 'Access token saved - enter to replace' : 'Permanent access token'} type="password" value={draft.whatsapp.accessToken} onChange={(e) => setWhatsapp('accessToken', e.target.value)} />
+            <input className={field} placeholder="Webhook verify token" value={draft.whatsapp.webhookVerifyToken} onChange={(e) => setWhatsapp('webhookVerifyToken', e.target.value)} />
+            <input className={field} placeholder="Graph API version" value={draft.whatsapp.apiVersion} onChange={(e) => setWhatsapp('apiVersion', e.target.value)} />
+            <label className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-bold dark:border-white/10 dark:bg-slate-900"><input type="checkbox" checked={draft.whatsapp.simulationMode} onChange={(e) => setWhatsapp('simulationMode', e.target.checked)} /> Simulation mode</label>
+          </div>
+        </div>
+
+        <div className="rounded-xl bg-gray-50 p-3 dark:bg-white/5">
+          <div className="mb-3 flex items-center gap-2 text-xs font-black uppercase tracking-wider text-gray-400"><Bot className="h-4 w-4" /> AI package</div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {[
+              ['aiEnabled', 'Enable AI hub'],
+              ['aiAutoReplyEnabled', 'Auto-reply draft engine'],
+              ['aiHumanApprovalRequired', 'Require human approval'],
+            ].map(([key, label]) => (
+              <label key={key} className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-bold dark:border-white/10 dark:bg-slate-900">
+                <input type="checkbox" checked={!!draft.features[key]} onChange={(e) => setFeature(key, e.target.checked)} /> {label}
+              </label>
+            ))}
+            <label className="text-xs font-semibold text-gray-500">Monthly token limit<input className={field} type="number" min="0" value={draft.features.monthlyAiTokenLimit} onChange={(e) => setFeature('monthlyAiTokenLimit', Number(e.target.value))} /></label>
+          </div>
+          <div className="mt-3 space-y-2">
+            {draft.platformAiProviders.map((provider, idx) => (
+              <div key={provider.provider} className="grid gap-2 rounded-lg border border-gray-200 bg-white p-2 dark:border-white/10 dark:bg-slate-900 sm:grid-cols-[90px_1fr_1fr]">
+                <label className="flex items-center gap-2 text-xs font-bold capitalize"><input type="checkbox" checked={!!provider.enabled} onChange={(e) => setProvider(idx, 'enabled', e.target.checked)} /> {provider.provider}</label>
+                <input className={field} placeholder="Model" value={provider.model || ''} onChange={(e) => setProvider(idx, 'model', e.target.value)} />
+                <div className="relative">
+                  <KeyRound className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                  <input className={`${field} pl-9`} type="password" placeholder={provider.hasApiKey ? 'API key saved - enter to replace' : 'API key'} value={provider.apiKey || ''} onChange={(e) => setProvider(idx, 'apiKey', e.target.value)} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
   );
 }
 

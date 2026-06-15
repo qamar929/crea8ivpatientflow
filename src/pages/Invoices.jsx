@@ -6,6 +6,7 @@ import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import ClinicLogoMark from '../components/branding/ClinicLogoMark';
+import PatientSearchSelect from '../components/ui/PatientSearchSelect';
 import { isReceptionist } from '../config/roles';
 
 const statusVariant = { paid: 'paid', pending: 'pending', partial: 'pending', refunded: 'refunded' };
@@ -40,7 +41,7 @@ const totalsFromForm = (form, selectedClient, editing = false) => {
   return { subtotal, discountAmt, taxAmt, total, previousBalance, grandTotal, balanceDue };
 };
 
-function InvoiceFormModal({ isOpen, onClose, onSave, invoice, clients, services, appointments, saving }) {
+function InvoiceFormModal({ isOpen, onClose, onSave, invoice, clients, services, appointments, saving, onPatientSelected }) {
   const [form, setForm] = useState(emptyInvoice);
 
   useEffect(() => {
@@ -106,10 +107,18 @@ function InvoiceFormModal({ isOpen, onClose, onSave, invoice, clients, services,
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="text-xs font-semibold text-gray-700 dark:text-gray-200">
             Patient
-            <select className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" value={form.clientId} onChange={e => set('clientId', e.target.value)}>
-              <option value="">Select patient</option>
-              {clients.map(client => <option key={client.id} value={client.id}>{client.patientNo ? `${client.patientNo} · ` : ''}{client.name}</option>)}
-            </select>
+            <div className="mt-1">
+              <PatientSearchSelect
+                value={form.clientId}
+                onChange={(id, patient) => {
+                  set('clientId', id);
+                  if (patient) onPatientSelected?.(patient);
+                }}
+                initialLabel={invoice?.client?.name || ''}
+                fallbackClients={clients}
+                inputClassName="w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/30"
+              />
+            </div>
           </label>
           <label className="text-xs font-semibold text-gray-700 dark:text-gray-200">
             Appointment
@@ -179,13 +188,14 @@ function InvoiceFormModal({ isOpen, onClose, onSave, invoice, clients, services,
   );
 }
 
-function InvoiceDetailModal({ invoice, isOpen, onClose, onMarkPaid, onRefund, onDownload }) {
+function InvoiceDetailModal({ invoice, isOpen, onClose, onMarkPaid, onRefund, onDownload, onPrint }) {
   const { clinicInfo } = useClinic();
   if (!invoice) return null;
+  const invoiceClinic = { ...clinicInfo, ...(invoice.clinic || {}) };
   const sendWhatsapp = () => {
     const phone = (invoice.client?.phone || '').replace(/\D/g, '');
     if (!phone) return alert('No WhatsApp number found for this patient.');
-    const message = `Hi ${invoice.client?.name || 'Patient'}, your invoice ${invoice.invoiceNo} from ${clinicInfo.name} is ${money(invoice.grandTotal)}. Paid: ${money(invoice.amountPaid)}. Balance: ${money(invoice.balanceDue)}.`;
+    const message = `Hi ${invoice.client?.name || 'Patient'}, your invoice ${invoice.invoiceNo} from ${invoiceClinic.name} is ${money(invoice.grandTotal)}. Paid: ${money(invoice.amountPaid)}. Balance: ${money(invoice.balanceDue)}.`;
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
@@ -194,10 +204,10 @@ function InvoiceDetailModal({ invoice, isOpen, onClose, onMarkPaid, onRefund, on
       <div className="space-y-6 printable-invoice">
         <div className="flex items-start justify-between">
           <div>
-            <ClinicLogoMark logo={clinicInfo.logo} alt={`${clinicInfo.name} logo`} className="mb-2 flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl" textClassName="text-white font-bold text-sm" style={{ background: 'var(--primary)' }} />
-            <p className="font-bold text-gray-900 dark:text-white">{clinicInfo.name}</p>
-            <p className="text-xs text-gray-500">{clinicInfo.address}</p>
-            <p className="text-xs text-gray-500">{clinicInfo.phone} · {clinicInfo.email}</p>
+            <ClinicLogoMark logo={invoiceClinic.logo} alt={`${invoiceClinic.name} logo`} className="mb-2 flex h-10 w-10 items-center justify-center overflow-hidden rounded-xl" textClassName="text-white font-bold text-sm" style={{ background: invoiceClinic.primaryColor || 'var(--primary)' }} />
+            <p className="font-bold text-gray-900 dark:text-white">{invoiceClinic.name}</p>
+            <p className="text-xs text-gray-500">{invoiceClinic.address}</p>
+            <p className="text-xs text-gray-500">{invoiceClinic.phone} · {invoiceClinic.email}</p>
           </div>
           <div className="text-right">
             <p className="text-2xl font-black text-gray-900 dark:text-white">INVOICE</p>
@@ -228,7 +238,7 @@ function InvoiceDetailModal({ invoice, isOpen, onClose, onMarkPaid, onRefund, on
         </div>
         {invoice.notes && <div className="rounded-xl border border-amber-100 bg-amber-50 p-3 text-xs text-amber-700">{invoice.notes}</div>}
         <div className="flex flex-wrap gap-2 no-print">
-          <Button variant="secondary" onClick={() => window.print()}>Print</Button>
+          <Button variant="secondary" onClick={() => onPrint(invoice)}>Print</Button>
           <Button variant="secondary" onClick={() => onDownload(invoice)}><Download className="h-4 w-4" /> PDF</Button>
           {invoice.status !== 'paid' && invoice.status !== 'refunded' && <Button onClick={() => onMarkPaid(invoice)}><CheckCircle className="h-4 w-4" /> Mark Paid</Button>}
           {invoice.status === 'paid' && <Button variant="secondary" onClick={() => onRefund(invoice)}><Undo2 className="h-4 w-4" /> Refund</Button>}
@@ -245,6 +255,8 @@ export default function Invoices() {
   const [clients, setClients] = useState([]);
   const [services, setServices] = useState([]);
   const [appointments, setAppointments] = useState([]);
+  const [pagination, setPagination] = useState({ total: 0, page: 1, pages: 1, limit: 50 });
+  const [serverStats, setServerStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
@@ -252,17 +264,49 @@ export default function Invoices() {
   const [showForm, setShowForm] = useState(false);
   const [editInvoice, setEditInvoice] = useState(null);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
+  const page = pagination.page;
 
-  const loadData = async () => {
-    setLoading(true);
+  const loadData = async ({ showSpinner = true } = {}) => {
+    const params = new URLSearchParams({
+      paginated: 'true',
+      page: String(page),
+      limit: String(pagination.limit),
+    });
+    if (statusFilter !== 'all') params.set('status', statusFilter);
+    if (search.trim()) params.set('search', search.trim());
+    if (receptionist) {
+      const today = new Date().toISOString().slice(0, 10);
+      params.set('from', today);
+      params.set('to', today);
+    }
+
+    const today = new Date();
+    const from = new Date(today);
+    from.setDate(today.getDate() - 30);
+    const to = new Date(today);
+    to.setDate(today.getDate() + 60);
+    const dateRange = `from=${from.toISOString().slice(0, 10)}&to=${to.toISOString().slice(0, 10)}`;
+
+    if (showSpinner) setLoading(true);
     try {
       const [invoiceRows, clientRows, serviceRows, appointmentRows] = await Promise.all([
-        fetchApi('/invoices'),
-        fetchApi('/clients'),
+        fetchApi(`/invoices?${params.toString()}`),
+        fetchApi('/clients?limit=20'),
         fetchApi('/services'),
-        fetchApi('/appointments'),
+        fetchApi(`/appointments?${dateRange}&limit=100`),
       ]);
-      setInvoices(invoiceRows);
+      const rows = Array.isArray(invoiceRows) ? invoiceRows : (invoiceRows.invoices || []);
+      setInvoices(rows);
+      if (!Array.isArray(invoiceRows)) {
+        setPagination(current => ({
+          ...current,
+          total: Number(invoiceRows.total || 0),
+          page: Number(invoiceRows.page || page),
+          pages: Number(invoiceRows.pages || 1),
+          limit: Number(invoiceRows.limit || current.limit),
+        }));
+        setServerStats(invoiceRows.stats || null);
+      }
       setClients(Array.isArray(clientRows) ? clientRows : (clientRows.clients || []));
       setServices(serviceRows);
       setAppointments(appointmentRows);
@@ -273,26 +317,29 @@ export default function Invoices() {
     }
   };
 
-  useEffect(() => { loadData(); }, []);
+  useEffect(() => {
+    const timer = setTimeout(() => loadData(), search.trim() ? 250 : 0);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [page, search, statusFilter, receptionist]);
 
-  const visibleInvoices = useMemo(() => {
-    const today = new Date().toISOString().slice(0, 10);
-    return receptionist ? invoices.filter(inv => String(inv.createdAt || '').slice(0, 10) === today) : invoices;
-  }, [invoices, receptionist]);
-
-  const filtered = visibleInvoices.filter(inv => {
-    const query = search.trim().toLowerCase();
-    if (statusFilter !== 'all' && inv.status !== statusFilter) return false;
-    if (!query) return true;
-    return [inv.invoiceNo, inv.client?.name, inv.client?.phone].some(value => String(value || '').toLowerCase().includes(query));
-  });
+  const filtered = invoices;
 
   const stats = useMemo(() => ({
-    invoiced: visibleInvoices.reduce((sum, inv) => sum + Number(inv.grandTotal || inv.total || 0), 0),
-    paid: visibleInvoices.reduce((sum, inv) => sum + Number(inv.amountPaid || 0), 0),
-    balance: visibleInvoices.reduce((sum, inv) => sum + Number(inv.balanceDue || 0), 0),
-    patientDues: clients.reduce((sum, client) => sum + Number(client.outstandingBalance || 0), 0),
-  }), [visibleInvoices, clients]);
+    invoiced: Number(serverStats?.invoiced ?? invoices.reduce((sum, inv) => sum + Number(inv.grandTotal || inv.total || 0), 0)),
+    paid: Number(serverStats?.paid ?? invoices.reduce((sum, inv) => sum + Number(inv.amountPaid || 0), 0)),
+    balance: Number(serverStats?.balance ?? invoices.reduce((sum, inv) => sum + Number(inv.balanceDue || 0), 0)),
+    patientDues: Number(serverStats?.patientDues ?? clients.reduce((sum, client) => sum + Number(client.outstandingBalance || 0), 0)),
+  }), [invoices, clients, serverStats]);
+
+  const goToPage = (nextPage) => {
+    setPagination(current => ({ ...current, page: Math.min(Math.max(1, nextPage), current.pages || 1) }));
+  };
+
+  const rememberPatient = (patient) => {
+    if (!patient?.id) return;
+    setClients(current => current.some(row => row.id === patient.id) ? current : [patient, ...current]);
+  };
 
   const saveInvoice = async (payload) => {
     setSaving(true);
@@ -343,20 +390,41 @@ export default function Invoices() {
     }
   };
 
+  const fetchPdfBlobUrl = async (invoice) => {
+    const token = localStorage.getItem('clinic_token');
+    const response = await fetch(`${API_URL}/invoices/${invoice.id}/pdf`, { headers: { Authorization: `Bearer ${token}` } });
+    if (!response.ok) {
+      let msg = 'PDF could not be generated.';
+      try { const j = await response.json(); if (j.error) msg = j.error; } catch (_) { /* non-JSON */ }
+      throw new Error(msg);
+    }
+    const blob = await response.blob();
+    return URL.createObjectURL(blob);
+  };
+
   const downloadPdf = async (invoice) => {
     try {
-      const token = localStorage.getItem('clinic_token');
-      const response = await fetch(`${API_URL}/invoices/${invoice.id}/pdf`, { headers: { Authorization: `Bearer ${token}` } });
-      if (!response.ok) throw new Error('PDF could not be downloaded.');
-      const blob = await response.blob();
-      const url = URL.createObjectURL(blob);
+      const url = await fetchPdfBlobUrl(invoice);
       const a = document.createElement('a');
       a.href = url;
       a.download = `${invoice.invoiceNo}.pdf`;
       a.click();
-      URL.revokeObjectURL(url);
+      setTimeout(() => URL.revokeObjectURL(url), 10000);
     } catch (err) {
       alert(err.message || 'PDF could not be downloaded.');
+    }
+  };
+
+  // Print uses the same server-rendered PDF (clean A4 portrait) instead of
+  // window.print() on the modal, which printed the whole app shell.
+  const printPdf = async (invoice) => {
+    try {
+      const url = await fetchPdfBlobUrl(invoice);
+      const w = window.open(url, '_blank');
+      if (w) { w.addEventListener('load', () => { try { w.print(); } catch (_) {} }); }
+      setTimeout(() => URL.revokeObjectURL(url), 60000);
+    } catch (err) {
+      alert(err.message || 'PDF could not be opened.');
     }
   };
 
@@ -392,11 +460,11 @@ export default function Invoices() {
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-gray-100 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-slate-900">
         <div className="relative min-w-[220px] flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          <input className="w-full rounded-lg border border-gray-200 py-2 pl-9 pr-3 text-sm dark:border-white/10 dark:bg-slate-900" placeholder="Search invoice, patient, phone..." value={search} onChange={e => setSearch(e.target.value)} />
+          <input className="w-full rounded-lg border border-gray-200 py-2 pl-9 pr-3 text-sm dark:border-white/10 dark:bg-slate-900" placeholder="Search invoice, patient, phone..." value={search} onChange={e => { setSearch(e.target.value); goToPage(1); }} />
         </div>
         <div className="flex gap-1">
           {['all', 'paid', 'partial', 'pending', 'refunded'].map(status => (
-            <button key={status} onClick={() => setStatusFilter(status)} className={`rounded-lg border px-3 py-2 text-xs font-medium capitalize ${statusFilter === status ? 'border-transparent bg-gradient-to-r from-[var(--primary)] to-[var(--secondary)] text-white' : 'border-gray-200 text-gray-600 dark:border-white/10 dark:text-gray-300'}`}>{status}</button>
+            <button key={status} onClick={() => { setStatusFilter(status); goToPage(1); }} className={`rounded-lg border px-3 py-2 text-xs font-medium capitalize ${statusFilter === status ? 'border-transparent bg-gradient-to-r from-[var(--primary)] to-[var(--secondary)] text-white' : 'border-gray-200 text-gray-600 dark:border-white/10 dark:text-gray-300'}`}>{status}</button>
           ))}
         </div>
       </div>
@@ -438,8 +506,20 @@ export default function Invoices() {
         )}
       </div>
 
-      <InvoiceFormModal isOpen={showForm} onClose={() => { setShowForm(false); setEditInvoice(null); }} onSave={saveInvoice} invoice={editInvoice} clients={clients} services={services} appointments={appointments} saving={saving} />
-      <InvoiceDetailModal invoice={selectedInvoice} isOpen={!!selectedInvoice} onClose={() => setSelectedInvoice(null)} onMarkPaid={markPaid} onRefund={refundInvoice} onDownload={downloadPdf} />
+      {!loading && pagination.total > 0 && (
+        <div className="flex flex-col gap-3 rounded-xl border border-gray-100 bg-white p-4 text-sm text-gray-600 shadow-sm dark:border-white/10 dark:bg-slate-900 dark:text-gray-300 sm:flex-row sm:items-center sm:justify-between">
+          <span>
+            Showing {filtered.length} of {pagination.total.toLocaleString()} invoices · Page {pagination.page} of {pagination.pages}
+          </span>
+          <div className="flex gap-2">
+            <Button variant="secondary" size="sm" disabled={pagination.page <= 1} onClick={() => goToPage(pagination.page - 1)}>Previous</Button>
+            <Button variant="secondary" size="sm" disabled={pagination.page >= pagination.pages} onClick={() => goToPage(pagination.page + 1)}>Next</Button>
+          </div>
+        </div>
+      )}
+
+      <InvoiceFormModal isOpen={showForm} onClose={() => { setShowForm(false); setEditInvoice(null); }} onSave={saveInvoice} invoice={editInvoice} clients={clients} services={services} appointments={appointments} saving={saving} onPatientSelected={rememberPatient} />
+      <InvoiceDetailModal invoice={selectedInvoice} isOpen={!!selectedInvoice} onClose={() => setSelectedInvoice(null)} onMarkPaid={markPaid} onRefund={refundInvoice} onDownload={downloadPdf} onPrint={printPdf} />
     </div>
   );
 }

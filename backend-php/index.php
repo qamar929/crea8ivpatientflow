@@ -204,6 +204,8 @@ $routes = [
     ['GET', '^api/v1/admin/tenants$', 'AdminController', 'listTenants', 'admin'],
     ['POST', '^api/v1/admin/tenants$', 'AdminController', 'createTenant', 'admin'],
     ['GET', '^api/v1/admin/tenants/([^/]+)$', 'AdminController', 'getTenant', 'admin'],
+    ['GET', '^api/v1/admin/tenants/([^/]+)/automation$', 'AdminController', 'getTenantAutomation', 'admin'],
+    ['PUT', '^api/v1/admin/tenants/([^/]+)/automation$', 'AdminController', 'updateTenantAutomation', 'admin'],
     ['POST', '^api/v1/admin/tenants/([^/]+)/activate$', 'AdminController', 'activateTenant', 'admin'],
     ['POST', '^api/v1/admin/tenants/([^/]+)/suspend$', 'AdminController', 'suspendTenant', 'admin'],
     ['POST', '^api/v1/admin/tenants/([^/]+)/extend$', 'AdminController', 'extendTenant', 'admin'],

@@ -2,11 +2,67 @@
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../services/mailService.php';
+require_once __DIR__ . '/../services/metaWhatsAppService.php';
+require_once __DIR__ . '/../services/tenantFeatureService.php';
 
 const PLAN_MONTHLY_PKR = 30000;
 const PLAN_ANNUAL_PKR  = 240000; // 20,000/month billed yearly
 
 class AdminController {
+    private function ensureAiProviderSettings($db) {
+        if (DB_DRIVER === 'sqlite') {
+            $db->exec("CREATE TABLE IF NOT EXISTS AIProviderSetting (
+                id TEXT PRIMARY KEY,
+                clinicId TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                apiKey TEXT,
+                enabled INTEGER DEFAULT 0,
+                model TEXT,
+                monthlyTokenLimit INTEGER DEFAULT 0,
+                tokenUsage INTEGER DEFAULT 0,
+                costEstimate REAL DEFAULT 0,
+                status TEXT DEFAULT 'not_configured',
+                updatedAt TEXT DEFAULT CURRENT_TIMESTAMP
+            )");
+            $db->exec("CREATE UNIQUE INDEX IF NOT EXISTS AIProviderSetting_clinic_provider ON AIProviderSetting(clinicId, provider)");
+        } else {
+            $db->exec("CREATE TABLE IF NOT EXISTS AIProviderSetting (
+                id VARCHAR(64) PRIMARY KEY,
+                clinicId VARCHAR(64) NOT NULL,
+                provider VARCHAR(40) NOT NULL,
+                apiKey TEXT,
+                enabled TINYINT DEFAULT 0,
+                model VARCHAR(120),
+                monthlyTokenLimit INT DEFAULT 0,
+                tokenUsage INT DEFAULT 0,
+                costEstimate DECIMAL(12,4) DEFAULT 0,
+                status VARCHAR(40) DEFAULT 'not_configured',
+                updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY AIProviderSetting_clinic_provider (clinicId, provider)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        }
+    }
+
+    private function ensurePlatformAiDefaults($db) {
+        $this->ensureAiProviderSettings($db);
+        $defaults = [
+            ['chatgpt', 'gpt-4o-mini'],
+            ['gemini', 'gemini-1.5-flash'],
+            ['claude', 'claude-3-5-sonnet'],
+        ];
+        foreach ($defaults as [$provider, $model]) {
+            $sql = DB_DRIVER === 'sqlite'
+                ? "INSERT OR IGNORE INTO AIProviderSetting (id, clinicId, provider, model, enabled, status) VALUES (?, 'platform', ?, ?, 0, 'not_configured')"
+                : "INSERT IGNORE INTO AIProviderSetting (id, clinicId, provider, model, enabled, status) VALUES (?, 'platform', ?, ?, 0, 'not_configured')";
+            $db->prepare($sql)->execute([generate_uuid(), $provider, $model]);
+        }
+    }
+
+    private function publicWhatsappSettings($settings) {
+        $settings['hasAccessToken'] = !empty($settings['accessToken']);
+        unset($settings['accessToken']);
+        return $settings;
+    }
 
     private function slugify($db, $name) {
         $base = strtolower(trim(preg_replace('/[^a-z0-9]+/i', '-', $name), '-'));
@@ -136,6 +192,99 @@ class AdminController {
         $clinic['users'] = $stmt->fetchAll();
 
         send_json($clinic);
+    }
+
+    public function getTenantAutomation($input, $user, $id) {
+        $db = DB::getConnection();
+        $stmt = $db->prepare("SELECT id, name FROM Clinic WHERE id = ? AND id != 'platform'");
+        $stmt->execute([$id]);
+        $clinic = $stmt->fetch();
+        if (!$clinic) send_error('Tenant not found', 404);
+
+        tenant_features_ensure($db);
+        $features = tenant_features_get($db, $id);
+
+        $stmt = $db->prepare("SELECT * FROM WhatsAppSetting WHERE clinicId = ?");
+        $stmt->execute([$id]);
+        $whatsapp = $stmt->fetch() ?: ['clinicId' => $id, 'simulationMode' => 1, 'apiVersion' => 'v23.0'];
+
+        $this->ensurePlatformAiDefaults($db);
+        $stmt = $db->prepare("SELECT provider, enabled, model, monthlyTokenLimit, tokenUsage, costEstimate, status, apiKey FROM AIProviderSetting WHERE clinicId = 'platform' ORDER BY provider");
+        $stmt->execute();
+        $providers = $stmt->fetchAll();
+        foreach ($providers as &$provider) {
+            $provider['hasApiKey'] = !empty($provider['apiKey']);
+            $provider['enabled'] = !empty($provider['enabled']);
+            unset($provider['apiKey']);
+        }
+
+        send_json([
+            'clinic' => $clinic,
+            'features' => $features,
+            'whatsapp' => $this->publicWhatsappSettings($whatsapp),
+            'platformAiProviders' => $providers,
+        ]);
+    }
+
+    public function updateTenantAutomation($input, $user, $id) {
+        $db = DB::getConnection();
+        $stmt = $db->prepare("SELECT id FROM Clinic WHERE id = ? AND id != 'platform'");
+        $stmt->execute([$id]);
+        if (!$stmt->fetch()) send_error('Tenant not found', 404);
+
+        $features = tenant_features_save($db, $id, $input['features'] ?? []);
+
+        if (isset($input['whatsapp']) && is_array($input['whatsapp'])) {
+            $w = $input['whatsapp'];
+            $currentStmt = $db->prepare("SELECT accessToken, webhookVerifyToken FROM WhatsAppSetting WHERE clinicId = ?");
+            $currentStmt->execute([$id]);
+            $current = $currentStmt->fetch() ?: [];
+            $token = !empty($w['accessToken']) ? meta_encrypt_secret($w['accessToken']) : ($current['accessToken'] ?? null);
+            $verifyToken = array_key_exists('webhookVerifyToken', $w) && $w['webhookVerifyToken'] !== ''
+                ? trim((string)$w['webhookVerifyToken'])
+                : ($current['webhookVerifyToken'] ?? null);
+            $sql = DB_DRIVER === 'sqlite'
+                ? "INSERT INTO WhatsAppSetting(clinicId, phoneNumberId, businessAccountId, accessToken, webhookVerifyToken, apiVersion, simulationMode, quietHoursStart, quietHoursEnd)
+                   VALUES(?,?,?,?,?,?,?,?,?)
+                   ON CONFLICT(clinicId) DO UPDATE SET phoneNumberId=excluded.phoneNumberId, businessAccountId=excluded.businessAccountId, accessToken=excluded.accessToken, webhookVerifyToken=excluded.webhookVerifyToken, apiVersion=excluded.apiVersion, simulationMode=excluded.simulationMode, quietHoursStart=excluded.quietHoursStart, quietHoursEnd=excluded.quietHoursEnd, updatedAt=CURRENT_TIMESTAMP"
+                : "INSERT INTO WhatsAppSetting(clinicId, phoneNumberId, businessAccountId, accessToken, webhookVerifyToken, apiVersion, simulationMode, quietHoursStart, quietHoursEnd)
+                   VALUES(?,?,?,?,?,?,?,?,?)
+                   ON DUPLICATE KEY UPDATE phoneNumberId=VALUES(phoneNumberId), businessAccountId=VALUES(businessAccountId), accessToken=VALUES(accessToken), webhookVerifyToken=VALUES(webhookVerifyToken), apiVersion=VALUES(apiVersion), simulationMode=VALUES(simulationMode), quietHoursStart=VALUES(quietHoursStart), quietHoursEnd=VALUES(quietHoursEnd), updatedAt=CURRENT_TIMESTAMP";
+            $db->prepare($sql)->execute([
+                $id,
+                trim((string)($w['phoneNumberId'] ?? '')) ?: null,
+                trim((string)($w['businessAccountId'] ?? '')) ?: null,
+                $token,
+                $verifyToken,
+                trim((string)($w['apiVersion'] ?? 'v23.0')) ?: 'v23.0',
+                !empty($w['simulationMode']) ? 1 : 0,
+                trim((string)($w['quietHoursStart'] ?? '21:00')) ?: '21:00',
+                trim((string)($w['quietHoursEnd'] ?? '09:00')) ?: '09:00',
+            ]);
+        }
+
+        if (isset($input['platformAiProviders']) && is_array($input['platformAiProviders'])) {
+            $this->ensurePlatformAiDefaults($db);
+            foreach ($input['platformAiProviders'] as $providerInput) {
+                $provider = strtolower($providerInput['provider'] ?? '');
+                if (!in_array($provider, ['chatgpt', 'gemini', 'claude'], true)) continue;
+                $existing = $db->prepare("SELECT apiKey FROM AIProviderSetting WHERE clinicId = 'platform' AND provider = ?");
+                $existing->execute([$provider]);
+                $currentKey = $existing->fetchColumn();
+                $apiKey = !empty($providerInput['apiKey']) ? $providerInput['apiKey'] : ($currentKey ?: null);
+                $enabled = !empty($providerInput['enabled']) ? 1 : 0;
+                $model = trim((string)($providerInput['model'] ?? '')) ?: null;
+                $limit = max(0, intval($providerInput['monthlyTokenLimit'] ?? 0));
+                $status = $enabled ? ($apiKey ? 'ready' : 'missing_key') : 'disabled';
+                $sql = DB_DRIVER === 'sqlite'
+                    ? "INSERT INTO AIProviderSetting (id, clinicId, provider, apiKey, enabled, model, monthlyTokenLimit, status) VALUES (?, 'platform', ?, ?, ?, ?, ?, ?) ON CONFLICT(clinicId, provider) DO UPDATE SET apiKey=excluded.apiKey, enabled=excluded.enabled, model=excluded.model, monthlyTokenLimit=excluded.monthlyTokenLimit, status=excluded.status, updatedAt=CURRENT_TIMESTAMP"
+                    : "INSERT INTO AIProviderSetting (id, clinicId, provider, apiKey, enabled, model, monthlyTokenLimit, status) VALUES (?, 'platform', ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE apiKey=VALUES(apiKey), enabled=VALUES(enabled), model=VALUES(model), monthlyTokenLimit=VALUES(monthlyTokenLimit), status=VALUES(status), updatedAt=CURRENT_TIMESTAMP";
+                $db->prepare($sql)->execute([generate_uuid(), $provider, $apiKey, $enabled, $model, $limit, $status]);
+            }
+        }
+
+        log_audit($id, $user['id'], 'tenant_automation_updated', 'ClinicFeatureSetting', $id, null, $features);
+        $this->getTenantAutomation([], $user, $id);
     }
 
     public function activateTenant($input, $user, $id) {

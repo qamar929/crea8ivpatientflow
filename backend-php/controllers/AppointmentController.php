@@ -57,6 +57,9 @@ class AppointmentController {
         $branchId = $_GET['branchId'] ?? '';
         $from = $_GET['from'] ?? '';
         $to = $_GET['to'] ?? '';
+        $limit = isset($_GET['limit']) ? min(200, max(1, intval($_GET['limit']))) : 0;
+        $page = max(1, intval($_GET['page'] ?? 1));
+        $offset = ($page - 1) * max(1, $limit);
 
         $db = DB::getConnection();
         $where = ["a.clinicId = ?"];
@@ -95,11 +98,14 @@ class AppointmentController {
                        s.name as staffName, s.role as staffRole, s.avatarColor as staffAvatarColor,
                        srv.name as serviceName
                 FROM Appointment a
-                LEFT JOIN Client c ON a.clientId = c.id
-                LEFT JOIN Staff s ON a.staffId = s.id
-                LEFT JOIN Service srv ON a.serviceId = srv.id
+                LEFT JOIN Client c ON a.clientId = c.id AND c.clinicId = a.clinicId
+                LEFT JOIN Staff s ON a.staffId = s.id AND s.clinicId = a.clinicId
+                LEFT JOIN Service srv ON a.serviceId = srv.id AND srv.clinicId = a.clinicId
                 WHERE $whereSql
                 ORDER BY a.date ASC, a.startTime ASC";
+        if ($limit > 0) {
+            $sql .= " LIMIT $limit OFFSET $offset";
+        }
 
         $stmt = $db->prepare($sql);
         $stmt->execute($params);
@@ -142,9 +148,9 @@ class AppointmentController {
                        s.name as staffName, s.role as staffRole, s.avatarColor as staffAvatarColor,
                        srv.name as serviceName
                 FROM Appointment a
-                LEFT JOIN Client c ON a.clientId = c.id
-                LEFT JOIN Staff s ON a.staffId = s.id
-                LEFT JOIN Service srv ON a.serviceId = srv.id
+                LEFT JOIN Client c ON a.clientId = c.id AND c.clinicId = a.clinicId
+                LEFT JOIN Staff s ON a.staffId = s.id AND s.clinicId = a.clinicId
+                LEFT JOIN Service srv ON a.serviceId = srv.id AND srv.clinicId = a.clinicId
                 WHERE a.id = ? AND a.clinicId = ?";
         
         $stmt = $db->prepare($sql);
