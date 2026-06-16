@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Activity, AlertTriangle, BarChart3, Bot, CheckCircle2, ChevronRight, CircleDollarSign, Clock3,
   FileText, Languages, Library, LockKeyhole, MessageCircle, Play, Plus, RefreshCw, Search,
-  Send, Settings2, ShieldCheck, Sparkles, Target, TestTube2, Users, Wifi,
+  Send, Settings2, ShieldCheck, Sparkles, Target, TestTube2, Users, Wifi, Loader2,
 } from 'lucide-react';
 import { fetchApi } from '../config/api';
 import { useSearchParams } from 'react-router-dom';
@@ -84,6 +84,18 @@ export default function WhatsAppCenter() {
     setComposer({ ...composer, body: '', mediaUrl: '' });
     const data = await fetchApi(`/whatsapp/conversations/${selected.id}`); setConversation(data.conversation); setMessages(data.messages); setNotice('Message queued successfully.');
   };
+  const [suggesting, setSuggesting] = useState(false);
+  const suggestReply = async () => {
+    if (!selected) return;
+    setSuggesting(true); setNotice('');
+    try {
+      const res = await fetchApi(`/whatsapp/conversations/${selected.id}/ai-suggest`, { method: 'POST', body: '{}' });
+      setComposer(c => ({ ...c, body: res.suggestion || '' }));
+      setNotice('AI drafted a reply — review and edit before sending.');
+    } catch (e) {
+      setNotice(e.message);
+    } finally { setSuggesting(false); }
+  };
   const toggleAutomation = async flow => {
     await fetchApi(`/whatsapp/automations/${flow.id}/toggle`, { method: 'PUT', body: JSON.stringify({ isActive: !Number(flow.isActive) }) });
     setAutomations(await fetchApi('/whatsapp/automations'));
@@ -164,7 +176,7 @@ export default function WhatsAppCenter() {
       </div>
 
       {tab === 'connectivity' && <Connectivity features={features} settings={settings} setSettings={setSettings} saveSettings={saveSettings} health={health} diagnostics={diagnostics} testPhone={testPhone} setTestPhone={setTestPhone} testMessage={testMessage} retryQueue={retryQueue} syncTemplates={syncTemplates} />}
-      {tab === 'inbox' && <Inbox features={features} contacts={visibleContacts} selected={selected} setSelected={setSelected} search={search} setSearch={setSearch} profile={profile} conversation={conversation} messages={messages} composer={composer} setComposer={setComposer} sendMessage={sendMessage} saveConversation={saveConversation} saveConsent={saveConsent} />}
+      {tab === 'inbox' && <Inbox features={features} contacts={visibleContacts} selected={selected} setSelected={setSelected} search={search} setSearch={setSearch} profile={profile} conversation={conversation} messages={messages} composer={composer} setComposer={setComposer} sendMessage={sendMessage} suggestReply={suggestReply} suggesting={suggesting} saveConversation={saveConversation} saveConsent={saveConsent} />}
       {tab === 'campaigns' && <Campaigns features={features} campaigns={campaigns} campaign={campaign} setCampaign={setCampaign} segments={segments} templates={templates} createCampaign={createCampaign} launchCampaign={launchCampaign} />}
       {tab === 'journeys' && <Journeys features={features} automations={automations} toggleAutomation={toggleAutomation} templates={templates} journey={journey} setJourney={setJourney} createJourney={createJourney} runJourneyCycle={runJourneyCycle} />}
       {tab === 'segments' && <Segments segments={segments} />}
@@ -190,7 +202,7 @@ function Connectivity({ features, settings, setSettings, saveSettings, health, d
   </div>;
 }
 
-function Inbox({ features, contacts, selected, setSelected, search, setSearch, profile, conversation, messages, composer, setComposer, sendMessage, saveConversation, saveConsent }) {
+function Inbox({ features, contacts, selected, setSelected, search, setSearch, profile, conversation, messages, composer, setComposer, sendMessage, suggestReply, suggesting, saveConversation, saveConsent }) {
   const freeReply = conversation?.freeReplyUntil && new Date(conversation.freeReplyUntil) > new Date();
   return <div className="grid min-h-[680px] overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm dark:border-white/10 dark:bg-slate-900 lg:grid-cols-[260px_1fr_285px]">
     <aside className="border-b border-slate-200 dark:border-white/10 lg:border-b-0 lg:border-r">
@@ -202,7 +214,7 @@ function Inbox({ features, contacts, selected, setSelected, search, setSearch, p
       <div className="flex-1 space-y-3 overflow-auto bg-slate-50/70 p-4 dark:bg-slate-950/40">{messages.length ? messages.map(m => <div key={m.id} className={`flex ${m.direction === 'outbound' ? 'justify-end' : 'justify-start'}`}><div className={`max-w-[80%] rounded-2xl px-3 py-2.5 text-xs leading-5 ${m.direction === 'outbound' ? 'rounded-br-sm bg-emerald-600 text-white' : 'rounded-bl-sm bg-white shadow dark:bg-slate-800'}`}><p>{m.body}</p><span className="mt-1 block text-[9px] opacity-70">{m.purpose} · {m.deliveryStatus}</span></div></div>) : <div className="grid h-full place-items-center text-center text-sm text-slate-400">Start a helpful, privacy-conscious patient conversation.</div>}</div>
       <div className="border-t border-slate-200 p-3 dark:border-white/10">
         <div className="mb-2 flex flex-wrap gap-1.5">{Object.entries(quickMessages).map(([key, text]) => <button key={key} onClick={() => setComposer({ ...composer, body: text, purpose: key === 'recommendation' ? 'clinical' : key })} className="rounded-lg bg-slate-100 px-2 py-1 text-[10px] font-bold capitalize text-slate-600 dark:bg-white/10 dark:text-slate-300">{key}</button>)}</div>
-        <div className="grid gap-2 md:grid-cols-[110px_110px_1fr_auto]"><Select value={composer.purpose} onChange={e => setComposer({ ...composer, purpose: e.target.value })}>{purposes.map(p => <option key={p}>{p}</option>)}</Select><Select value={composer.messageType} onChange={e => setComposer({ ...composer, messageType: e.target.value })}><option>text</option><option>image</option><option>video</option><option value="document">PDF / document</option></Select><Input value={composer.body} onChange={e => setComposer({ ...composer, body: e.target.value })} placeholder="Write a patient-friendly message..." /><Button disabled={!features.whatsappEnabled} onClick={sendMessage}><Send className="h-4 w-4" /> Send</Button></div>
+        <div className="grid gap-2 md:grid-cols-[110px_110px_1fr_auto]"><Select value={composer.purpose} onChange={e => setComposer({ ...composer, purpose: e.target.value })}>{purposes.map(p => <option key={p}>{p}</option>)}</Select><Select value={composer.messageType} onChange={e => setComposer({ ...composer, messageType: e.target.value })}><option>text</option><option>image</option><option>video</option><option value="document">PDF / document</option></Select><Input value={composer.body} onChange={e => setComposer({ ...composer, body: e.target.value })} placeholder="Write a patient-friendly message..." /><div className="flex gap-2"><Button variant="secondary" disabled={!features.whatsappEnabled || suggesting} onClick={suggestReply} title="Draft a reply with AI (you review before sending)">{suggesting ? <Loader2 className="h-4 w-4 animate-spin" /> : <Sparkles className="h-4 w-4" />} Suggest</Button><Button disabled={!features.whatsappEnabled} onClick={sendMessage}><Send className="h-4 w-4" /> Send</Button></div></div>
         {composer.messageType !== 'text' && <div className="mt-2"><Input value={composer.mediaUrl} onChange={e => setComposer({ ...composer, mediaUrl: e.target.value })} placeholder="Secure media URL for image, video, PDF, invoice, prescription or consent form" /></div>}
       </div>
     </main>

@@ -4,6 +4,7 @@ require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../services/metaWhatsAppService.php';
 require_once __DIR__ . '/../services/whatsappAutomationService.php';
 require_once __DIR__ . '/../services/tenantFeatureService.php';
+require_once __DIR__ . '/../services/aiService.php';
 
 class WhatsAppController {
     private function db() { return DB::getConnection(); }
@@ -21,6 +22,39 @@ class WhatsAppController {
     public function contacts($input,$user){ $db=$this->db();$q=$_GET['search']??'';$stmt=$db->prepare("SELECT c.*, (SELECT COUNT(*) FROM Appointment a WHERE a.clientId=c.id AND a.clinicId=c.clinicId) appointmentCount,(SELECT MAX(date) FROM Appointment a WHERE a.clientId=c.id AND a.clinicId=c.clinicId) lastAppointment,(SELECT body FROM WhatsAppMessage m WHERE m.clientId=c.id AND m.clinicId=c.clinicId ORDER BY createdAt DESC LIMIT 1) lastMessage FROM Client c WHERE c.clinicId=? AND c.status='active' AND (c.name LIKE ? OR c.phone LIKE ?) ORDER BY c.name");$like="%$q%";$stmt->execute([$user['clinicId'],$like,$like]);send_json($stmt->fetchAll()); }
     public function profile($input,$user,$id){ $db=$this->db();$stmt=$db->prepare("SELECT * FROM Client WHERE id=? AND clinicId=?");$stmt->execute([$id,$user['clinicId']]);$client=$stmt->fetch();if(!$client)send_error('Patient not found',404);$stmt=$db->prepare("SELECT a.*,s.name staffName,srv.name serviceName FROM Appointment a LEFT JOIN Staff s ON s.id=a.staffId AND s.clinicId=a.clinicId LEFT JOIN Service srv ON srv.id=a.serviceId AND srv.clinicId=a.clinicId WHERE a.clientId=? AND a.clinicId=? ORDER BY date DESC");$stmt->execute([$id,$user['clinicId']]);send_json(['client'=>$client,'appointments'=>$stmt->fetchAll()]); }
     public function messages($input,$user,$clientId){ $db=$this->db();$this->assertClientInClinic($db,$clientId,$user['clinicId']);$conversation=$this->conversation($db,$user['clinicId'],$clientId);$stmt=$db->prepare("SELECT * FROM WhatsAppMessage WHERE conversationId=? AND clinicId=? ORDER BY createdAt ASC");$stmt->execute([$conversation['id'],$user['clinicId']]);send_json(['conversation'=>$conversation,'messages'=>$stmt->fetchAll()]); }
+
+    // AI draft reply for a conversation (human reviews + sends — never auto-sent).
+    // Uses the super-admin's shared platform AI key.
+    public function aiSuggest($input,$user,$clientId){
+        $db=$this->db();
+        $this->requireFeature($db,$user['clinicId'],'whatsappEnabled','WhatsApp is not enabled for this clinic plan.');
+        if(!ai_is_configured($db)) send_error('AI is not configured yet. Ask the platform admin to add an AI key under Platform settings.',400);
+        $this->assertClientInClinic($db,$clientId,$user['clinicId']);
+
+        $cs=$db->prepare("SELECT name FROM Client WHERE id=? AND clinicId=?"); $cs->execute([$clientId,$user['clinicId']]); $client=$cs->fetch();
+        $cl=$db->prepare("SELECT name,clinicType FROM Clinic WHERE id=?"); $cl->execute([$user['clinicId']]); $clinic=$cl->fetch();
+
+        $conversation=$this->conversation($db,$user['clinicId'],$clientId);
+        $hist=$db->prepare("SELECT direction,body FROM WhatsAppMessage WHERE conversationId=? AND clinicId=? AND body IS NOT NULL AND body<>'' ORDER BY createdAt DESC LIMIT 12");
+        $hist->execute([$conversation['id'],$user['clinicId']]);
+        $rows=array_reverse($hist->fetchAll());
+        if(!$rows) send_error('No patient messages yet to reply to.',400);
+
+        $clinicName=$clinic['name']??'the clinic';
+        $type=$clinic['clinicType']??'dental';
+        $system="You are the front-desk assistant for {$clinicName}, a {$type} clinic. Draft a short, warm, professional WhatsApp reply to the patient"
+               .($client?(' ('.$client['name'].')'):'')
+               .". Rules: under 55 words; no medical diagnosis or treatment advice — for clinical questions, invite them to book or visit; match the patient's language (e.g. Urdu/English); be specific and helpful; no placeholders like [name].";
+        $messages=[['role'=>'system','content'=>$system]];
+        foreach($rows as $r){ $messages[]=['role'=>($r['direction']==='inbound'?'user':'assistant'),'content'=>$r['body']]; }
+
+        try{
+            $suggestion=ai_complete($db,$messages,['maxTokens'=>180,'temperature'=>0.5]);
+            send_json(['suggestion'=>$suggestion]);
+        }catch(Exception $e){
+            send_error($e->getMessage(),502);
+        }
+    }
     public function send($input,$user,$clientId){ $db=$this->db();$this->requireFeature($db,$user['clinicId'],'whatsappEnabled','WhatsApp is not enabled for this clinic plan.');$stmt=$db->prepare("SELECT * FROM Client WHERE id=? AND clinicId=?");$stmt->execute([$clientId,$user['clinicId']]);$client=$stmt->fetch();if(!$client||!$client['phone'])send_error('Patient phone number is required',400);$purpose=$input['purpose']??'support';if($purpose==='marketing'){$this->requireFeature($db,$user['clinicId'],'whatsappMarketingEnabled','WhatsApp marketing is not enabled for this clinic.');if(!intval($client['whatsappMarketingOptIn']??0))send_error('Marketing consent is not recorded for this patient.',400);}$conversation=$this->conversation($db,$user['clinicId'],$clientId);$settings=$this->settings($db,$user['clinicId']);if(empty($settings['simulationMode'])&&(empty($conversation['freeReplyUntil'])||strtotime($conversation['freeReplyUntil'])<time()))send_error('Free reply window is closed. Please send an approved Meta template.',400);$type=$input['messageType']??'text';$body=$input['body']??'';$payload=$type==='text'?['type'=>'text','text'=>['preview_url'=>false,'body'=>$body]]:['type'=>$type,$type=>['link'=>$input['mediaUrl']??'','caption'=>$body]];try{$sent=meta_whatsapp_send($settings,$client['phone'],$payload);}catch(Exception $e){$queueId=$this->queue($db,$user['clinicId'],$clientId,$conversation['id'],$client['phone'],$payload,$purpose,$e->getMessage());send_error($e->getMessage().' Saved to retry queue.',502,['queueId'=>$queueId]);}$id=generate_uuid();$db->prepare("INSERT INTO WhatsAppMessage(id,clinicId,conversationId,clientId,direction,purpose,messageType,body,mediaUrl,metaMessageId,deliveryStatus,sentBy) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)")->execute([$id,$user['clinicId'],$conversation['id'],$clientId,'outbound',$purpose,$type,$body,$input['mediaUrl']??null,$sent['messageId'],$sent['status'],$user['id']??null]);send_json(['id'=>$id,'status'=>$sent['status'],'simulation'=>$sent['simulation']],201); }
     public function sendTemplate($input,$user,$clientId){ $db=$this->db();$this->requireFeature($db,$user['clinicId'],'whatsappEnabled','WhatsApp is not enabled for this clinic plan.');$stmt=$db->prepare("SELECT * FROM Client WHERE id=? AND clinicId=?");$stmt->execute([$clientId,$user['clinicId']]);$client=$stmt->fetch();if(!$client||!$client['phone'])send_error('Patient phone number is required',400);$name=$input['templateName']??'';if(!$name)send_error('Template is required',400);$conversation=$this->conversation($db,$user['clinicId'],$clientId);$sent=meta_whatsapp_send($this->settings($db,$user['clinicId']),$client['phone'],$this->templatePayload($name,$input['language']??'en'));$id=generate_uuid();$db->prepare("INSERT INTO WhatsAppMessage(id,clinicId,conversationId,clientId,direction,purpose,messageType,body,templateName,metaMessageId,deliveryStatus,sentBy) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)")->execute([$id,$user['clinicId'],$conversation['id'],$clientId,'outbound',$input['purpose']??'appointment','template',$input['body']??$name,$name,$sent['messageId'],$sent['status'],$user['id']??null]);send_json(['id'=>$id,'status'=>$sent['status'],'simulation'=>$sent['simulation']],201); }
     public function templates($input,$user){$db=$this->db();$stmt=$db->prepare("SELECT * FROM WhatsAppTemplate WHERE clinicId=? ORDER BY createdAt DESC");$stmt->execute([$user['clinicId']]);send_json($stmt->fetchAll());}

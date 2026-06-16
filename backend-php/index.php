@@ -388,6 +388,7 @@ $routes = [
     ['GET', '^api/v1/whatsapp/contacts$', 'WhatsAppController', 'contacts', ['owner', 'manager', 'receptionist']],
     ['GET', '^api/v1/whatsapp/contacts/([^/]+)$', 'WhatsAppController', 'profile', ['owner', 'manager', 'receptionist']],
     ['GET', '^api/v1/whatsapp/conversations/([^/]+)$', 'WhatsAppController', 'messages', ['owner', 'manager', 'receptionist']],
+    ['POST', '^api/v1/whatsapp/conversations/([^/]+)/ai-suggest$', 'WhatsAppController', 'aiSuggest', ['owner', 'manager', 'receptionist']],
     ['POST', '^api/v1/whatsapp/conversations/([^/]+)/messages$', 'WhatsAppController', 'send', ['owner', 'manager', 'receptionist']],
     ['POST', '^api/v1/whatsapp/conversations/([^/]+)/templates$', 'WhatsAppController', 'sendTemplate', ['owner', 'manager', 'receptionist']],
     ['PUT', '^api/v1/whatsapp/conversations/([^/]+)$', 'WhatsAppController', 'updateConversation', ['owner', 'manager', 'receptionist']],
