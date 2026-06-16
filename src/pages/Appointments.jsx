@@ -289,6 +289,7 @@ export default function Appointments() {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState('list');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [sort, setSort] = useState('date_desc'); // default: most recent date first
   const [selectedAppt, setSelectedAppt] = useState(null);
   const [showFormModal, setShowFormModal] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
@@ -361,11 +362,20 @@ export default function Appointments() {
   };
 
   const filtered = useMemo(() => {
+    const byDate = (a, b) => (a.date || '').localeCompare(b.date || '') || (a.startTime || '').localeCompare(b.startTime || '');
+    const name = (a) => (a.clientName || a.client?.name || '').toLowerCase();
+    const sorters = {
+      date_desc: (a, b) => byDate(b, a),
+      date_asc: byDate,
+      patient_asc: (a, b) => name(a).localeCompare(name(b)) || byDate(b, a),
+      doctor_asc: (a, b) => (a.staffName || '').localeCompare(b.staffName || '') || byDate(b, a),
+      amount_desc: (a, b) => (Number(b.price) || 0) - (Number(a.price) || 0),
+    };
     return appointments.filter(a => {
       if (statusFilter !== 'all' && a.status !== statusFilter) return false;
       return true;
-    }).sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.startTime || '').localeCompare(b.startTime || ''));
-  }, [appointments, statusFilter]);
+    }).sort(sorters[sort] || sorters.date_desc);
+  }, [appointments, statusFilter, sort]);
 
   const calendarEvents = useMemo(() => {
     return appointments.map(a => ({
@@ -443,6 +453,14 @@ export default function Appointments() {
             <option value="pending">Pending</option>
             <option value="completed">Completed</option>
             <option value="cancelled">Cancelled</option>
+          </select>
+          <select value={sort} onChange={e => setSort(e.target.value)} title="Sort appointments"
+            className="border border-gray-200 dark:border-white/10 rounded-lg px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white dark:bg-white/5">
+            <option value="date_desc">Date — newest first</option>
+            <option value="date_asc">Date — oldest first</option>
+            <option value="patient_asc">Patient — A to Z</option>
+            <option value="doctor_asc">Doctor — A to Z</option>
+            <option value="amount_desc">Fee — high to low</option>
           </select>
         </div>
         <Button onClick={() => { setEditTarget(null); setShowFormModal(true); }} size="sm">

@@ -57,6 +57,17 @@ class AppointmentController {
         $branchId = $_GET['branchId'] ?? '';
         $from = $_GET['from'] ?? '';
         $to = $_GET['to'] ?? '';
+        $sort = $_GET['sort'] ?? 'date_desc';
+        // Whitelisted sort options (default: most recent appointment date first).
+        $sortMap = [
+            'date_desc'   => 'a.date DESC, a.startTime DESC',
+            'date_asc'    => 'a.date ASC, a.startTime ASC',
+            'patient_asc' => 'c.name ASC, a.date DESC',
+            'doctor_asc'  => 's.name ASC, a.date DESC',
+            'status_asc'  => 'a.status ASC, a.date DESC',
+            'amount_desc' => 'a.price DESC',
+        ];
+        $orderBy = $sortMap[$sort] ?? $sortMap['date_desc'];
         $limit = isset($_GET['limit']) ? min(200, max(1, intval($_GET['limit']))) : 0;
         $page = max(1, intval($_GET['page'] ?? 1));
         $offset = ($page - 1) * max(1, $limit);
@@ -102,7 +113,7 @@ class AppointmentController {
                 LEFT JOIN Staff s ON a.staffId = s.id AND s.clinicId = a.clinicId
                 LEFT JOIN Service srv ON a.serviceId = srv.id AND srv.clinicId = a.clinicId
                 WHERE $whereSql
-                ORDER BY a.date ASC, a.startTime ASC";
+                ORDER BY $orderBy";
         if ($limit > 0) {
             $sql .= " LIMIT $limit OFFSET $offset";
         }
