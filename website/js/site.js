@@ -6,6 +6,39 @@ const PF_API_URL = window.PF_API_URL || (
     : 'https://crea8ivmedia.com/app/api/v1'
 );
 
+// Platform branding — applied live from the super admin's Platform settings.
+(function applyPlatformBranding() {
+  fetch(PF_API_URL + '/public/platform-branding')
+    .then((r) => r.json())
+    .then((d) => {
+      const b = d && d.branding;
+      if (!b) return;
+      const root = document.documentElement.style;
+      if (b.primaryColor) { root.setProperty('--accent', b.primaryColor); root.setProperty('--accent-soft', b.primaryColor); }
+      if (b.secondaryColor) root.setProperty('--accent-deep', b.secondaryColor);
+
+      // Logo mark (text initials or image)
+      document.querySelectorAll('.brand-mark').forEach((el) => {
+        if (b.logoUrl) { el.innerHTML = '<img src="' + b.logoUrl + '" alt="" style="width:100%;height:100%;object-fit:contain">'; }
+        else if (b.logoText) { el.textContent = b.logoText; }
+      });
+      if (b.brandName) {
+        document.title = b.brandName + (b.tagline ? ' — ' + b.tagline : '');
+        document.querySelectorAll('[data-pf-brand]').forEach((el) => { el.textContent = b.brandName; });
+      }
+      // Hero text (home page)
+      const heroH1 = document.querySelector('.hero h1');
+      if (heroH1 && b.heroTitle) heroH1.textContent = b.heroTitle;
+      const heroSub = document.querySelector('.hero .hero-sub') || document.querySelector('.hero h1 + p');
+      if (heroSub && b.heroSubtitle) heroSub.textContent = b.heroSubtitle;
+      // Contact links
+      if (b.supportEmail) document.querySelectorAll('a[href^="mailto:"]').forEach((a) => { a.href = 'mailto:' + b.supportEmail; if (a.dataset.pfContact !== undefined) a.textContent = b.supportEmail; });
+      if (b.supportPhone) document.querySelectorAll('a[href^="tel:"]').forEach((a) => { a.href = 'tel:' + b.supportPhone.replace(/\s/g, ''); });
+      if (b.whatsapp) document.querySelectorAll('a[href*="wa.me"]').forEach((a) => { a.href = 'https://wa.me/' + b.whatsapp.replace(/[^\d]/g, ''); });
+    })
+    .catch(() => { /* keep static defaults */ });
+})();
+
 // Mobile nav
 document.querySelectorAll('.nav-toggle').forEach((btn) => {
   btn.addEventListener('click', () => {

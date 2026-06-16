@@ -201,6 +201,8 @@ $routes = [
 
     // Platform owner (superadmin) routes
     ['GET', '^api/v1/admin/stats$', 'AdminController', 'stats', 'admin'],
+    ['GET', '^api/v1/admin/platform$', 'AdminController', 'getPlatform', 'admin'],
+    ['PUT', '^api/v1/admin/platform$', 'AdminController', 'updatePlatform', 'admin'],
     ['GET', '^api/v1/admin/tenants$', 'AdminController', 'listTenants', 'admin'],
     ['POST', '^api/v1/admin/tenants$', 'AdminController', 'createTenant', 'admin'],
     ['GET', '^api/v1/admin/tenants/([^/]+)$', 'AdminController', 'getTenant', 'admin'],
@@ -243,6 +245,7 @@ $routes = [
     ['GET', '^api/v1/settings/public-site$', 'PublicSiteController', 'getSettings', ['owner', 'manager']],
     ['PUT', '^api/v1/settings/public-site$', 'PublicSiteController', 'updateSettings', ['owner', 'manager']],
     ['GET', '^api/v1/public/branding$', 'PublicSiteController', 'branding', false],
+    ['GET', '^api/v1/public/platform-branding$', 'PublicSiteController', 'platformBranding', false],
     ['GET', '^api/v1/public/site$', 'PublicSiteController', 'getSite', false],
     ['GET', '^api/v1/public/availability$', 'PublicSiteController', 'availability', false],
     ['POST', '^api/v1/public/book$', 'PublicSiteController', 'book', false],

@@ -64,6 +64,93 @@ class AdminController {
         return $settings;
     }
 
+    // ---- Platform-wide settings (super admin): marketing branding + shared AI ----
+    private function ensurePlatformSettings($db) {
+        $sql = DB_DRIVER === 'sqlite'
+            ? "CREATE TABLE IF NOT EXISTS PlatformSetting (settingKey TEXT PRIMARY KEY, settingValue TEXT, updatedAt TEXT DEFAULT CURRENT_TIMESTAMP)"
+            : "CREATE TABLE IF NOT EXISTS PlatformSetting (settingKey VARCHAR(64) PRIMARY KEY, settingValue TEXT, updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP)";
+        $db->exec($sql);
+    }
+
+    private function defaultBranding() {
+        return [
+            'brandName' => 'Crea8iv PatientFlow',
+            'tagline' => 'Clinic Management Platform',
+            'logoText' => 'PF',
+            'logoUrl' => '',
+            'primaryColor' => '#f97316',
+            'secondaryColor' => '#ea580c',
+            'heroTitle' => 'Run your whole clinic from one portal',
+            'heroSubtitle' => 'Appointments, patients, billing, WhatsApp and reporting — built for modern clinics.',
+            'supportEmail' => 'info@crea8ivmedia.com',
+            'supportPhone' => '+92 310 5704555',
+            'whatsapp' => '+92 310 5704555',
+        ];
+    }
+
+    private function getBranding($db) {
+        $this->ensurePlatformSettings($db);
+        $stmt = $db->prepare("SELECT settingValue FROM PlatformSetting WHERE settingKey = 'marketing_branding'");
+        $stmt->execute();
+        $saved = $stmt->fetchColumn();
+        $decoded = $saved ? (json_decode($saved, true) ?: []) : [];
+        return array_merge($this->defaultBranding(), $decoded);
+    }
+
+    public function getPlatform($input, $user) {
+        $db = DB::getConnection();
+        $this->ensurePlatformAiDefaults($db);
+        $stmt = $db->prepare("SELECT provider, enabled, model, monthlyTokenLimit, status, apiKey FROM AIProviderSetting WHERE clinicId = 'platform' ORDER BY provider");
+        $stmt->execute();
+        $providers = $stmt->fetchAll();
+        foreach ($providers as &$p) {
+            $p['hasApiKey'] = !empty($p['apiKey']);
+            $p['enabled'] = !empty($p['enabled']);
+            unset($p['apiKey']);
+        }
+        send_json(['branding' => $this->getBranding($db), 'aiProviders' => $providers]);
+    }
+
+    public function updatePlatform($input, $user) {
+        $db = DB::getConnection();
+        $this->ensurePlatformSettings($db);
+
+        if (isset($input['branding']) && is_array($input['branding'])) {
+            $allowed = array_keys($this->defaultBranding());
+            $merged = $this->getBranding($db);
+            foreach ($allowed as $k) {
+                if (array_key_exists($k, $input['branding'])) $merged[$k] = trim((string)$input['branding'][$k]);
+            }
+            $json = json_encode($merged);
+            $sql = DB_DRIVER === 'sqlite'
+                ? "INSERT INTO PlatformSetting (settingKey, settingValue) VALUES ('marketing_branding', ?) ON CONFLICT(settingKey) DO UPDATE SET settingValue=excluded.settingValue, updatedAt=CURRENT_TIMESTAMP"
+                : "INSERT INTO PlatformSetting (settingKey, settingValue) VALUES ('marketing_branding', ?) ON DUPLICATE KEY UPDATE settingValue=VALUES(settingValue), updatedAt=CURRENT_TIMESTAMP";
+            $db->prepare($sql)->execute([$json]);
+        }
+
+        if (isset($input['aiProviders']) && is_array($input['aiProviders'])) {
+            $this->ensurePlatformAiDefaults($db);
+            foreach ($input['aiProviders'] as $pi) {
+                $provider = strtolower($pi['provider'] ?? '');
+                if (!in_array($provider, ['chatgpt', 'gemini', 'claude'], true)) continue;
+                $existing = $db->prepare("SELECT apiKey FROM AIProviderSetting WHERE clinicId = 'platform' AND provider = ?");
+                $existing->execute([$provider]);
+                $currentKey = $existing->fetchColumn();
+                $apiKey = !empty($pi['apiKey']) ? $pi['apiKey'] : ($currentKey ?: null);
+                $enabled = !empty($pi['enabled']) ? 1 : 0;
+                $model = trim((string)($pi['model'] ?? '')) ?: null;
+                $status = $enabled ? ($apiKey ? 'ready' : 'missing_key') : 'disabled';
+                $sql = DB_DRIVER === 'sqlite'
+                    ? "INSERT INTO AIProviderSetting (id, clinicId, provider, apiKey, enabled, model, status) VALUES (?, 'platform', ?, ?, ?, ?, ?) ON CONFLICT(clinicId, provider) DO UPDATE SET apiKey=excluded.apiKey, enabled=excluded.enabled, model=excluded.model, status=excluded.status, updatedAt=CURRENT_TIMESTAMP"
+                    : "INSERT INTO AIProviderSetting (id, clinicId, provider, apiKey, enabled, model, status) VALUES (?, 'platform', ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE apiKey=VALUES(apiKey), enabled=VALUES(enabled), model=VALUES(model), status=VALUES(status), updatedAt=CURRENT_TIMESTAMP";
+                $db->prepare($sql)->execute([generate_uuid(), $provider, $apiKey, $enabled, $model, $status]);
+            }
+        }
+
+        log_audit('platform', $user['id'], 'platform_settings_updated', 'PlatformSetting', 'marketing_branding', null, null);
+        $this->getPlatform([], $user);
+    }
+
     private function slugify($db, $name) {
         $base = strtolower(trim(preg_replace('/[^a-z0-9]+/i', '-', $name), '-'));
         $base = substr($base ?: 'clinic', 0, 50);

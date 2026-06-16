@@ -16,6 +16,7 @@ import AdminLeads from './pages/admin/AdminLeads';
 import AdminTenants from './pages/admin/AdminTenants';
 import AdminPayments from './pages/admin/AdminPayments';
 import AdminSupport from './pages/admin/AdminSupport';
+import AdminPlatform from './pages/admin/AdminPlatform';
 import PublicSite from './pages/PublicSite';
 import Dashboard from './pages/Dashboard';
 import ReceptionDesk from './pages/ReceptionDesk';
@@ -88,6 +89,7 @@ export default function AppNew() {
               <Route path="tenants" element={<AdminTenants />} />
               <Route path="payments" element={<AdminPayments />} />
               <Route path="support" element={<AdminSupport />} />
+              <Route path="platform" element={<AdminPlatform />} />
             </Route>
             <Route
               path="/"

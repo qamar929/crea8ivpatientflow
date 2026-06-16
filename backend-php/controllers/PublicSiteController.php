@@ -111,6 +111,25 @@ class PublicSiteController {
         ]);
     }
 
+    // Public marketing-site branding (PatientFlow website reads this). No auth,
+    // no secrets — just the platform brand the super admin set in /admin/platform.
+    public function platformBranding($input, $user = null) {
+        $db = DB::getConnection();
+        $defaults = [
+            'brandName' => 'Crea8iv PatientFlow', 'tagline' => 'Clinic Management Platform',
+            'logoText' => 'PF', 'logoUrl' => '', 'primaryColor' => '#f97316', 'secondaryColor' => '#ea580c',
+            'heroTitle' => 'Run your whole clinic from one portal',
+            'heroSubtitle' => 'Appointments, patients, billing, WhatsApp and reporting — built for modern clinics.',
+            'supportEmail' => 'info@crea8ivmedia.com', 'supportPhone' => '+92 310 5704555', 'whatsapp' => '+92 310 5704555',
+        ];
+        try {
+            $stmt = $db->query("SELECT settingValue FROM PlatformSetting WHERE settingKey = 'marketing_branding'");
+            $saved = $stmt ? $stmt->fetchColumn() : null;
+            if ($saved) $defaults = array_merge($defaults, json_decode($saved, true) ?: []);
+        } catch (Exception $e) { /* table may not exist yet — return defaults */ }
+        send_json(['branding' => $defaults]);
+    }
+
     public function getSite($input, $user = null) {
         $db = DB::getConnection();
         $clinic = $this->resolveClinicByRequest($db, true);

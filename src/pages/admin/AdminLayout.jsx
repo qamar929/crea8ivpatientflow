@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard, Users, Building2, Receipt, LogOut, Rocket, LifeBuoy,
+  LayoutDashboard, Users, Building2, Receipt, LogOut, Rocket, LifeBuoy, SlidersHorizontal,
 } from 'lucide-react';
 
 const NAV = [
@@ -9,6 +9,7 @@ const NAV = [
   { to: '/admin/tenants', label: 'Clinics', icon: Building2 },
   { to: '/admin/payments', label: 'Payments', icon: Receipt },
   { to: '/admin/support', label: 'Support', icon: LifeBuoy },
+  { to: '/admin/platform', label: 'Platform', icon: SlidersHorizontal },
 ];
 
 export default function AdminLayout() {
