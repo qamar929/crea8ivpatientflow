@@ -261,6 +261,7 @@ export default function Invoices() {
   const [saving, setSaving] = useState(false);
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [sort, setSort] = useState('date_desc'); // default: newest invoice date first
   const [showForm, setShowForm] = useState(false);
   const [editInvoice, setEditInvoice] = useState(null);
   const [selectedInvoice, setSelectedInvoice] = useState(null);
@@ -274,6 +275,7 @@ export default function Invoices() {
     });
     if (statusFilter !== 'all') params.set('status', statusFilter);
     if (search.trim()) params.set('search', search.trim());
+    if (sort) params.set('sort', sort);
     if (receptionist) {
       const today = new Date().toISOString().slice(0, 10);
       params.set('from', today);
@@ -321,7 +323,7 @@ export default function Invoices() {
     const timer = setTimeout(() => loadData(), search.trim() ? 250 : 0);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, search, statusFilter, receptionist]);
+  }, [page, search, statusFilter, sort, receptionist]);
 
   const filtered = invoices;
 
@@ -467,6 +469,20 @@ export default function Invoices() {
             <button key={status} onClick={() => { setStatusFilter(status); goToPage(1); }} className={`rounded-lg border px-3 py-2 text-xs font-medium capitalize ${statusFilter === status ? 'border-transparent bg-gradient-to-r from-[var(--primary)] to-[var(--secondary)] text-white' : 'border-gray-200 text-gray-600 dark:border-white/10 dark:text-gray-300'}`}>{status}</button>
           ))}
         </div>
+        <select
+          value={sort}
+          onChange={e => { setSort(e.target.value); goToPage(1); }}
+          title="Sort invoices"
+          className="rounded-lg border border-gray-200 py-2 px-3 text-xs font-medium text-gray-600 dark:border-white/10 dark:bg-slate-900 dark:text-gray-300"
+        >
+          <option value="date_desc">Date — newest first</option>
+          <option value="date_asc">Date — oldest first</option>
+          <option value="amount_desc">Amount — high to low</option>
+          <option value="amount_asc">Amount — low to high</option>
+          <option value="balance_desc">Balance due — high to low</option>
+          <option value="patient_asc">Patient name — A to Z</option>
+          <option value="invoice_desc">Invoice # — newest</option>
+        </select>
       </div>
 
       <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm dark:border-white/10 dark:bg-slate-900">

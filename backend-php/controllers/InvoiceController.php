@@ -117,6 +117,18 @@ class InvoiceController {
         $from = $_GET['from'] ?? '';
         $to = $_GET['to'] ?? '';
         $search = $_GET['search'] ?? '';
+        $sort = $_GET['sort'] ?? 'date_desc';
+        // Whitelisted sort options (default: newest invoice date first).
+        $sortMap = [
+            'date_desc'    => 'i.createdAt DESC',
+            'date_asc'     => 'i.createdAt ASC',
+            'amount_desc'  => 'i.grandTotal DESC',
+            'amount_asc'   => 'i.grandTotal ASC',
+            'balance_desc' => 'i.balanceDue DESC',
+            'patient_asc'  => 'c.name ASC, i.createdAt DESC',
+            'invoice_desc' => 'i.invoiceNo DESC',
+        ];
+        $orderBy = $sortMap[$sort] ?? $sortMap['date_desc'];
         $paginated = ($_GET['paginated'] ?? '') === 'true';
         $hasExplicitLimit = isset($_GET['limit']);
         $page = max(1, intval($_GET['page'] ?? 1));
@@ -184,7 +196,7 @@ class InvoiceController {
                 LEFT JOIN Client c ON i.clientId = c.id AND c.clinicId = i.clinicId
                 LEFT JOIN Clinic cl ON cl.id = i.clinicId
                 WHERE $whereSql
-                ORDER BY i.createdAt DESC";
+                ORDER BY $orderBy";
         if ($paginated || $hasExplicitLimit) {
             $sql .= " LIMIT $limit OFFSET $offset";
         }

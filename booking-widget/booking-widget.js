@@ -120,7 +120,7 @@
       var sel = el('select', { class: 'pfb-select' });
       sel.appendChild(el('option', { value: '' }, 'Choose a service…'));
       (site.services || []).forEach(function (sv) {
-        var o = el('option', { value: sv.id }, esc(sv.name) + (sv.price ? ' — PKR ' + sv.price : ''));
+        var o = el('option', { value: sv.id }, esc(sv.name));
         if (sv.id === s.serviceId) o.setAttribute('selected', 'selected');
         sel.appendChild(o);
       });
