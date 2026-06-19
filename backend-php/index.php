@@ -2,6 +2,7 @@
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/helpers.php';
+require_once __DIR__ . '/services/packageService.php';
 
 // Handle CORS — allowlist: portal, marketing website, and any
 // tenant subdomain of crea8ivpatientflow.com (wildcard SaaS domains)
@@ -143,6 +144,21 @@ function require_superadmin($user) {
     }
 }
 
+// Package gate: block API access to a module the clinic's package doesn't include
+// (so AI-tier endpoints 403 for Core clinics, matching the hidden navigation).
+function require_package_feature($user, $path) {
+    $feature = pf_feature_for_path($path);
+    if ($feature === null) return;
+    $clinicId = $user['clinicId'] ?? '';
+    if ($clinicId === '') return;
+    require_once __DIR__ . '/services/tenantFeatureService.php';
+    $db = DB::getConnection();
+    $features = tenant_features_get($db, $clinicId);
+    if (!tenant_feature_bool($features, $feature)) {
+        send_error('This feature is not included in your plan.', 403, ['code' => 'feature_not_in_plan']);
+    }
+}
+
 function normalize_clinic_role($role) {
     $value = strtolower(trim((string)$role));
     if (in_array($value, ['owner', 'admin', 'administrator'], true)) return 'owner';
@@ -223,6 +239,7 @@ $routes = [
     ['POST', '^api/v1/admin/tenants/([^/]+)/suspend$', 'AdminController', 'suspendTenant', 'admin'],
     ['POST', '^api/v1/admin/tenants/([^/]+)/extend$', 'AdminController', 'extendTenant', 'admin'],
     ['POST', '^api/v1/admin/tenants/([^/]+)/impersonate$', 'AdminController', 'impersonateTenant', 'admin'],
+    ['PUT', '^api/v1/admin/tenants/([^/]+)/package$', 'AdminController', 'setPackage', 'admin'],
     ['PUT', '^api/v1/admin/tenants/([^/]+)/domain$', 'AdminController', 'setDomain', 'admin'],
     ['PUT', '^api/v1/admin/tenants/([^/]+)/domain/ssl$', 'AdminController', 'setDomainSsl', 'admin'],
     ['PUT', '^api/v1/admin/tenants/([^/]+)$', 'AdminController', 'updateTenant', 'admin'],
@@ -457,8 +474,10 @@ foreach ($routes as $route) {
             } elseif (is_array($guard)) {
                 require_active_tenant($user);
                 require_clinic_role($user, $guard);
+                require_package_feature($user, $path);
             } elseif ($guard === true) {
                 require_active_tenant($user);
+                require_package_feature($user, $path);
             }
             // 'auth' = any valid token, no further checks
         }

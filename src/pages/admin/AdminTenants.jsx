@@ -526,16 +526,57 @@ function TenantAutomationControls({ tenantId }) {
     }
   };
 
+  const changePackage = async (key) => {
+    if (key === data.package) return;
+    setSaving(true); setErr(''); setNotice('');
+    try {
+      await fetchApi(`/admin/tenants/${tenantId}/package`, { method: 'PUT', body: JSON.stringify({ package: key }) });
+      const res = await fetchApi(`/admin/tenants/${tenantId}/automation`);
+      setData(res);
+      setDraft((d) => ({
+        ...d,
+        features: {
+          ...d.features,
+          marketingEnabled: !!Number(res.features?.marketingEnabled),
+          metaLeadsEnabled: !!Number(res.features?.metaLeadsEnabled),
+          importsEnabled: !!Number(res.features?.importsEnabled),
+          whatsappEnabled: !!Number(res.features?.whatsappEnabled),
+          whatsappMarketingEnabled: !!Number(res.features?.whatsappMarketingEnabled),
+          whatsappAutomationEnabled: !!Number(res.features?.whatsappAutomationEnabled),
+          aiEnabled: !!Number(res.features?.aiEnabled),
+          aiAutoReplyEnabled: !!Number(res.features?.aiAutoReplyEnabled),
+        },
+      }));
+      setNotice(`Package changed to ${key === 'ai' ? 'PatientFlow AI' : 'PatientFlow Core'}.`);
+    } catch (e) { setErr(e.message); } finally { setSaving(false); }
+  };
+
   if (!data || !draft) {
     return <section className="rounded-xl border border-gray-200/70 p-4 text-sm text-gray-400 dark:border-white/10"><Loader2 className="mr-2 inline h-4 w-4 animate-spin" /> Loading automation controls…</section>;
   }
 
   return (
     <section className="rounded-xl border border-gray-200/70 p-4 dark:border-white/10">
+      <div className="mb-4 rounded-xl border border-orange-200 bg-orange-50/60 dark:border-orange-500/30 dark:bg-orange-500/10 p-3">
+        <p className="text-xs font-black uppercase tracking-wider text-orange-700 dark:text-orange-300">Subscription package</p>
+        <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-2">One active package — controls which modules this clinic sees &amp; uses.</p>
+        <div className="flex flex-wrap gap-2">
+          {(data.packages || []).map((p) => (
+            <button
+              key={p.key}
+              onClick={() => changePackage(p.key)}
+              disabled={saving}
+              className={`rounded-lg px-3 py-1.5 text-xs font-bold border transition-colors disabled:opacity-60 ${data.package === p.key ? 'bg-orange-600 text-white border-orange-600' : 'border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:border-orange-300 hover:text-orange-600'}`}
+            >
+              {data.package === p.key ? '✓ ' : ''}{p.name} · PKR {Number(p.pricePKR).toLocaleString()}/mo
+            </button>
+          ))}
+        </div>
+      </div>
       <div className="flex items-center justify-between gap-3">
         <div>
           <h3 className="text-sm font-black text-gray-900 dark:text-white">Automation & AI</h3>
-          <p className="mt-1 text-xs text-gray-400">Superadmin controlled features, quotas and provider keys.</p>
+          <p className="mt-1 text-xs text-gray-400">Fine-tune individual features (the package sets these automatically).</p>
         </div>
         <button onClick={save} disabled={saving} className="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
           {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Save

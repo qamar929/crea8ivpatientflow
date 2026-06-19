@@ -319,7 +319,26 @@ class AdminController {
             'features' => $features,
             'whatsapp' => $this->publicWhatsappSettings($whatsapp),
             'platformAiProviders' => $providers,
+            'package' => pf_package_get($db, $id),
+            'packages' => array_values(pf_packages()),
         ]);
+    }
+
+    // Assign / change / upgrade / downgrade a clinic's package (super admin).
+    public function setPackage($input, $user, $id) {
+        $db = DB::getConnection();
+        $stmt = $db->prepare("SELECT id FROM Clinic WHERE id = ? AND id != 'platform'");
+        $stmt->execute([$id]);
+        if (!$stmt->fetch()) send_error('Tenant not found', 404);
+
+        $key = strtolower(trim($input['package'] ?? ''));
+        try {
+            $applied = pf_package_set($db, $id, $key);
+        } catch (Exception $e) {
+            send_error($e->getMessage(), 400);
+        }
+        log_audit($id, $user['id'], 'tenant_package_changed', 'Clinic', $id, null, ['package' => $applied]);
+        send_json(['package' => $applied, 'features' => tenant_features_get($db, $id)]);
     }
 
     public function updateTenantAutomation($input, $user, $id) {
