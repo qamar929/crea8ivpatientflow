@@ -85,6 +85,74 @@ function InfoCard({ label, value }) {
   );
 }
 
+const TP_STATUS = {
+  planned: { label: 'Planned', cls: 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300' },
+  in_progress: { label: 'In progress', cls: 'bg-amber-100 text-amber-700' },
+  completed: { label: 'Completed', cls: 'bg-emerald-100 text-emerald-700' },
+  cancelled: { label: 'Cancelled', cls: 'bg-rose-100 text-rose-700' },
+};
+
+function TreatmentPlan({ clientId }) {
+  const [items, setItems] = useState(null);
+  const [form, setForm] = useState({ procedure: '', tooth: '', cost: '' });
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const load = () => fetchApi(`/clients/${clientId}/treatment-plan`).then(setItems).catch((e) => setErr(e.message));
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [clientId]);
+
+  const add = async () => {
+    if (!form.procedure.trim()) return;
+    setBusy(true); setErr('');
+    try {
+      await fetchApi(`/clients/${clientId}/treatment-plan`, { method: 'POST', body: JSON.stringify({ procedure: form.procedure, tooth: form.tooth, cost: Number(form.cost) || 0 }) });
+      setForm({ procedure: '', tooth: '', cost: '' }); load();
+    } catch (e) { setErr(e.message); } finally { setBusy(false); }
+  };
+  const setStatus = async (item, status) => { try { await fetchApi(`/treatment-plan/${item.id}`, { method: 'PUT', body: JSON.stringify({ status }) }); load(); } catch (e) { setErr(e.message); } };
+  const del = async (item) => { if (!window.confirm('Remove this treatment?')) return; try { await fetchApi(`/treatment-plan/${item.id}`, { method: 'DELETE' }); load(); } catch (e) { setErr(e.message); } };
+
+  const total = (items || []).filter((i) => i.status !== 'cancelled').reduce((s, i) => s + Number(i.cost || 0), 0);
+  const fld = 'rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 px-2.5 py-1.5 text-sm dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-300';
+
+  return (
+    <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/5">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-black text-gray-950 dark:text-white">Treatment Plan</h3>
+        {total > 0 && <span className="text-xs font-bold text-gray-500">Plan total: {money(total)}</span>}
+      </div>
+      {err && <p className="mt-2 text-xs text-red-600">{err}</p>}
+
+      {!items ? (
+        <div className="py-6 text-center"><Loader2 className="mx-auto h-4 w-4 animate-spin text-gray-400" /></div>
+      ) : (
+        <div className="mt-3 space-y-2">
+          {items.map((it) => (
+            <div key={it.id} className="flex flex-wrap items-center gap-2 rounded-lg bg-gray-50 px-3 py-2 dark:bg-white/5">
+              <div className="min-w-0 flex-1">
+                <p className="text-sm font-semibold text-gray-900 dark:text-white truncate">{it.procedure}{it.tooth ? <span className="text-gray-400 font-normal"> · tooth {it.tooth}</span> : null}</p>
+              </div>
+              <span className="text-sm font-bold text-gray-900 dark:text-white">{money(it.cost)}</span>
+              <select value={it.status} onChange={(e) => setStatus(it, e.target.value)} className={`${fld} text-xs`}>
+                {Object.entries(TP_STATUS).map(([k, v]) => <option key={k} value={k}>{v.label}</option>)}
+              </select>
+              <button onClick={() => del(it)} className="rounded p-1 text-gray-400 hover:bg-rose-50 hover:text-rose-600"><Trash2 className="h-3.5 w-3.5" /></button>
+            </div>
+          ))}
+          {items.length === 0 && <p className="py-4 text-center text-sm text-gray-400">No treatments planned yet.</p>}
+        </div>
+      )}
+
+      <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3 dark:border-white/10">
+        <input className={`${fld} flex-1 min-w-[140px]`} placeholder="Procedure (e.g. Root canal)" value={form.procedure} onChange={(e) => setForm({ ...form, procedure: e.target.value })} />
+        <input className={`${fld} w-24`} placeholder="Tooth" value={form.tooth} onChange={(e) => setForm({ ...form, tooth: e.target.value })} />
+        <input className={`${fld} w-28`} type="number" placeholder="Cost" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} />
+        <Button size="sm" onClick={add} disabled={busy || !form.procedure.trim()}>Add</Button>
+      </div>
+    </div>
+  );
+}
+
 export default function ClientProfile() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -188,6 +256,8 @@ export default function ClientProfile() {
             <h3 className="text-sm font-black text-gray-950 dark:text-white">Clinical Notes</h3>
             <p className="mt-2 text-sm text-gray-500">{client.notes || 'No clinical notes recorded yet.'}</p>
           </div>
+
+          <TreatmentPlan clientId={client.id} />
 
           <PatientDocuments clientId={client.id} />
         </main>

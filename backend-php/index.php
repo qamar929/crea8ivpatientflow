@@ -278,6 +278,10 @@ $routes = [
     ['GET', '^api/v1/clients/([^/]+)$', 'ClientController', 'getById', ['owner', 'manager', 'doctor', 'therapist', 'accountant', 'receptionist', 'staff']],
     ['PUT', '^api/v1/clients/([^/]+)$', 'ClientController', 'update', ['owner', 'manager', 'doctor', 'therapist', 'receptionist']],
     ['DELETE', '^api/v1/clients/([^/]+)$', 'ClientController', 'remove', ['owner', 'manager', 'receptionist']],
+    ['GET', '^api/v1/clients/([^/]+)/treatment-plan$', 'TreatmentController', 'list', ['owner', 'manager', 'doctor', 'therapist', 'receptionist']],
+    ['POST', '^api/v1/clients/([^/]+)/treatment-plan$', 'TreatmentController', 'create', ['owner', 'manager', 'doctor', 'therapist']],
+    ['PUT', '^api/v1/treatment-plan/([^/]+)$', 'TreatmentController', 'update', ['owner', 'manager', 'doctor', 'therapist']],
+    ['DELETE', '^api/v1/treatment-plan/([^/]+)$', 'TreatmentController', 'remove', ['owner', 'manager', 'doctor', 'therapist']],
 
     // Appointments Routes
     ['GET', '^api/v1/appointments/today$', 'AppointmentController', 'getToday', ['owner', 'manager', 'doctor', 'therapist', 'receptionist', 'staff']],
