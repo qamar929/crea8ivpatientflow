@@ -143,9 +143,19 @@ function require_superadmin($user) {
     }
 }
 
+function normalize_clinic_role($role) {
+    $value = strtolower(trim((string)$role));
+    if (in_array($value, ['owner', 'admin', 'administrator'], true)) return 'owner';
+    if (in_array($value, ['manager', 'clinic_manager', 'clinic manager'], true)) return 'manager';
+    if (in_array($value, ['doctor', 'dentist', 'physician', 'consultant'], true)) return 'doctor';
+    if (in_array($value, ['assistant', 'dental assistant', 'clinical assistant', 'staff'], true)) return 'staff';
+    if (in_array($value, ['reception', 'frontdesk', 'front-desk', 'front_desk'], true)) return 'receptionist';
+    return $value;
+}
+
 function require_clinic_role($user, $roles) {
-    $roles = is_array($roles) ? $roles : [$roles];
-    if (!in_array(($user['role'] ?? ''), $roles, true)) {
+    $roles = array_map('normalize_clinic_role', is_array($roles) ? $roles : [$roles]);
+    if (!in_array(normalize_clinic_role($user['role'] ?? ''), $roles, true)) {
         send_error('Insufficient permissions', 403);
     }
 }
@@ -185,6 +195,7 @@ function require_client_portal($user) {
 $routes = [
     // Health Check
     ['GET', '^api/v1/health$', 'StatusController', 'health', false],
+    ['GET', '^api/v1/features$', 'StatusController', 'features', true],
 
     // Auth Routes
     ['POST', '^api/v1/auth/register$', 'AuthController', 'register', false],
@@ -266,7 +277,7 @@ $routes = [
     ['POST', '^api/v1/clients/([^/]+)/portal-credentials$', 'ClientController', 'generatePortalCredentials', ['owner', 'manager', 'receptionist']],
     ['GET', '^api/v1/clients/([^/]+)$', 'ClientController', 'getById', ['owner', 'manager', 'doctor', 'therapist', 'accountant', 'receptionist', 'staff']],
     ['PUT', '^api/v1/clients/([^/]+)$', 'ClientController', 'update', ['owner', 'manager', 'doctor', 'therapist', 'receptionist']],
-    ['DELETE', '^api/v1/clients/([^/]+)$', 'ClientController', 'remove', ['owner', 'manager']],
+    ['DELETE', '^api/v1/clients/([^/]+)$', 'ClientController', 'remove', ['owner', 'manager', 'receptionist']],
 
     // Appointments Routes
     ['GET', '^api/v1/appointments/today$', 'AppointmentController', 'getToday', ['owner', 'manager', 'doctor', 'therapist', 'receptionist', 'staff']],
@@ -306,11 +317,11 @@ $routes = [
     ['GET', '^api/v1/invoices$', 'InvoiceController', 'list', ['owner', 'manager', 'accountant', 'receptionist']],
     ['POST', '^api/v1/invoices$', 'InvoiceController', 'create', ['owner', 'manager', 'accountant', 'receptionist']],
     ['PUT', '^api/v1/invoices/([^/]+)/paid$', 'InvoiceController', 'markPaid', ['owner', 'manager', 'accountant', 'receptionist']],
-    ['PUT', '^api/v1/invoices/([^/]+)/refund$', 'InvoiceController', 'refund', ['owner', 'manager', 'accountant']],
+    ['PUT', '^api/v1/invoices/([^/]+)/refund$', 'InvoiceController', 'refund', ['owner', 'manager', 'accountant', 'receptionist']],
     ['GET', '^api/v1/invoices/([^/]+)/pdf$', 'InvoiceController', 'getPDF', ['owner', 'manager', 'accountant', 'receptionist']],
     ['GET', '^api/v1/invoices/([^/]+)$', 'InvoiceController', 'getById', ['owner', 'manager', 'accountant', 'receptionist']],
-    ['PUT', '^api/v1/invoices/([^/]+)$', 'InvoiceController', 'update', ['owner', 'manager', 'accountant']],
-    ['DELETE', '^api/v1/invoices/([^/]+)$', 'InvoiceController', 'remove', ['owner', 'manager']],
+    ['PUT', '^api/v1/invoices/([^/]+)$', 'InvoiceController', 'update', ['owner', 'manager', 'accountant', 'receptionist']],
+    ['DELETE', '^api/v1/invoices/([^/]+)$', 'InvoiceController', 'remove', ['owner', 'manager', 'receptionist']],
 
     // Inventory Routes
     ['GET', '^api/v1/inventory/alerts/low-stock$', 'InventoryController', 'getLowStock', ['owner', 'manager', 'doctor', 'therapist', 'receptionist', 'staff']],

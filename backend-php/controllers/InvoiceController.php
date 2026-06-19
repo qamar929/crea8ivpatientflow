@@ -531,6 +531,7 @@ class InvoiceController {
 
             $this->recomputeClientTotals($db, $user['clinicId'], $invoice['clientId']);
 
+            log_audit($user['clinicId'], $user['id'] ?? null, 'invoice_refunded', 'Invoice', $id, null, ['amount' => $invoice['amountPaid'], 'by' => $user['role'] ?? '']);
             $db->commit();
             send_json(['message' => 'Refunded']);
         } catch (Exception $e) {
@@ -558,6 +559,7 @@ class InvoiceController {
 
             $this->recomputeClientTotals($db, $user['clinicId'], $invoice['clientId']);
 
+            log_audit($user['clinicId'], $user['id'] ?? null, 'invoice_deleted', 'Invoice', $id, null, ['by' => $user['role'] ?? '']);
             $db->commit();
             send_json(['message' => 'Deleted']);
         } catch (Exception $e) {

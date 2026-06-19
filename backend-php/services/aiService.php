@@ -2,6 +2,7 @@
 // Central AI helper. Resolves the super-admin's shared platform key
 // (AIProviderSetting clinicId='platform') and runs a chat completion.
 // Today only ChatGPT (OpenAI) is wired; gemini/claude can be added here.
+require_once __DIR__ . '/metaWhatsAppService.php'; // meta_encrypt_secret / meta_decrypt_secret
 
 function ai_get_platform_provider($db) {
     try {
@@ -26,6 +27,11 @@ function ai_complete($db, $messages, $opts = []) {
         throw new Exception('AI is not configured. Ask the platform admin to add a key under Platform settings.');
     }
 
+    // Keys are stored encrypted (enc:...); meta_decrypt_secret returns legacy
+    // plaintext unchanged, so this is backward-compatible.
+    $apiKey = meta_decrypt_secret($provider['apiKey']);
+    if (!$apiKey) throw new Exception('AI key could not be read. Re-save it in Platform settings.');
+
     if ($provider['provider'] === 'chatgpt') {
         $model = $provider['model'] ?: 'gpt-4o-mini';
         $payload = [
@@ -39,7 +45,7 @@ function ai_complete($db, $messages, $opts = []) {
             CURLOPT_RETURNTRANSFER => true,
             CURLOPT_POST => true,
             CURLOPT_POSTFIELDS => json_encode($payload),
-            CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $provider['apiKey'], 'Content-Type: application/json'],
+            CURLOPT_HTTPHEADER => ['Authorization: Bearer ' . $apiKey, 'Content-Type: application/json'],
             CURLOPT_TIMEOUT => 30,
         ]);
         $body = curl_exec($ch);

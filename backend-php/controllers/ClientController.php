@@ -179,6 +179,7 @@ class ClientController {
         $stmt = $db->prepare("UPDATE Client SET status = 'inactive' WHERE id = ? AND clinicId = ?");
         $stmt->execute([$id, $user['clinicId']]);
 
+        log_audit($user['clinicId'], $user['id'] ?? null, 'client_deactivated', 'Client', $id, null, ['by' => $user['role'] ?? '']);
         send_json(['message' => 'Client deactivated']);
     }
 

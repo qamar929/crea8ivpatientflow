@@ -136,7 +136,8 @@ class AdminController {
                 $existing = $db->prepare("SELECT apiKey FROM AIProviderSetting WHERE clinicId = 'platform' AND provider = ?");
                 $existing->execute([$provider]);
                 $currentKey = $existing->fetchColumn();
-                $apiKey = !empty($pi['apiKey']) ? $pi['apiKey'] : ($currentKey ?: null);
+                // Encrypt new keys at rest; keep the (already-encrypted) stored one otherwise.
+                $apiKey = !empty($pi['apiKey']) ? meta_encrypt_secret($pi['apiKey']) : ($currentKey ?: null);
                 $enabled = !empty($pi['enabled']) ? 1 : 0;
                 $model = trim((string)($pi['model'] ?? '')) ?: null;
                 $status = $enabled ? ($apiKey ? 'ready' : 'missing_key') : 'disabled';
@@ -235,6 +236,7 @@ class AdminController {
 
     public function listTenants($input, $user) {
         $db = DB::getConnection();
+        tenant_features_ensure($db);
         $status = $_GET['status'] ?? '';
 
         $where = "WHERE c.id != 'platform'";
@@ -248,11 +250,18 @@ class AdminController {
             "SELECT c.id, c.name, c.slug, c.customDomain, c.domainStatus, c.sslStatus,
                     c.status, c.clinicType, c.trialEndsAt,
                     c.suspendedAt, c.suspensionReason, c.createdAt,
+                    COALESCE(fs.marketingEnabled, 0) AS marketingEnabled,
+                    COALESCE(fs.whatsappEnabled, 0) AS whatsappEnabled,
+                    COALESCE(fs.aiEnabled, 0) AS aiEnabled,
+                    COALESCE(fs.metaLeadsEnabled, 0) AS metaLeadsEnabled,
+                    COALESCE(fs.importsEnabled, 0) AS importsEnabled,
                     (SELECT COUNT(*) FROM User u WHERE u.clinicId = c.id) AS userCount,
                     (SELECT COUNT(*) FROM Client cl WHERE cl.clinicId = c.id) AS patientCount,
                     (SELECT MAX(s.expiresAt) FROM Subscription s
                       WHERE s.clinicId = c.id AND s.status = 'active') AS subscriptionExpiresAt
-             FROM Clinic c $where ORDER BY c.createdAt DESC"
+             FROM Clinic c
+             LEFT JOIN ClinicFeatureSetting fs ON fs.clinicId = c.id
+             $where ORDER BY c.createdAt DESC"
         );
         $stmt->execute($params);
         send_json($stmt->fetchAll());
@@ -358,7 +367,7 @@ class AdminController {
                 $existing = $db->prepare("SELECT apiKey FROM AIProviderSetting WHERE clinicId = 'platform' AND provider = ?");
                 $existing->execute([$provider]);
                 $currentKey = $existing->fetchColumn();
-                $apiKey = !empty($providerInput['apiKey']) ? $providerInput['apiKey'] : ($currentKey ?: null);
+                $apiKey = !empty($providerInput['apiKey']) ? meta_encrypt_secret($providerInput['apiKey']) : ($currentKey ?: null);
                 $enabled = !empty($providerInput['enabled']) ? 1 : 0;
                 $model = trim((string)($providerInput['model'] ?? '')) ?: null;
                 $limit = max(0, intval($providerInput['monthlyTokenLimit'] ?? 0));
