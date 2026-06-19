@@ -63,8 +63,16 @@ const navGroups = [
   },
 ];
 
+const FEATURE_LOCKS = {
+  '/marketing': 'marketingEnabled',
+  '/whatsapp': 'whatsappEnabled',
+  '/ai': 'aiEnabled',
+  '/meta-leads': 'metaLeadsEnabled',
+  '/imports': 'importsEnabled',
+};
+
 export default function SidebarNew() {
-  const { clinicInfo } = useClinic();
+  const { clinicInfo, features } = useClinic();
   const [collapsed, setCollapsed] = useState(false);
   const role = getCurrentRole();
 
@@ -124,24 +132,42 @@ export default function SidebarNew() {
               </p>
             )}
             <div className="space-y-0.5">
-              {group.items.filter((item) => canAccessPath(item.to, role)).map(({ to, icon: Icon, label }) => (
-                <NavLink
-                  key={to}
-                  to={to}
-                  className={({ isActive }) =>
-                    clsx(
-                      'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150',
-                      isActive
-                        ? 'bg-white/20 text-white shadow-lg backdrop-blur-sm border-l-2 border-white'
-                        : 'text-white/60 hover:text-white hover:bg-white/10 border-l-2 border-transparent'
-                    )
-                  }
-                  title={collapsed ? label : undefined}
-                >
-                  <Icon className="w-[18px] h-[18px] shrink-0" />
-                  {!collapsed && <span className="truncate">{label}</span>}
-                </NavLink>
-              ))}
+              {group.items.filter((item) => canAccessPath(item.to, role)).map(({ to, icon: Icon, label }) => {
+                const featureKey = FEATURE_LOCKS[to];
+                const disabled = featureKey && !features[featureKey];
+                if (disabled) {
+                  return (
+                    <button
+                      key={to}
+                      type="button"
+                      disabled
+                      className="flex w-full cursor-not-allowed items-center gap-3 rounded-lg border-l-2 border-transparent px-3 py-2.5 text-left text-sm font-medium text-white/30"
+                      title={`Contact Support to activate ${label}.`}
+                    >
+                      <Icon className="w-[18px] h-[18px] shrink-0" />
+                      {!collapsed && <span className="truncate">{label}</span>}
+                    </button>
+                  );
+                }
+                return (
+                  <NavLink
+                    key={to}
+                    to={to}
+                    className={({ isActive }) =>
+                      clsx(
+                        'flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-all duration-150',
+                        isActive
+                          ? 'bg-white/20 text-white shadow-lg backdrop-blur-sm border-l-2 border-white'
+                          : 'text-white/60 hover:text-white hover:bg-white/10 border-l-2 border-transparent'
+                      )
+                    }
+                    title={collapsed ? label : undefined}
+                  >
+                    <Icon className="w-[18px] h-[18px] shrink-0" />
+                    {!collapsed && <span className="truncate">{label}</span>}
+                  </NavLink>
+                );
+              })}
             </div>
           </div>
         ))}

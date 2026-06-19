@@ -55,11 +55,26 @@ const defaultClinicInfo = {
   secondaryColor: '#ea580c',
 };
 
+const defaultFeatures = {
+  marketingEnabled: false,
+  metaLeadsEnabled: false,
+  importsEnabled: false,
+  whatsappEnabled: false,
+  whatsappMarketingEnabled: false,
+  whatsappAutomationEnabled: false,
+  aiEnabled: false,
+  aiAutoReplyEnabled: false,
+  aiHumanApprovalRequired: true,
+  monthlyAiTokenLimit: 0,
+  monthlyWhatsAppLimit: 0,
+};
+
 export function ClinicProvider({ children }) {
   const [activeSpecialty, setActiveSpecialty] = useState('all');
   // True once /public/branding confirms a clinic owns this domain. While false
   // (e.g. the platform domain crea8ivmedia.com) the portal shows PatientFlow.
   const [clinicMatched, setClinicMatched] = useState(false);
+  const [features, setFeatures] = useState(defaultFeatures);
   const [clinicInfo, setClinicInfo] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('clinic_branding') || 'null');
@@ -108,6 +123,13 @@ export function ClinicProvider({ children }) {
   }, []);
 
   useEffect(() => {
+    if (!isClinicUserSession()) return;
+    fetchApi('/features')
+      .then((data) => setFeatures((current) => ({ ...current, ...data })))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
     // Signed-in clinic users: hydrate from the server-saved clinic settings
     // (the Clinic table) so edits persist across logins on ANY domain —
     // including the shared platform domain where /public/branding matches
@@ -131,10 +153,11 @@ export function ClinicProvider({ children }) {
     activeSpecialty,
     setActiveSpecialty,
     clinicInfo,
+    features,
     updateClinicInfo,
     clinicMatched,
     isPlatform: !clinicMatched,
-  }), [activeSpecialty, clinicInfo, clinicMatched]);
+  }), [activeSpecialty, clinicInfo, clinicMatched, features]);
 
   return (
     <ClinicContext.Provider value={value}>

@@ -288,6 +288,7 @@ $routes = [
     ['PUT', '^api/v1/appointments/([^/]+)$', 'AppointmentController', 'update', ['owner', 'manager', 'doctor', 'therapist', 'receptionist']],
     ['DELETE', '^api/v1/appointments/([^/]+)$', 'AppointmentController', 'remove', ['owner', 'manager', 'doctor', 'therapist', 'receptionist']],
     ['PUT', '^api/v1/appointments/([^/]+)/cancel$', 'AppointmentController', 'cancel', ['owner', 'manager', 'doctor', 'therapist', 'receptionist']],
+    ['PUT', '^api/v1/appointments/([^/]+)/reschedule$', 'AppointmentController', 'reschedule', ['owner', 'manager', 'doctor', 'therapist', 'receptionist']],
     ['PUT', '^api/v1/appointments/([^/]+)/checkin$', 'AppointmentController', 'checkIn', ['owner', 'manager', 'doctor', 'therapist', 'receptionist']],
 
     // Staff Routes

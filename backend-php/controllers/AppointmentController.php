@@ -327,7 +327,40 @@ class AppointmentController {
         $db = DB::getConnection();
         $stmt = $db->prepare("UPDATE Appointment SET status = 'cancelled' WHERE id = ? AND clinicId = ?");
         $stmt->execute([$id, $user['clinicId']]);
+        log_audit($user['clinicId'], $user['id'] ?? null, 'appointment_cancelled', 'Appointment', $id, null, null);
         send_json(['message' => 'Cancelled']);
+    }
+
+    // Dedicated reschedule: move date/time, keep everything else, record the
+    // old→new in notes + audit, re-confirm, and conflict-check.
+    public function reschedule($input, $user, $id) {
+        $db = DB::getConnection();
+        $stmt = $db->prepare("SELECT * FROM Appointment WHERE id = ? AND clinicId = ?");
+        $stmt->execute([$id, $user['clinicId']]);
+        $existing = $stmt->fetch();
+        if (!$existing) send_error('Appointment not found', 404);
+
+        $date = $input['date'] ?? '';
+        $startTime = $input['startTime'] ?? '';
+        if (empty($date) || empty($startTime)) send_error('New date and time are required', 400);
+
+        $duration = intval($existing['duration'] ?: 30);
+        $endTime = date('H:i', strtotime("$date $startTime") + $duration * 60);
+
+        $conflicts = $this->checkConflict($db, $user['clinicId'], $existing['staffId'], $date, $startTime, $endTime, $id);
+        if (!empty($conflicts)) send_error('Time slot conflict', 409, ['conflicts' => $conflicts]);
+
+        $note = trim(($existing['notes'] ?? '') . "\nRescheduled from {$existing['date']} {$existing['startTime']} → $date $startTime");
+        $db->prepare("UPDATE Appointment SET date = ?, startTime = ?, endTime = ?, status = 'confirmed', notes = ? WHERE id = ? AND clinicId = ?")
+           ->execute([$date, $startTime, $endTime, $note, $id, $user['clinicId']]);
+
+        log_audit($user['clinicId'], $user['id'] ?? null, 'appointment_rescheduled', 'Appointment', $id,
+                  ['date' => $existing['date'], 'startTime' => $existing['startTime']],
+                  ['date' => $date, 'startTime' => $startTime]);
+
+        $stmt = $db->prepare("SELECT * FROM Appointment WHERE id = ? AND clinicId = ?");
+        $stmt->execute([$id, $user['clinicId']]);
+        send_json($stmt->fetch());
     }
 
     // Permanently remove an appointment record (distinct from cancel, which

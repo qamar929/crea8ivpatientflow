@@ -39,15 +39,20 @@ class GalleryController {
 
         $file = $_FILES['image'];
 
-        // Validate it really is an image (defense against arbitrary file upload)
-        $allowed = ['image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/gif' => 'gif'];
+        // Validate the real MIME (defense against arbitrary file upload).
+        // Images for the clinical gallery; PDF for patient documents
+        // (consent forms, lab reports, prescriptions).
+        $allowed = [
+            'image/jpeg' => 'jpg', 'image/png' => 'png', 'image/webp' => 'webp', 'image/gif' => 'gif',
+            'application/pdf' => 'pdf',
+        ];
         $finfo = finfo_open(FILEINFO_MIME_TYPE);
         $mime = finfo_file($finfo, $file['tmp_name']);
         if (!isset($allowed[$mime])) {
-            send_error('Only JPG, PNG, WEBP or GIF images are allowed', 400);
+            send_error('Only images (JPG, PNG, WEBP, GIF) or PDF documents are allowed', 400);
         }
-        if ($file['size'] > 8 * 1024 * 1024) {
-            send_error('Image must be under 8 MB', 400);
+        if ($file['size'] > 15 * 1024 * 1024) {
+            send_error('File must be under 15 MB', 400);
         }
 
         $type = $input['type'] ?? 'before';

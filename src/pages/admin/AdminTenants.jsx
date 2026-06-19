@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2, PlayCircle, PauseCircle, CalendarPlus, Globe, ShieldCheck, Plus, Pencil, Trash2, LogIn, Search, Copy, Check, X, Users as UsersIcon, Building2, CreditCard, Clock, MessageCircle, Bot, KeyRound } from 'lucide-react';
+import { Loader2, PlayCircle, PauseCircle, CalendarPlus, Globe, ShieldCheck, Plus, Pencil, Trash2, LogIn, Search, Copy, Check, X, Users as UsersIcon, Building2, CreditCard, Clock, MessageCircle, Bot, KeyRound, Megaphone, Facebook, Database } from 'lucide-react';
 import { fetchApi } from '../../config/api';
 import Modal from '../../components/ui/Modal';
 import ColorPicker from '../../components/ui/ColorPicker';
@@ -60,6 +60,14 @@ const FILTERS = [
   { key: 'suspended', label: 'Suspended' },
   { key: 'pending', label: 'Pending' },
   { key: 'expiring', label: 'Expiring ≤30d' },
+];
+
+const GROWTH_MODULES = [
+  { key: 'marketingEnabled', label: 'Marketing', icon: Megaphone },
+  { key: 'whatsappEnabled', label: 'WhatsApp', icon: MessageCircle },
+  { key: 'aiEnabled', label: 'AI', icon: Bot },
+  { key: 'metaLeadsEnabled', label: 'Meta', icon: Facebook },
+  { key: 'importsEnabled', label: 'Imports', icon: Database },
 ];
 
 export default function AdminTenants() {
@@ -159,6 +167,22 @@ export default function AdminTenants() {
     run(t.id, () => fetchApi(`/admin/tenants/${t.id}/domain`, { method: 'PUT', body: JSON.stringify({ customDomain }) }));
   };
 
+  const toggleGrowthFeature = (t, key) => {
+    const next = !Number(t[key] || 0);
+    run(t.id, async () => {
+      const current = await fetchApi(`/admin/tenants/${t.id}/automation`);
+      await fetchApi(`/admin/tenants/${t.id}/automation`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          features: {
+            ...(current.features || {}),
+            [key]: next,
+          },
+        }),
+      });
+    });
+  };
+
   const markConnected = (t) => {
     if (!window.confirm(`Mark ${t.customDomain} as connected?\n\nOnly do this AFTER you have:\n1. Pointed its DNS to the server\n2. Issued an SSL certificate in hosting\n3. Deployed the portal to its folder\n\nThis flips the platform record to "connected".`)) return;
     run(t.id, () => fetchApi(`/admin/tenants/${t.id}/domain/ssl`, { method: 'PUT', body: JSON.stringify({ action: 'connect' }) }));
@@ -219,12 +243,13 @@ export default function AdminTenants() {
               <th className="px-4 py-3">Subscription ends</th>
               <th className="px-4 py-3">Users</th>
               <th className="px-4 py-3">Patients</th>
+              <th className="px-4 py-3">Growth</th>
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-white/5">
             {filtered.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-10 text-center text-gray-400">{tenants.length === 0 ? 'No clinics yet. Click “New Clinic” to add one.' : 'No clinics match this filter.'}</td></tr>
+              <tr><td colSpan={7} className="px-4 py-10 text-center text-gray-400">{tenants.length === 0 ? 'No clinics yet. Click “New Clinic” to add one.' : 'No clinics match this filter.'}</td></tr>
             )}
             {filtered.map((t) => (
               <tr key={t.id} className="hover:bg-gray-50/70 dark:hover:bg-white/[0.03]">
@@ -256,6 +281,31 @@ export default function AdminTenants() {
                 </td>
                 <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{t.userCount}</td>
                 <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{t.patientCount}</td>
+                <td className="px-4 py-3 min-w-[250px]">
+                  <div className="flex flex-wrap gap-1.5">
+                    {GROWTH_MODULES.map(({ key, label, icon: Icon }) => {
+                      const enabled = !!Number(t[key] || 0);
+                      return (
+                        <button
+                          key={key}
+                          type="button"
+                          onClick={() => toggleGrowthFeature(t, key)}
+                          disabled={busy === t.id}
+                          aria-pressed={enabled}
+                          title={`${enabled ? 'Turn off' : 'Turn on'} ${label}`}
+                          className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-black transition-colors disabled:opacity-60 ${
+                            enabled
+                              ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300'
+                              : 'border-gray-200 bg-gray-50 text-gray-500 hover:border-indigo-200 hover:text-indigo-600 dark:border-white/10 dark:bg-white/5 dark:text-gray-400'
+                          }`}
+                        >
+                          <Icon className="h-3.5 w-3.5" />
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </td>
                 <td className="px-4 py-3">
                   <div className="flex items-center justify-end gap-3 flex-wrap">
                     {busy === t.id ? (
@@ -442,6 +492,9 @@ function TenantAutomationControls({ tenantId }) {
       setData(res);
       setDraft({
         features: {
+          marketingEnabled: !!Number(res.features?.marketingEnabled),
+          metaLeadsEnabled: !!Number(res.features?.metaLeadsEnabled),
+          importsEnabled: !!Number(res.features?.importsEnabled),
           whatsappEnabled: !!Number(res.features?.whatsappEnabled),
           whatsappMarketingEnabled: !!Number(res.features?.whatsappMarketingEnabled),
           whatsappAutomationEnabled: !!Number(res.features?.whatsappAutomationEnabled),
@@ -510,6 +563,20 @@ function TenantAutomationControls({ tenantId }) {
       {notice && <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">{notice}</div>}
 
       <div className="mt-4 grid gap-3">
+        <div className="rounded-xl bg-gray-50 p-3 dark:bg-white/5">
+          <div className="mb-3 flex items-center gap-2 text-xs font-black uppercase tracking-wider text-gray-400"><Megaphone className="h-4 w-4" /> Growth modules</div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {GROWTH_MODULES.map(({ key, label, icon: Icon }) => (
+              <label key={key} className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-bold dark:border-white/10 dark:bg-slate-900">
+                <input type="checkbox" checked={!!draft.features[key]} onChange={(e) => setFeature(key, e.target.checked)} />
+                <Icon className="h-4 w-4 text-gray-400" />
+                {label}
+              </label>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-gray-400">Controls the five Growth menu items shown in the clinic portal sidebar.</p>
+        </div>
+
         <div className="rounded-xl bg-gray-50 p-3 dark:bg-white/5">
           <div className="mb-3 flex items-center gap-2 text-xs font-black uppercase tracking-wider text-gray-400"><MessageCircle className="h-4 w-4" /> WhatsApp package</div>
           <div className="grid gap-2 sm:grid-cols-2">

@@ -45,6 +45,15 @@ import MetaLeadCenter from './pages/MetaLeadCenter';
 import ImportCenter from './pages/ImportCenter';
 import Support from './pages/Support';
 import { canAccessPath } from './config/roles';
+import { useClinic } from './context/ClinicContext';
+
+const FEATURE_ROUTES = {
+  marketing: { key: 'marketingEnabled', label: 'Marketing' },
+  whatsapp: { key: 'whatsappEnabled', label: 'WhatsApp Center' },
+  ai: { key: 'aiEnabled', label: 'AI Hub' },
+  'meta-leads': { key: 'metaLeadsEnabled', label: 'Meta Leads' },
+  imports: { key: 'importsEnabled', label: 'Import Center' },
+};
 
 function ProtectedRoute({ children }) {
   const isAuth = localStorage.getItem('clinic_auth') === 'true';
@@ -63,6 +72,24 @@ function SuperadminRoute({ children }) {
 
 function RoleRoute({ path, children }) {
   return canAccessPath(`/${path}`) ? children : <Navigate to="/dashboard" replace />;
+}
+
+function FeatureRoute({ path, children }) {
+  const { features } = useClinic();
+  const feature = FEATURE_ROUTES[path];
+  if (!canAccessPath(`/${path}`)) return <Navigate to="/dashboard" replace />;
+  if (feature && !features[feature.key]) {
+    return (
+      <div className="flex min-h-[55vh] items-center justify-center p-6">
+        <div className="max-w-md rounded-2xl border border-amber-200 bg-amber-50 p-6 text-center text-amber-900 shadow-sm dark:border-amber-500/30 dark:bg-amber-500/10 dark:text-amber-100">
+          <p className="text-xs font-black uppercase tracking-[0.2em] opacity-70">Feature locked</p>
+          <h1 className="mt-3 text-2xl font-black">{feature.label}</h1>
+          <p className="mt-2 text-sm leading-6">Contact Support to activate {feature.label} for this clinic.</p>
+        </div>
+      </div>
+    );
+  }
+  return children;
 }
 
 export default function AppNew() {
@@ -119,14 +146,14 @@ export default function AppNew() {
               <Route path="inventory" element={<RoleRoute path="inventory"><Inventory /></RoleRoute>} />
               <Route path="gallery" element={<RoleRoute path="gallery"><Gallery /></RoleRoute>} />
               <Route path="feedback" element={<RoleRoute path="feedback"><Feedback /></RoleRoute>} />
-              <Route path="marketing" element={<RoleRoute path="marketing"><Marketing /></RoleRoute>} />
-              <Route path="whatsapp" element={<RoleRoute path="whatsapp"><WhatsAppCenter /></RoleRoute>} />
+              <Route path="marketing" element={<FeatureRoute path="marketing"><Marketing /></FeatureRoute>} />
+              <Route path="whatsapp" element={<FeatureRoute path="whatsapp"><WhatsAppCenter /></FeatureRoute>} />
               <Route path="reports" element={<RoleRoute path="reports"><Reports /></RoleRoute>} />
               <Route path="audit" element={<RoleRoute path="audit"><AuditTrail /></RoleRoute>} />
               <Route path="branches" element={<RoleRoute path="branches"><MultiBranch /></RoleRoute>} />
-              <Route path="ai" element={<RoleRoute path="ai"><AIHub /></RoleRoute>} />
-              <Route path="meta-leads" element={<RoleRoute path="meta-leads"><MetaLeadCenter /></RoleRoute>} />
-              <Route path="imports" element={<RoleRoute path="imports"><ImportCenter /></RoleRoute>} />
+              <Route path="ai" element={<FeatureRoute path="ai"><AIHub /></FeatureRoute>} />
+              <Route path="meta-leads" element={<FeatureRoute path="meta-leads"><MetaLeadCenter /></FeatureRoute>} />
+              <Route path="imports" element={<FeatureRoute path="imports"><ImportCenter /></FeatureRoute>} />
               <Route path="support" element={<RoleRoute path="support"><Support /></RoleRoute>} />
             </Route>
             <Route path="*" element={<Navigate to="/dashboard" replace />} />

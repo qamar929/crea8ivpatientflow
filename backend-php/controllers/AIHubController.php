@@ -69,6 +69,9 @@ class AIHubController {
         $this->ensureDefaultsForClinic($db, 'platform');
         $this->ensureDefaultsForClinic($db, $user['clinicId']);
         $features = tenant_features_get($db, $user['clinicId']);
+        if (empty($features['aiEnabled'])) {
+            send_error('Contact Support to activate AI Hub.', 403, ['code' => 'feature_inactive']);
+        }
 
         $stmt = $db->prepare("SELECT * FROM AIProviderSetting WHERE clinicId = 'platform' ORDER BY provider");
         $stmt->execute();

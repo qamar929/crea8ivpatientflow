@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../services/metaWhatsAppService.php';
+require_once __DIR__ . '/../services/tenantFeatureService.php';
 
 class MetaLeadController {
     private function db() {
@@ -64,8 +65,16 @@ class MetaLeadController {
         return $db;
     }
 
+    private function requireFeature($db, $clinicId) {
+        $features = tenant_features_get($db, $clinicId);
+        if (empty($features['metaLeadsEnabled'])) {
+            send_error('Contact Support to activate Meta Leads.', 403, ['code' => 'feature_inactive']);
+        }
+    }
+
     public function settings($input, $user) {
         $db = $this->db();
+        $this->requireFeature($db, $user['clinicId']);
         $stmt = $db->prepare("SELECT * FROM MetaLeadSetting WHERE clinicId = ?");
         $stmt->execute([$user['clinicId']]);
         $settings = $stmt->fetch() ?: ['clinicId' => $user['clinicId'], 'syncEnabled' => 0];
@@ -76,6 +85,7 @@ class MetaLeadController {
 
     public function saveSettings($input, $user) {
         $db = $this->db();
+        $this->requireFeature($db, $user['clinicId']);
         $existing = $db->prepare("SELECT accessToken FROM MetaLeadSetting WHERE clinicId = ?");
         $existing->execute([$user['clinicId']]);
         $currentToken = $existing->fetchColumn();
@@ -93,6 +103,7 @@ class MetaLeadController {
 
     public function list($input, $user) {
         $db = $this->db();
+        $this->requireFeature($db, $user['clinicId']);
         $status = $_GET['status'] ?? '';
         $where = ['clinicId = ?'];
         $params = [$user['clinicId']];
@@ -104,6 +115,7 @@ class MetaLeadController {
 
     public function create($input, $user) {
         $db = $this->db();
+        $this->requireFeature($db, $user['clinicId']);
         if (empty($input['patientName'])) send_error('patientName is required', 400);
         $id = generate_uuid();
         $stmt = $db->prepare("INSERT INTO MetaLead (id, clinicId, patientName, phone, email, source, campaignName, adName, formName, branchId, status, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
@@ -116,6 +128,7 @@ class MetaLeadController {
 
     public function update($input, $user, $id) {
         $db = $this->db();
+        $this->requireFeature($db, $user['clinicId']);
         $fields = [];
         $params = [];
         foreach (['patientName','phone','email','source','campaignName','adName','formName','branchId','status','notes'] as $key) {
@@ -131,6 +144,7 @@ class MetaLeadController {
 
     public function remove($input, $user, $id) {
         $db = $this->db();
+        $this->requireFeature($db, $user['clinicId']);
         $stmt = $db->prepare("DELETE FROM MetaLead WHERE id = ? AND clinicId = ?");
         $stmt->execute([$id, $user['clinicId']]);
         log_audit($user['clinicId'], $user['id'] ?? null, 'delete', 'MetaLead', $id);
@@ -139,6 +153,7 @@ class MetaLeadController {
 
     public function convert($input, $user, $id) {
         $db = $this->db();
+        $this->requireFeature($db, $user['clinicId']);
         $stmt = $db->prepare("SELECT * FROM MetaLead WHERE id = ? AND clinicId = ?");
         $stmt->execute([$id, $user['clinicId']]);
         $lead = $stmt->fetch();

@@ -63,6 +63,9 @@ CREATE TABLE `PublicSiteConfig` (
 -- SaaS feature controls managed by platform superadmin
 CREATE TABLE `ClinicFeatureSetting` (
   `clinicId` VARCHAR(64) NOT NULL,
+  `marketingEnabled` TINYINT(1) NOT NULL DEFAULT 0,
+  `metaLeadsEnabled` TINYINT(1) NOT NULL DEFAULT 0,
+  `importsEnabled` TINYINT(1) NOT NULL DEFAULT 0,
   `whatsappEnabled` TINYINT(1) NOT NULL DEFAULT 0,
   `whatsappMarketingEnabled` TINYINT(1) NOT NULL DEFAULT 0,
   `whatsappAutomationEnabled` TINYINT(1) NOT NULL DEFAULT 0,

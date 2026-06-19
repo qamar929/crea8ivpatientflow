@@ -45,6 +45,7 @@ export function syncBrandingMetadata(clinicInfo = {}) {
   const tagline = clinicInfo.tagline || 'Clinic management portal';
   const iconUrl = getBrandIconUrl(clinicInfo);
   const themeColor = clinicInfo.primaryColor || '#0f766e';
+  const appBase = import.meta.env.BASE_URL || '/';
 
   document.title = `${name} - Clinic Portal`;
   document.querySelector('meta[name="description"]')?.setAttribute('content', `${name}: ${tagline}`);
@@ -59,8 +60,8 @@ export function syncBrandingMetadata(clinicInfo = {}) {
     name: `${name} Portal`,
     short_name: name.slice(0, 24),
     description: tagline,
-    start_url: '/dashboard',
-    scope: '/',
+    start_url: `${appBase}dashboard`,
+    scope: appBase,
     display: 'standalone',
     orientation: 'portrait-primary',
     background_color: '#f6f7f9',

@@ -1,18 +1,38 @@
 <?php
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../helpers.php';
+require_once __DIR__ . '/../services/tenantFeatureService.php';
 
 class MarketingController {
+    private function marketingEnabled($db, $clinicId) {
+        $features = tenant_features_get($db, $clinicId);
+        return !empty($features['marketingEnabled']);
+    }
+
+    private function requireMarketing($db, $clinicId) {
+        if (!$this->marketingEnabled($db, $clinicId)) {
+            send_error('Contact Support to activate Marketing Growth.', 403, ['code' => 'marketing_growth_inactive']);
+        }
+    }
+
     public function list($input, $user) {
         $db = DB::getConnection();
+        if (!$this->marketingEnabled($db, $user['clinicId'])) {
+            send_json([
+                'enabled' => false,
+                'message' => 'Contact Support to activate Marketing Growth.',
+                'campaigns' => [],
+            ]);
+        }
         $stmt = $db->prepare("SELECT * FROM Campaign WHERE clinicId = ? ORDER BY createdAt DESC");
         $stmt->execute([$user['clinicId']]);
         $campaigns = $stmt->fetchAll();
-        send_json($campaigns);
+        send_json(['enabled' => true, 'campaigns' => $campaigns]);
     }
 
     public function getById($input, $user, $id) {
         $db = DB::getConnection();
+        $this->requireMarketing($db, $user['clinicId']);
         $stmt = $db->prepare("SELECT * FROM Campaign WHERE id = ? AND clinicId = ?");
         $stmt->execute([$id, $user['clinicId']]);
         $campaign = $stmt->fetch();
@@ -24,6 +44,7 @@ class MarketingController {
 
     public function create($input, $user) {
         $db = DB::getConnection();
+        $this->requireMarketing($db, $user['clinicId']);
 
         $id = generate_uuid();
         $name = $input['name'] ?? '';
@@ -51,6 +72,7 @@ class MarketingController {
 
     public function update($input, $user, $id) {
         $db = DB::getConnection();
+        $this->requireMarketing($db, $user['clinicId']);
         $stmt = $db->prepare("SELECT id FROM Campaign WHERE id = ? AND clinicId = ?");
         $stmt->execute([$id, $user['clinicId']]);
         if (!$stmt->fetch()) {
@@ -84,6 +106,7 @@ class MarketingController {
 
     public function remove($input, $user, $id) {
         $db = DB::getConnection();
+        $this->requireMarketing($db, $user['clinicId']);
         $stmt = $db->prepare("DELETE FROM Campaign WHERE id = ? AND clinicId = ?");
         $stmt->execute([$id, $user['clinicId']]);
         send_json(['message' => 'Deleted']);
@@ -91,6 +114,7 @@ class MarketingController {
 
     public function send($input, $user, $id) {
         $db = DB::getConnection();
+        $this->requireMarketing($db, $user['clinicId']);
         
         // Find Campaign
         $stmt = $db->prepare("SELECT * FROM Campaign WHERE id = ? AND clinicId = ?");
