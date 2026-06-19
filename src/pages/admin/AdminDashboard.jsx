@@ -9,7 +9,7 @@ const pkr = (n) => 'PKR ' + Number(n || 0).toLocaleString('en-PK');
 
 function StatCard({ icon: Icon, label, value, tone = 'indigo' }) {
   const tones = {
-    indigo: 'from-indigo-600 to-violet-600',
+    indigo: 'from-orange-600 to-orange-500',
     teal: 'from-teal-600 to-emerald-600',
     amber: 'from-amber-500 to-orange-500',
     rose: 'from-rose-500 to-pink-600',
@@ -63,7 +63,7 @@ export default function AdminDashboard() {
           <h1 className="text-2xl font-black text-gray-950 dark:text-white">Platform Dashboard</h1>
           <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Revenue and tenant health at a glance.</p>
         </div>
-        <Link to="/admin/tenants" className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold shadow-sm transition-colors">
+        <Link to="/admin/tenants" className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-sm font-bold shadow-sm transition-colors">
           <Plus className="w-4 h-4" /> New Clinic
         </Link>
       </div>
@@ -104,7 +104,7 @@ export default function AdminDashboard() {
               {stats.expiringSoon.map((s) => (
                 <li key={s.clinicId}>
                   <button onClick={() => navigate('/admin/tenants')} className="w-full py-2.5 flex items-center justify-between text-left group">
-                    <span className="text-sm font-semibold text-gray-800 dark:text-gray-200 group-hover:text-indigo-600">{s.name}</span>
+                    <span className="text-sm font-semibold text-gray-800 dark:text-gray-200 group-hover:text-orange-600">{s.name}</span>
                     <span className="flex items-center gap-1 text-xs font-bold text-amber-600">{String(s.expiresAt).slice(0, 10)} <ChevronRight className="w-3.5 h-3.5 opacity-0 group-hover:opacity-100" /></span>
                   </button>
                 </li>

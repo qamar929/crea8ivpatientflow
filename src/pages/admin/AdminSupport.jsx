@@ -4,7 +4,7 @@ import { fetchApi } from '../../config/api';
 
 const STATUS_STYLES = {
   open: 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300',
-  in_progress: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300',
+  in_progress: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300',
   waiting: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
   resolved: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
   closed: 'bg-gray-100 text-gray-500 dark:bg-white/5 dark:text-gray-400',
@@ -63,7 +63,7 @@ export default function AdminSupport() {
   if (active) {
     return (
       <div className="space-y-5 max-w-3xl">
-        <button onClick={() => { setActive(null); load(); }} className="inline-flex items-center gap-2 text-sm font-semibold text-indigo-600 hover:opacity-80">
+        <button onClick={() => { setActive(null); load(); }} className="inline-flex items-center gap-2 text-sm font-semibold text-orange-600 hover:opacity-80">
           <ArrowLeft className="w-4 h-4" /> Back to inbox
         </button>
 
@@ -84,11 +84,11 @@ export default function AdminSupport() {
               <div key={m.id} className={`flex ${m.senderType === 'admin' ? 'justify-end' : 'justify-start'}`}>
                 <div className={`max-w-[80%] rounded-2xl px-4 py-2.5 text-sm ${
                   m.senderType === 'admin'
-                    ? 'bg-indigo-600 text-white rounded-br-sm'
+                    ? 'bg-orange-600 text-white rounded-br-sm'
                     : 'bg-gray-100 dark:bg-white/10 text-gray-800 dark:text-gray-200 rounded-bl-sm'
                 }`}>
                   <p className="whitespace-pre-wrap">{m.body}</p>
-                  <p className={`text-[10px] mt-1 ${m.senderType === 'admin' ? 'text-indigo-200' : 'text-gray-400'}`}>
+                  <p className={`text-[10px] mt-1 ${m.senderType === 'admin' ? 'text-orange-200' : 'text-gray-400'}`}>
                     {m.senderType === 'admin' ? 'You' : 'Clinic'} · {String(m.createdAt).slice(0, 16).replace('T', ' ')}
                   </p>
                 </div>
@@ -100,8 +100,8 @@ export default function AdminSupport() {
 
           <form onSubmit={sendReply} className="mt-5 flex gap-2">
             <input value={reply} onChange={(e) => setReply(e.target.value)} placeholder="Type your reply..."
-              className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-500/40" />
-            <button disabled={busy} className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-bold px-5 rounded-xl">
+              className="flex-1 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] text-sm text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-orange-500/40" />
+            <button disabled={busy} className="inline-flex items-center gap-2 bg-orange-600 hover:bg-orange-700 disabled:opacity-60 text-white text-sm font-bold px-5 rounded-xl">
               <Send className="w-4 h-4" /> Send
             </button>
           </form>

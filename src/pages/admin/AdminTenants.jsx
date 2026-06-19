@@ -34,7 +34,7 @@ function ExpiryBadge({ date, status }) {
 const DOMAIN_STATUS = {
   pending: 'text-amber-600',
   dns_verified: 'text-sky-600',
-  awaiting_ssl: 'text-indigo-600',
+  awaiting_ssl: 'text-orange-600',
   connected: 'text-emerald-600',
   failed: 'text-rose-600',
 };
@@ -49,7 +49,7 @@ const STATUS_STYLES = {
 
 const CLINIC_TYPES = ['dental', 'aesthetic', 'general', 'clinic', 'spa', 'salon'];
 
-const field = 'w-full border border-gray-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-indigo-300 text-gray-900 dark:text-gray-100';
+const field = 'w-full border border-gray-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-orange-300 text-gray-900 dark:text-gray-100';
 const labelCls = 'block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1';
 
 const FILTERS = [
@@ -201,7 +201,7 @@ export default function AdminTenants() {
         </div>
         <button
           onClick={() => setShowCreate(true)}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold shadow-sm transition-colors"
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-sm font-bold shadow-sm transition-colors"
         >
           <Plus className="w-4 h-4" /> New Clinic
         </button>
@@ -218,7 +218,7 @@ export default function AdminTenants() {
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Search clinics by name, domain, type…"
-            className="w-full pl-9 pr-3 py-2 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 text-gray-900 dark:text-gray-100"
+            className="w-full pl-9 pr-3 py-2 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 text-gray-900 dark:text-gray-100"
           />
         </div>
         <div className="flex items-center gap-1 flex-wrap">
@@ -226,7 +226,7 @@ export default function AdminTenants() {
             <button
               key={f.key}
               onClick={() => setFilter(f.key)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${filter === f.key ? 'bg-indigo-600 text-white' : 'bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/10'}`}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${filter === f.key ? 'bg-orange-600 text-white' : 'bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/10'}`}
             >
               {f.label}{counts[f.key] ? <span className="ml-1 opacity-70">{counts[f.key]}</span> : ''}
             </button>
@@ -255,7 +255,7 @@ export default function AdminTenants() {
               <tr key={t.id} className="hover:bg-gray-50/70 dark:hover:bg-white/[0.03]">
                 <td className="px-4 py-3">
                   <button onClick={() => setDrawerId(t.id)} className="text-left group">
-                    <p className="font-bold text-gray-900 dark:text-white group-hover:text-indigo-600 group-hover:underline">{t.name}</p>
+                    <p className="font-bold text-gray-900 dark:text-white group-hover:text-orange-600 group-hover:underline">{t.name}</p>
                   </button>
                   <p className="text-xs text-gray-400">{t.slug ? `${t.slug} · ` : ''}{t.clinicType}</p>
                   {t.customDomain && (
@@ -281,72 +281,54 @@ export default function AdminTenants() {
                 </td>
                 <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{t.userCount}</td>
                 <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{t.patientCount}</td>
-                <td className="px-4 py-3 min-w-[250px]">
-                  <div className="flex flex-wrap gap-1.5">
-                    {GROWTH_MODULES.map(({ key, label, icon: Icon }) => {
-                      const enabled = !!Number(t[key] || 0);
-                      return (
-                        <button
-                          key={key}
-                          type="button"
-                          onClick={() => toggleGrowthFeature(t, key)}
-                          disabled={busy === t.id}
-                          aria-pressed={enabled}
-                          title={`${enabled ? 'Turn off' : 'Turn on'} ${label}`}
-                          className={`inline-flex items-center gap-1 rounded-full border px-2 py-1 text-[10px] font-black transition-colors disabled:opacity-60 ${
-                            enabled
-                              ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300'
-                              : 'border-gray-200 bg-gray-50 text-gray-500 hover:border-indigo-200 hover:text-indigo-600 dark:border-white/10 dark:bg-white/5 dark:text-gray-400'
-                          }`}
-                        >
-                          <Icon className="h-3.5 w-3.5" />
-                          {label}
-                        </button>
-                      );
-                    })}
-                  </div>
+                <td className="px-4 py-3">
+                  <button
+                    onClick={() => setDrawerId(t.id)}
+                    title={GROWTH_MODULES.map((m) => `${m.label}: ${Number(t[m.key] || 0) ? 'on' : 'off'}`).join('\n')}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 dark:border-white/10 px-2.5 py-1 text-[11px] font-bold text-gray-600 dark:text-gray-300 hover:border-orange-300 hover:text-orange-600"
+                  >
+                    <span className="flex gap-0.5">
+                      {GROWTH_MODULES.map((m) => (
+                        <span key={m.key} className={`w-1.5 h-1.5 rounded-full ${Number(t[m.key] || 0) ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-white/20'}`} />
+                      ))}
+                    </span>
+                    {GROWTH_MODULES.filter((m) => Number(t[m.key] || 0)).length}/{GROWTH_MODULES.length}
+                  </button>
                 </td>
                 <td className="px-4 py-3">
-                  <div className="flex items-center justify-end gap-3 flex-wrap">
+                  <div className="flex items-center justify-end gap-1">
                     {busy === t.id ? (
                       <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
                     ) : (
                       <>
-                        <button onClick={() => manage(t)} title="Sign in to this clinic's portal as superadmin" className="inline-flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-700">
-                          <LogIn className="w-4 h-4" /> Manage
+                        <button onClick={() => manage(t)} title="Sign in to this clinic's portal as superadmin" className="inline-flex items-center gap-1.5 rounded-lg bg-orange-600 hover:bg-orange-700 px-2.5 py-1.5 text-xs font-bold text-white">
+                          <LogIn className="w-3.5 h-3.5" /> Manage
                         </button>
-                        <button onClick={() => copyLoginLink(t)} title="Copy this clinic's login link" className="inline-flex items-center gap-1 text-xs font-bold text-gray-500 hover:text-indigo-600">
-                          {copiedId === t.id ? <><Check className="w-4 h-4 text-emerald-600" /> Copied</> : <><Copy className="w-4 h-4" /> Link</>}
-                        </button>
-                        {(t.status === 'pending' || t.status === 'suspended' || t.status === 'grace') && (
-                          <button onClick={() => activate(t)} title="Activate (new subscription)" className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 hover:text-emerald-700">
-                            <PlayCircle className="w-4 h-4" /> Activate
-                          </button>
-                        )}
-                        {t.subscriptionExpiresAt && t.status !== 'pending' && (
-                          <button onClick={() => extend(t)} title="Extend subscription" className="inline-flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-700">
-                            <CalendarPlus className="w-4 h-4" /> Extend
-                          </button>
-                        )}
-                        {(t.status === 'active' || t.status === 'trial' || t.status === 'grace') && (
-                          <button onClick={() => suspend(t)} title="Deactivate access" className="inline-flex items-center gap-1 text-xs font-bold text-rose-600 hover:text-rose-700">
-                            <PauseCircle className="w-4 h-4" /> Deactivate
-                          </button>
-                        )}
-                        <button onClick={() => setEditTenant(t)} title="Edit clinic details" className="inline-flex items-center gap-1 text-xs font-bold text-gray-500 hover:text-indigo-600">
-                          <Pencil className="w-4 h-4" /> Edit
-                        </button>
-                        <button onClick={() => setDomain(t)} title="Set white-label domain" className="inline-flex items-center gap-1 text-xs font-bold text-gray-500 hover:text-indigo-600">
-                          <Globe className="w-4 h-4" /> Domain
-                        </button>
-                        {t.customDomain && t.domainStatus && !['none', 'connected'].includes(t.domainStatus) && (
-                          <button onClick={() => markConnected(t)} title="Mark domain live/connected (after its DNS + SSL are set up in hosting)" className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 hover:text-emerald-700">
-                            <ShieldCheck className="w-4 h-4" /> Activate Domain
-                          </button>
-                        )}
-                        <button onClick={() => setDeleteTenant(t)} title="Delete clinic permanently" className="inline-flex items-center gap-1 text-xs font-bold text-rose-500 hover:text-rose-700">
-                          <Trash2 className="w-4 h-4" /> Delete
-                        </button>
+                        {(() => {
+                          const iconBtn = "p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10";
+                          return (
+                            <div className="flex items-center">
+                              <button onClick={() => copyLoginLink(t)} title="Copy login link" className={iconBtn}>
+                                {copiedId === t.id ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 hover:text-orange-600" />}
+                              </button>
+                              {(t.status === 'pending' || t.status === 'suspended' || t.status === 'grace') && (
+                                <button onClick={() => activate(t)} title="Activate (new subscription)" className={`${iconBtn} hover:text-emerald-600`}><PlayCircle className="w-4 h-4" /></button>
+                              )}
+                              {t.subscriptionExpiresAt && t.status !== 'pending' && (
+                                <button onClick={() => extend(t)} title="Extend subscription" className={`${iconBtn} hover:text-orange-600`}><CalendarPlus className="w-4 h-4" /></button>
+                              )}
+                              {(t.status === 'active' || t.status === 'trial' || t.status === 'grace') && (
+                                <button onClick={() => suspend(t)} title="Deactivate access" className={`${iconBtn} hover:text-rose-600`}><PauseCircle className="w-4 h-4" /></button>
+                              )}
+                              <button onClick={() => setEditTenant(t)} title="Edit clinic details" className={`${iconBtn} hover:text-orange-600`}><Pencil className="w-4 h-4" /></button>
+                              <button onClick={() => setDomain(t)} title="Set white-label domain" className={`${iconBtn} hover:text-orange-600`}><Globe className="w-4 h-4" /></button>
+                              {t.customDomain && t.domainStatus && !['none', 'connected'].includes(t.domainStatus) && (
+                                <button onClick={() => markConnected(t)} title="Mark domain connected (after DNS + SSL)" className={`${iconBtn} hover:text-emerald-600`}><ShieldCheck className="w-4 h-4" /></button>
+                              )}
+                              <button onClick={() => setDeleteTenant(t)} title="Delete clinic permanently" className={`${iconBtn} hover:text-rose-600`}><Trash2 className="w-4 h-4" /></button>
+                            </div>
+                          );
+                        })()}
                       </>
                     )}
                   </div>
@@ -431,7 +413,7 @@ function TenantDrawer({ id, onClose, onManage, onEdit }) {
                 { icon: CreditCard, label: 'Status', value: data.status },
               ].map((s) => (
                 <div key={s.label} className="rounded-xl border border-gray-200/70 dark:border-white/10 p-3 text-center">
-                  <s.icon className="w-4 h-4 mx-auto text-indigo-500" />
+                  <s.icon className="w-4 h-4 mx-auto text-orange-500" />
                   <p className="text-sm font-black text-gray-900 dark:text-white mt-1 capitalize">{s.value}</p>
                   <p className="text-[11px] text-gray-400">{s.label}</p>
                 </div>
@@ -465,7 +447,7 @@ function TenantDrawer({ id, onClose, onManage, onEdit }) {
             )}
 
             <div className="flex gap-2 pt-1">
-              <button onClick={() => onManage({ id: data.id, name: data.name })} className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold">
+              <button onClick={() => onManage({ id: data.id, name: data.name })} className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-sm font-bold">
                 <LogIn className="w-4 h-4" /> Manage clinic
               </button>
               <button onClick={() => onEdit(data)} className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-white/10 text-sm font-bold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5">
@@ -555,7 +537,7 @@ function TenantAutomationControls({ tenantId }) {
           <h3 className="text-sm font-black text-gray-900 dark:text-white">Automation & AI</h3>
           <p className="mt-1 text-xs text-gray-400">Superadmin controlled features, quotas and provider keys.</p>
         </div>
-        <button onClick={save} disabled={saving} className="inline-flex items-center gap-2 rounded-lg bg-indigo-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
+        <button onClick={save} disabled={saving} className="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
           {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Save
         </button>
       </div>
@@ -718,7 +700,7 @@ function CreateClinicModal({ onClose, onCreated }) {
 
         <div className="flex justify-end gap-2 pt-1">
           <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-100 dark:hover:bg-white/10">Cancel</button>
-          <button onClick={submit} disabled={saving || !f.name || !(f.ownerEmail || f.email)} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-bold">
+          <button onClick={submit} disabled={saving || !f.name || !(f.ownerEmail || f.email)} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white text-sm font-bold">
             {saving && <Loader2 className="w-4 h-4 animate-spin" />} Create clinic
           </button>
         </div>
@@ -769,7 +751,7 @@ function EditClinicModal({ tenant, onClose, onSaved }) {
         <ColorPicker label="Accent color" value={f.secondaryColor} onChange={(v) => set('secondaryColor', v)} />
         <div className="flex justify-end gap-2 pt-1">
           <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-100 dark:hover:bg-white/10">Cancel</button>
-          <button onClick={submit} disabled={saving} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white text-sm font-bold">
+          <button onClick={submit} disabled={saving} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white text-sm font-bold">
             {saving && <Loader2 className="w-4 h-4 animate-spin" />} Save changes
           </button>
         </div>
