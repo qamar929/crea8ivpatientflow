@@ -1,9 +1,29 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { Bell, Search, ChevronDown, LogOut, User, Settings, Sun, Moon } from 'lucide-react';
+import {
+  AlertTriangle,
+  Bell,
+  CalendarClock,
+  ChevronDown,
+  CreditCard,
+  Inbox,
+  LogOut,
+  MessageCircle,
+  Moon,
+  PackageCheck,
+  Search,
+  Settings,
+  ShieldAlert,
+  Star,
+  Sun,
+  User,
+  Users,
+  Warehouse,
+} from 'lucide-react';
 import { useClinic } from '../../context/ClinicContext';
 import { useTheme } from '../../context/ThemeContext';
 import { getCurrentRole, getCurrentUser, ROLE_LABELS } from '../../config/roles';
+import { fetchApi } from '../../config/api';
 
 const pageTitles = {
   '/dashboard': 'Dashboard',
@@ -30,11 +50,37 @@ const pageTitles = {
   '/settings': 'Settings',
 };
 
-const notifications = [
-  { id: 1, text: 'Farah Siddiqui confirmed her 11:00 AM appointment', time: '5m ago', read: false },
-  { id: 2, text: 'New client registration: Rabia Noor', time: '32m ago', read: false },
-  { id: 3, text: 'Staff reminder: Nida Farooq has a pending payroll review', time: '1h ago', read: false },
-];
+const notificationIcons = {
+  appointment: CalendarClock,
+  schedule: CalendarClock,
+  billing: CreditCard,
+  inventory: Warehouse,
+  patient: Users,
+  package: PackageCheck,
+  feedback: Star,
+  whatsapp: MessageCircle,
+  support: Inbox,
+  subscription: ShieldAlert,
+};
+
+const priorityStyles = {
+  urgent: 'bg-red-50 text-red-700 ring-red-100 dark:bg-red-500/10 dark:text-red-300 dark:ring-red-500/20',
+  high: 'bg-amber-50 text-amber-700 ring-amber-100 dark:bg-amber-500/10 dark:text-amber-300 dark:ring-amber-500/20',
+  normal: 'bg-blue-50 text-blue-700 ring-blue-100 dark:bg-blue-500/10 dark:text-blue-300 dark:ring-blue-500/20',
+  low: 'bg-slate-50 text-slate-600 ring-slate-100 dark:bg-white/5 dark:text-slate-300 dark:ring-white/10',
+};
+
+function timeAgo(value) {
+  const timestamp = value ? new Date(value.replace(' ', 'T')).getTime() : Date.now();
+  const seconds = Math.max(1, Math.floor((Date.now() - timestamp) / 1000));
+  if (seconds < 60) return 'just now';
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) return `${minutes}m ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  return `${days}d ago`;
+}
 
 export default function Header() {
   const { clinicInfo } = useClinic();
@@ -43,6 +89,10 @@ export default function Header() {
   const navigate = useNavigate();
   const [showNotifications, setShowNotifications] = useState(false);
   const [showUserMenu, setShowUserMenu] = useState(false);
+  const [notifications, setNotifications] = useState([]);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [urgentCount, setUrgentCount] = useState(0);
+  const [loadingNotifications, setLoadingNotifications] = useState(false);
 
   const user = getCurrentUser();
   const role = getCurrentRole();
@@ -51,10 +101,47 @@ export default function Header() {
   const title = pageTitles[location.pathname] || pageTitles['/' + pathParts[0]] || clinicInfo.name;
   const breadcrumb = pathParts.map((p, i) => ({ label: pageTitles['/' + p] || p, path: '/' + pathParts.slice(0, i + 1).join('/') }));
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  const loadNotifications = async () => {
+    if (localStorage.getItem('clinic_auth') !== 'true') return;
+    setLoadingNotifications(true);
+    try {
+      const data = await fetchApi('/notifications?limit=20');
+      setNotifications(data.notifications || []);
+      setUnreadCount(Number(data.unreadCount || 0));
+      setUrgentCount(Number(data.urgentCount || 0));
+    } catch (_) {
+      setNotifications([]);
+      setUnreadCount(0);
+      setUrgentCount(0);
+    } finally {
+      setLoadingNotifications(false);
+    }
+  };
+
+  useEffect(() => {
+    loadNotifications();
+    const timer = window.setInterval(loadNotifications, 60000);
+    return () => window.clearInterval(timer);
+  }, [location.pathname]);
+
+  const markAllRead = async () => {
+    await fetchApi('/notifications/read-all', { method: 'POST' });
+    await loadNotifications();
+  };
+
+  const openNotification = async (notification) => {
+    if (!notification.computed) {
+      await fetchApi(`/notifications/${notification.id}/read`, { method: 'POST' }).catch(() => {});
+    }
+    setShowNotifications(false);
+    if (notification.actionUrl) navigate(notification.actionUrl);
+    await loadNotifications();
+  };
 
   const handleLogout = () => {
     localStorage.removeItem('clinic_auth');
+    localStorage.removeItem('clinic_token');
+    localStorage.removeItem('clinic_refresh');
     localStorage.removeItem('clinic_user');
     navigate('/login');
   };
@@ -107,31 +194,69 @@ export default function Header() {
           <button
             onClick={() => { setShowNotifications(!showNotifications); setShowUserMenu(false); }}
             className="relative p-2 rounded-lg hover:bg-white dark:hover:bg-white/10 text-gray-500 dark:text-gray-400 transition-colors shadow-sm border border-transparent hover:border-gray-200/60"
+            title="Notifications"
           >
             <Bell className="w-5 h-5" />
             {unreadCount > 0 && (
-              <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 text-white text-[9px] font-bold rounded-full flex items-center justify-center animate-pulse">
-                {unreadCount}
+              <span className={`absolute top-1 right-1 min-w-4 h-4 px-1 text-white text-[9px] font-bold rounded-full flex items-center justify-center ${urgentCount > 0 ? 'bg-red-500 animate-pulse' : 'bg-amber-500'}`}>
+                {unreadCount > 9 ? '9+' : unreadCount}
               </span>
             )}
           </button>
           {showNotifications && (
-            <div className="absolute right-0 top-12 w-[calc(100vw-2rem)] sm:w-80 bg-white/90 dark:bg-slate-800/90 backdrop-blur-xl border border-gray-200/50 dark:border-white/10 shadow-2xl rounded-2xl z-50 overflow-hidden">
+            <div className="absolute right-0 top-12 w-[calc(100vw-2rem)] sm:w-[26rem] bg-white/95 dark:bg-slate-900/95 backdrop-blur-xl border border-gray-200/50 dark:border-white/10 shadow-2xl rounded-2xl z-50 overflow-hidden">
               <div className="px-4 py-3 border-b border-gray-200/50 dark:border-white/10 flex items-center justify-between">
-                <span className="text-sm font-semibold text-gray-900 dark:text-white">Notifications</span>
-                <button className="text-xs font-medium" style={{ color: 'var(--primary)' }}>Mark all read</button>
-              </div>
-              {notifications.map((n) => (
-                <div key={n.id} className="px-4 py-3 border-b border-gray-100/50 dark:border-white/5 hover:bg-gray-50/80 dark:hover:bg-white/5 cursor-pointer transition-colors">
-                  <div className="flex gap-2">
-                    <span className="w-1.5 h-1.5 rounded-full mt-1.5 shrink-0" style={{ background: 'var(--primary)' }} />
-                    <div>
-                      <p className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed">{n.text}</p>
-                      <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-1">{n.time}</p>
-                    </div>
-                  </div>
+                <div>
+                  <span className="text-sm font-semibold text-gray-900 dark:text-white">Notifications</span>
+                  <p className="text-[10px] font-medium text-gray-400 dark:text-gray-500">{unreadCount} active item{unreadCount === 1 ? '' : 's'}</p>
                 </div>
-              ))}
+                <button onClick={markAllRead} className="text-xs font-medium" style={{ color: 'var(--primary)' }}>Mark saved read</button>
+              </div>
+              <div className="max-h-[70vh] overflow-y-auto">
+                {loadingNotifications && notifications.length === 0 && (
+                  <div className="px-4 py-8 text-center text-xs font-medium text-gray-400">Loading clinic alerts...</div>
+                )}
+                {!loadingNotifications && notifications.length === 0 && (
+                  <div className="px-4 py-8 text-center">
+                    <Bell className="mx-auto h-5 w-5 text-gray-300 dark:text-gray-600" />
+                    <p className="mt-2 text-xs font-semibold text-gray-500 dark:text-gray-400">No active notifications</p>
+                  </div>
+                )}
+                {notifications.map((n) => {
+                  const Icon = notificationIcons[n.type] || AlertTriangle;
+                  const priorityClass = priorityStyles[n.priority] || priorityStyles.normal;
+                  return (
+                    <button
+                      type="button"
+                      key={n.id}
+                      onClick={() => openNotification(n)}
+                      className="w-full px-4 py-3 border-b border-gray-100/70 dark:border-white/5 hover:bg-gray-50/90 dark:hover:bg-white/5 cursor-pointer transition-colors text-left"
+                    >
+                      <div className="flex gap-3">
+                        <span className={`mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg ring-1 ${priorityClass}`}>
+                          <Icon className="h-4 w-4" />
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="text-xs font-bold text-gray-800 dark:text-gray-100 leading-5">{n.title}</p>
+                            {!n.read && <span className="mt-1 h-2 w-2 shrink-0 rounded-full" style={{ background: 'var(--primary)' }} />}
+                          </div>
+                          <p className="mt-0.5 text-[11px] text-gray-500 dark:text-gray-400 leading-5">{n.body}</p>
+                          <div className="mt-2 flex items-center gap-2">
+                            <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold capitalize ring-1 ${priorityClass}`}>{n.priority || 'normal'}</span>
+                            <span className="text-[10px] font-medium text-gray-400 dark:text-gray-500">{n.computed ? 'live alert' : timeAgo(n.createdAt)}</span>
+                          </div>
+                        </div>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+              {notifications.length > 0 && (
+                <div className="border-t border-gray-200/50 dark:border-white/10 bg-gray-50/80 px-4 py-2 text-[10px] font-medium text-gray-400 dark:bg-white/5 dark:text-gray-500">
+                  Live alerts disappear when the underlying issue is resolved.
+                </div>
+              )}
             </div>
           )}
         </div>

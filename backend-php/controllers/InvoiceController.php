@@ -4,10 +4,40 @@ require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../services/pdfService.php';
 
 class InvoiceController {
-    private function generateInvoiceNo($prefix = 'INV') {
-        $year = date('Y');
-        $rand = rand(1000, 9999);
-        return "$prefix-$year-$rand";
+    private function assertAppointmentInClinic($db, $appointmentId, $clinicId, $clientId = null) {
+        if (empty($appointmentId)) return;
+        $sql = "SELECT id FROM Appointment WHERE id = ? AND clinicId = ?";
+        $params = [$appointmentId, $clinicId];
+        if ($clientId !== null && $clientId !== '') {
+            $sql .= " AND clientId = ?";
+            $params[] = $clientId;
+        }
+        $stmt = $db->prepare($sql);
+        $stmt->execute($params);
+        if (!$stmt->fetch()) {
+            send_error('Appointment not found for this client/clinic', 400);
+        }
+    }
+
+    private function generateInvoiceNo($db, $clinicId, $prefix = 'INV') {
+        $safePrefix = preg_replace('/[^A-Z0-9-]/i', '', strtoupper($prefix ?: 'INV')) ?: 'INV';
+        $date = date('Ymd');
+        $pattern = "$safePrefix-$date-%";
+
+        $stmtCount = $db->prepare("SELECT COUNT(*) FROM Invoice WHERE clinicId = ? AND invoiceNo LIKE ?");
+        $stmtCount->execute([$clinicId, $pattern]);
+        $seq = intval($stmtCount->fetchColumn()) + 1;
+
+        $stmtExists = $db->prepare("SELECT id FROM Invoice WHERE invoiceNo = ? LIMIT 1");
+        for ($attempt = 0; $attempt < 100; $attempt++) {
+            $invoiceNo = sprintf('%s-%s-%04d', $safePrefix, $date, $seq + $attempt);
+            $stmtExists->execute([$invoiceNo]);
+            if (!$stmtExists->fetch()) {
+                return $invoiceNo;
+            }
+        }
+
+        return sprintf('%s-%s-%s', $safePrefix, $date, bin2hex(random_bytes(3)));
     }
 
     private function calculateTotals($items, $discountPercent = 0, $taxPercent = 0, $previousBalance = 0, $amountPaid = 0) {
@@ -87,6 +117,23 @@ class InvoiceController {
         $from = $_GET['from'] ?? '';
         $to = $_GET['to'] ?? '';
         $search = $_GET['search'] ?? '';
+        $sort = $_GET['sort'] ?? 'date_desc';
+        // Whitelisted sort options (default: newest invoice date first).
+        $sortMap = [
+            'date_desc'    => 'i.createdAt DESC',
+            'date_asc'     => 'i.createdAt ASC',
+            'amount_desc'  => 'i.grandTotal DESC',
+            'amount_asc'   => 'i.grandTotal ASC',
+            'balance_desc' => 'i.balanceDue DESC',
+            'patient_asc'  => 'c.name ASC, i.createdAt DESC',
+            'invoice_desc' => 'i.invoiceNo DESC',
+        ];
+        $orderBy = $sortMap[$sort] ?? $sortMap['date_desc'];
+        $paginated = ($_GET['paginated'] ?? '') === 'true';
+        $hasExplicitLimit = isset($_GET['limit']);
+        $page = max(1, intval($_GET['page'] ?? 1));
+        $limit = min(100, max(10, intval($_GET['limit'] ?? 50)));
+        $offset = ($page - 1) * $limit;
 
         $db = DB::getConnection();
         $where = ["i.clinicId = ?"];
@@ -106,18 +153,53 @@ class InvoiceController {
             $params[] = $to . ' 23:59:59';
         }
         if (!empty($search)) {
-            $where[] = "i.invoiceNo LIKE ?";
-            $params[] = "%$search%";
+            $where[] = "(i.invoiceNo LIKE ? OR c.name LIKE ? OR c.phone LIKE ?)";
+            $like = "%$search%";
+            $params[] = $like;
+            $params[] = $like;
+            $params[] = $like;
         }
 
         $whereSql = implode(" AND ", $where);
+
+        $countSql = "SELECT COUNT(*)
+                     FROM Invoice i
+                     LEFT JOIN Client c ON i.clientId = c.id AND c.clinicId = i.clinicId
+                     WHERE $whereSql";
+        $stmtCount = $db->prepare($countSql);
+        $stmtCount->execute($params);
+        $total = intval($stmtCount->fetchColumn());
+
+        $statsSql = "SELECT COALESCE(SUM(i.grandTotal), 0) AS invoiced,
+                            COALESCE(SUM(i.amountPaid), 0) AS paid,
+                            COALESCE(SUM(i.balanceDue), 0) AS balance
+                     FROM Invoice i
+                     LEFT JOIN Client c ON i.clientId = c.id AND c.clinicId = i.clinicId
+                     WHERE $whereSql";
+        $stmtStats = $db->prepare($statsSql);
+        $stmtStats->execute($params);
+        $stats = $stmtStats->fetch() ?: ['invoiced' => 0, 'paid' => 0, 'balance' => 0];
+
+        $stmtDues = $db->prepare("SELECT COALESCE(SUM(outstandingBalance), 0) FROM Client WHERE clinicId = ? AND status != 'inactive'");
+        $stmtDues->execute([$user['clinicId']]);
+        $patientDues = floatval($stmtDues->fetchColumn() ?: 0);
         
         $sql = "SELECT i.*, 
-                       c.name as clientName, c.phone as clientPhone
+                       c.name as clientName, c.phone as clientPhone,
+                       cl.id as clinic_id, cl.name as clinic_name, cl.tagline as clinic_tagline,
+                       cl.logo as clinic_logo, cl.address as clinic_address, cl.phone as clinic_phone,
+                       cl.email as clinic_email, cl.website as clinic_website, cl.registrationNo as clinic_registrationNo,
+                       cl.invoicePrefix as clinic_invoicePrefix, cl.invoiceFooter as clinic_invoiceFooter,
+                       cl.paymentTerms as clinic_paymentTerms, cl.primaryColor as clinic_primaryColor,
+                       cl.secondaryColor as clinic_secondaryColor, cl.font as clinic_font
                 FROM Invoice i
-                LEFT JOIN Client c ON i.clientId = c.id
+                LEFT JOIN Client c ON i.clientId = c.id AND c.clinicId = i.clinicId
+                LEFT JOIN Clinic cl ON cl.id = i.clinicId
                 WHERE $whereSql
-                ORDER BY i.createdAt DESC";
+                ORDER BY $orderBy";
+        if ($paginated || $hasExplicitLimit) {
+            $sql .= " LIMIT $limit OFFSET $offset";
+        }
 
         $stmt = $db->prepare($sql);
         $stmt->execute($params);
@@ -130,11 +212,49 @@ class InvoiceController {
                 'name' => $row['clientName'],
                 'phone' => $row['clientPhone']
             ];
-            unset($row['clientName'], $row['clientPhone']);
+            $row['clinic'] = [
+                'id' => $row['clinic_id'],
+                'name' => $row['clinic_name'],
+                'tagline' => $row['clinic_tagline'],
+                'logo' => $row['clinic_logo'],
+                'address' => $row['clinic_address'],
+                'phone' => $row['clinic_phone'],
+                'email' => $row['clinic_email'],
+                'website' => $row['clinic_website'],
+                'registrationNo' => $row['clinic_registrationNo'],
+                'invoicePrefix' => $row['clinic_invoicePrefix'],
+                'invoiceFooter' => $row['clinic_invoiceFooter'],
+                'paymentTerms' => $row['clinic_paymentTerms'],
+                'primaryColor' => $row['clinic_primaryColor'],
+                'secondaryColor' => $row['clinic_secondaryColor'],
+                'font' => $row['clinic_font'],
+            ];
+            unset(
+                $row['clientName'], $row['clientPhone'],
+                $row['clinic_id'], $row['clinic_name'], $row['clinic_tagline'], $row['clinic_logo'],
+                $row['clinic_address'], $row['clinic_phone'], $row['clinic_email'], $row['clinic_website'],
+                $row['clinic_registrationNo'], $row['clinic_invoicePrefix'], $row['clinic_invoiceFooter'],
+                $row['clinic_paymentTerms'], $row['clinic_primaryColor'], $row['clinic_secondaryColor'], $row['clinic_font']
+            );
             $row['items'] = json_decode($row['items'], true) ?: [];
             $formatted[] = $row;
         }
 
+        if ($paginated) {
+            send_json([
+                'invoices' => $formatted,
+                'total' => $total,
+                'page' => $page,
+                'pages' => max(1, (int)ceil($total / $limit)),
+                'limit' => $limit,
+                'stats' => [
+                    'invoiced' => floatval($stats['invoiced'] ?? 0),
+                    'paid' => floatval($stats['paid'] ?? 0),
+                    'balance' => floatval($stats['balance'] ?? 0),
+                    'patientDues' => $patientDues,
+                ],
+            ]);
+        }
         send_json($formatted);
     }
 
@@ -144,8 +264,8 @@ class InvoiceController {
                        c.id as c_id, c.name as c_name, c.phone as c_phone, c.email as c_email, c.dob as c_dob, c.gender as c_gender, c.patientNo as c_patientNo, c.avatarColor as c_avatarColor, c.initials as c_initials, c.outstandingBalance as c_outstandingBalance,
                        a.id as a_id, a.date as a_date, a.startTime as a_startTime, a.endTime as a_endTime, a.status as a_status
                 FROM Invoice i
-                LEFT JOIN Client c ON i.clientId = c.id
-                LEFT JOIN Appointment a ON i.appointmentId = a.id
+                LEFT JOIN Client c ON i.clientId = c.id AND c.clinicId = i.clinicId
+                LEFT JOIN Appointment a ON i.appointmentId = a.id AND a.clinicId = i.clinicId
                 WHERE i.id = ? AND i.clinicId = ?";
         
         $stmt = $db->prepare($sql);
@@ -204,6 +324,9 @@ class InvoiceController {
         if (empty($clientId)) {
             send_error('clientId is required', 400);
         }
+        if ($amountPaid < 0 || $discount < 0 || $tax < 0) {
+            send_error('Amounts and percentages cannot be negative', 400);
+        }
 
         $db = DB::getConnection();
         
@@ -215,6 +338,7 @@ class InvoiceController {
         if (!$client) {
             send_error('Client not found', 404);
         }
+        $this->assertAppointmentInClinic($db, $appointmentId, $user['clinicId'], $clientId);
 
         // Find Clinic prefix
         $stmtClinic = $db->prepare("SELECT invoicePrefix FROM Clinic WHERE id = ?");
@@ -225,7 +349,7 @@ class InvoiceController {
         $totals = $this->calculateTotals($items, $discount, $tax, $previousBalance, $amountPaid);
 
         $invoiceId = generate_uuid();
-        $invoiceNo = $this->generateInvoiceNo($prefix);
+        $invoiceNo = $this->generateInvoiceNo($db, $user['clinicId'], $prefix);
 
         try {
             $db->beginTransaction();
@@ -242,8 +366,8 @@ class InvoiceController {
 
             $db->commit();
 
-            $stmtFetch = $db->prepare("SELECT * FROM Invoice WHERE id = ?");
-            $stmtFetch->execute([$invoiceId]);
+            $stmtFetch = $db->prepare("SELECT * FROM Invoice WHERE id = ? AND clinicId = ?");
+            $stmtFetch->execute([$invoiceId, $user['clinicId']]);
             $createdInvoice = $stmtFetch->fetch();
             $createdInvoice['items'] = json_decode($createdInvoice['items'], true) ?: [];
 
@@ -276,12 +400,19 @@ class InvoiceController {
         $notes = array_key_exists('notes', $input) ? $input['notes'] : $existing['notes'];
         $dueDate = array_key_exists('dueDate', $input) ? ($input['dueDate'] ?: null) : $existing['dueDate'];
         $status = $input['status'] ?? null;
+        if ($amountPaid < 0 || $discountPercent < 0 || $taxPercent < 0 || $previousBalance < 0) {
+            send_error('Amounts and percentages cannot be negative', 400);
+        }
+        if ($status !== null && !in_array($status, ['pending', 'partial', 'paid', 'refunded', 'cancelled'], true)) {
+            send_error('Invalid invoice status', 400);
+        }
 
         $stmtClient = $db->prepare("SELECT id FROM Client WHERE id = ? AND clinicId = ?");
         $stmtClient->execute([$clientId, $user['clinicId']]);
         if (!$stmtClient->fetch()) {
             send_error('Client not found', 404);
         }
+        $this->assertAppointmentInClinic($db, $appointmentId, $user['clinicId'], $clientId);
 
         $totals = $this->calculateTotals($items, $discountPercent, $taxPercent, $previousBalance, $amountPaid);
         $finalStatus = $status ?: $totals['status'];
@@ -323,8 +454,8 @@ class InvoiceController {
 
             $db->commit();
 
-            $stmtFetch = $db->prepare("SELECT * FROM Invoice WHERE id = ?");
-            $stmtFetch->execute([$id]);
+            $stmtFetch = $db->prepare("SELECT * FROM Invoice WHERE id = ? AND clinicId = ?");
+            $stmtFetch->execute([$id, $user['clinicId']]);
             $updated = $stmtFetch->fetch();
             $updated['items'] = json_decode($updated['items'], true) ?: [];
 
@@ -338,6 +469,9 @@ class InvoiceController {
     public function markPaid($input, $user, $id) {
         $paymentMethod = $input['paymentMethod'] ?? null;
         $amountPaid = isset($input['amountPaid']) ? floatval($input['amountPaid']) : null;
+        if ($amountPaid !== null && $amountPaid < 0) {
+            send_error('amountPaid cannot be negative', 400);
+        }
 
         $db = DB::getConnection();
         
@@ -360,15 +494,15 @@ class InvoiceController {
         try {
             $db->beginTransaction();
 
-            $stmtUpdate = $db->prepare("UPDATE Invoice SET status = ?, amountPaid = ?, balanceDue = ?, paymentMethod = ?, paidAt = ? WHERE id = ?");
-            $stmtUpdate->execute([$status, $paid, $balanceDue, $paymentMethod, $paidAt, $id]);
+            $stmtUpdate = $db->prepare("UPDATE Invoice SET status = ?, amountPaid = ?, balanceDue = ?, paymentMethod = ?, paidAt = ? WHERE id = ? AND clinicId = ?");
+            $stmtUpdate->execute([$status, $paid, $balanceDue, $paymentMethod, $paidAt, $id, $user['clinicId']]);
 
             $this->recomputeClientTotals($db, $user['clinicId'], $existing['clientId']);
 
             $db->commit();
 
-            $stmtFetch = $db->prepare("SELECT * FROM Invoice WHERE id = ?");
-            $stmtFetch->execute([$id]);
+            $stmtFetch = $db->prepare("SELECT * FROM Invoice WHERE id = ? AND clinicId = ?");
+            $stmtFetch->execute([$id, $user['clinicId']]);
             $updated = $stmtFetch->fetch();
             $updated['items'] = json_decode($updated['items'], true) ?: [];
 
@@ -392,11 +526,12 @@ class InvoiceController {
         try {
             $db->beginTransaction();
 
-            $stmtUpdate = $db->prepare("UPDATE Invoice SET status = 'refunded' WHERE id = ?");
-            $stmtUpdate->execute([$id]);
+            $stmtUpdate = $db->prepare("UPDATE Invoice SET status = 'refunded' WHERE id = ? AND clinicId = ?");
+            $stmtUpdate->execute([$id, $user['clinicId']]);
 
             $this->recomputeClientTotals($db, $user['clinicId'], $invoice['clientId']);
 
+            log_audit($user['clinicId'], $user['id'] ?? null, 'invoice_refunded', 'Invoice', $id, null, ['amount' => $invoice['amountPaid'], 'by' => $user['role'] ?? '']);
             $db->commit();
             send_json(['message' => 'Refunded']);
         } catch (Exception $e) {
@@ -424,6 +559,7 @@ class InvoiceController {
 
             $this->recomputeClientTotals($db, $user['clinicId'], $invoice['clientId']);
 
+            log_audit($user['clinicId'], $user['id'] ?? null, 'invoice_deleted', 'Invoice', $id, null, ['by' => $user['role'] ?? '']);
             $db->commit();
             send_json(['message' => 'Deleted']);
         } catch (Exception $e) {
@@ -444,8 +580,8 @@ class InvoiceController {
         }
 
         // Find client
-        $stmtClient = $db->prepare("SELECT * FROM Client WHERE id = ?");
-        $stmtClient->execute([$invoice['clientId']]);
+        $stmtClient = $db->prepare("SELECT * FROM Client WHERE id = ? AND clinicId = ?");
+        $stmtClient->execute([$invoice['clientId'], $user['clinicId']]);
         $client = $stmtClient->fetch();
 
         // Find clinic

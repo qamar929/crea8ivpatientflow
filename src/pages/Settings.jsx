@@ -4,11 +4,12 @@ import { useClinic } from '../context/ClinicContext';
 import {
   Building2, Palette, Bell, Shield, Save, Check,
   ToggleLeft, ToggleRight, ChevronRight, FileText, MessageCircle,
-  Users as UsersIcon, KeyRound, Pencil, Trash2, Plus, AlertCircle,
+  Users as UsersIcon, KeyRound, Pencil, Trash2, Plus, AlertCircle, Eye, EyeOff,
 } from 'lucide-react';
 import Button from '../components/ui/Button';
 import Badge from '../components/ui/Badge';
 import Modal from '../components/ui/Modal';
+import ColorPicker from '../components/ui/ColorPicker';
 import ClinicLogoMark from '../components/branding/ClinicLogoMark';
 import PublicWebsiteEditor from '../components/settings/PublicWebsiteEditor';
 import CustomDomain from '../components/settings/CustomDomain';
@@ -61,6 +62,7 @@ function AccountManagement() {
   const [editForm, setEditForm] = useState({ name: '', email: '', role: 'receptionist', ledgerMode: 'actual' });
   // Reset form
   const [resetForm, setResetForm] = useState({ newPassword: '', confirm: '' });
+  const [showResetPass, setShowResetPass] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -267,7 +269,12 @@ function AccountManagement() {
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Password</label>
-            <input type="password" required minLength={6} value={addForm.password} onChange={(e) => setAddForm({ ...addForm, password: e.target.value })} className="w-full border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40" />
+            <div className="relative">
+              <input type={showResetPass ? 'text' : 'password'} required minLength={6} value={addForm.password} onChange={(e) => setAddForm({ ...addForm, password: e.target.value })} className="w-full border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] text-gray-900 dark:text-white rounded-lg px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40" />
+              <button type="button" onClick={() => setShowResetPass((v) => !v)} title={showResetPass ? 'Hide password' : 'Show password'} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                {showResetPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Role</label>
@@ -337,11 +344,16 @@ function AccountManagement() {
         <form onSubmit={handleReset} className="space-y-4">
           <div>
             <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">New Password</label>
-            <input type="password" required minLength={6} value={resetForm.newPassword} onChange={(e) => setResetForm({ ...resetForm, newPassword: e.target.value })} className="w-full border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40" />
+            <div className="relative">
+              <input type={showResetPass ? 'text' : 'password'} required minLength={6} value={resetForm.newPassword} onChange={(e) => setResetForm({ ...resetForm, newPassword: e.target.value })} className="w-full border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] text-gray-900 dark:text-white rounded-lg px-3 py-2 pr-10 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40" />
+              <button type="button" onClick={() => setShowResetPass((v) => !v)} title={showResetPass ? 'Hide password' : 'Show password'} className="absolute right-2 top-1/2 -translate-y-1/2 p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                {showResetPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+              </button>
+            </div>
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Confirm Password</label>
-            <input type="password" required minLength={6} value={resetForm.confirm} onChange={(e) => setResetForm({ ...resetForm, confirm: e.target.value })} className="w-full border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40" />
+            <input type={showResetPass ? 'text' : 'password'} required minLength={6} value={resetForm.confirm} onChange={(e) => setResetForm({ ...resetForm, confirm: e.target.value })} className="w-full border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40" />
           </div>
           {formError && (
             <div className="text-xs text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-900/40 rounded-lg px-3 py-2">{formError}</div>
@@ -375,16 +387,6 @@ function AccountManagement() {
   );
 }
 
-const PRESET_COLORS = [
-  { label: 'Clinic Teal', value: '#0f766e' },
-  { label: 'Signature Rose', value: '#be3455' },
-  { label: 'Medical Blue', value: '#2563eb' },
-  { label: 'Forest', value: '#15803d' },
-  { label: 'Plum', value: '#7e22ce' },
-  { label: 'Graphite', value: '#334155' },
-  { label: 'Cyan', value: '#0891b2' },
-  { label: 'Coral', value: '#e11d48' },
-];
 
 function SectionHeader({ icon: Icon, title, description }) {
   return (
@@ -442,6 +444,39 @@ export default function Settings() {
   const [localVision, setLocalVision] = useState(clinicInfo.vision || '');
   const [localServicesOverview, setLocalServicesOverview] = useState(clinicInfo.servicesOverview || '');
   const [logoError, setLogoError] = useState('');
+
+  useEffect(() => {
+    // The server (Clinic table) is the source of truth — seed the form from it
+    // so saved edits survive logout/login instead of falling back to cached or
+    // default branding.
+    let cancelled = false;
+    fetchApi('/settings/public-site')
+      .then(({ clinic }) => {
+        if (cancelled || !clinic) return;
+        const v = (x, fallback = '') => (x === null || x === undefined ? fallback : x);
+        if (clinic.name) { setLocalName(clinic.name); setClinicName(clinic.name); }
+        setLocalTagline(v(clinic.tagline));
+        if (clinic.logo) setLocalLogo(clinic.logo);
+        setLocalAddress(v(clinic.address));
+        setLocalPhone(v(clinic.phone));
+        setLocalEmail(v(clinic.email));
+        setLocalWhatsapp(v(clinic.whatsapp));
+        setLocalWebsite(v(clinic.website));
+        setLocalRegistrationNo(v(clinic.registrationNo));
+        if (clinic.invoicePrefix) setLocalInvoicePrefix(clinic.invoicePrefix);
+        setLocalInvoiceFooter(v(clinic.invoiceFooter));
+        setLocalPaymentTerms(v(clinic.paymentTerms));
+        setLocalMission(v(clinic.mission));
+        setLocalVision(v(clinic.vision));
+        setLocalServicesOverview(v(clinic.servicesOverview));
+        if (clinic.primaryColor) setLocalPrimary(clinic.primaryColor);
+        if (clinic.secondaryColor) setLocalSecondary(clinic.secondaryColor);
+        if (clinic.font) setLocalFont(clinic.font);
+      })
+      .catch(() => { /* roles without access keep context values */ });
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [notifications, setNotifications] = useState({
     smsReminders: true,
@@ -698,51 +733,11 @@ export default function Settings() {
             <div className="text-xs text-gray-400 font-mono">{localPrimary}</div>
           </div>
 
-          {/* Primary color */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-2">Primary Color</label>
-            <div className="flex items-center gap-2 flex-wrap">
-              {PRESET_COLORS.map(c => (
-                <button
-                  key={c.value}
-                  onClick={() => setLocalPrimary(c.value)}
-                  title={c.label}
-                  className={`w-8 h-8 rounded-lg transition-all ${localPrimary === c.value ? 'ring-2 ring-offset-2 ring-gray-400 scale-110' : 'hover:scale-105'}`}
-                  style={{ background: c.value }}
-                />
-              ))}
-              <input
-                type="color"
-                value={localPrimary}
-                onChange={e => setLocalPrimary(e.target.value)}
-                className="w-8 h-8 rounded-lg cursor-pointer border-0 p-0"
-                title="Custom color"
-              />
-            </div>
-          </div>
+          {/* Primary color — precise hex + RGB picker */}
+          <ColorPicker label="Primary Color" value={localPrimary} onChange={setLocalPrimary} />
 
           {/* Secondary color */}
-          <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-2">Accent Color</label>
-            <div className="flex items-center gap-2 flex-wrap">
-              {PRESET_COLORS.map(c => (
-                <button
-                  key={c.value}
-                  onClick={() => setLocalSecondary(c.value)}
-                  title={c.label}
-                  className={`w-8 h-8 rounded-lg transition-all ${localSecondary === c.value ? 'ring-2 ring-offset-2 ring-gray-400 scale-110' : 'hover:scale-105'}`}
-                  style={{ background: c.value }}
-                />
-              ))}
-              <input
-                type="color"
-                value={localSecondary}
-                onChange={e => setLocalSecondary(e.target.value)}
-                className="w-8 h-8 rounded-lg cursor-pointer border-0 p-0"
-                title="Custom color"
-              />
-            </div>
-          </div>
+          <ColorPicker label="Accent Color" value={localSecondary} onChange={setLocalSecondary} />
 
           {/* Font */}
           <div>

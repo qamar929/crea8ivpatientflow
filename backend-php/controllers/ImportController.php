@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../helpers.php';
+require_once __DIR__ . '/../services/tenantFeatureService.php';
 
 class ImportController {
     private function db() {
@@ -42,8 +43,16 @@ class ImportController {
         return $db;
     }
 
+    private function requireFeature($db, $clinicId) {
+        $features = tenant_features_get($db, $clinicId);
+        if (empty($features['importsEnabled'])) {
+            send_error('Contact Support to activate Import Center.', 403, ['code' => 'feature_inactive']);
+        }
+    }
+
     public function list($input, $user) {
         $db = $this->db();
+        $this->requireFeature($db, $user['clinicId']);
         $stmt = $db->prepare("SELECT * FROM ImportJob WHERE clinicId = ? ORDER BY createdAt DESC");
         $stmt->execute([$user['clinicId']]);
         $jobs = $stmt->fetchAll();
@@ -56,6 +65,7 @@ class ImportController {
 
     public function create($input, $user) {
         $db = $this->db();
+        $this->requireFeature($db, $user['clinicId']);
         $id = generate_uuid();
         $sourceType = $input['sourceType'] ?? 'csv';
         $entityType = $input['entityType'] ?? 'patients';
@@ -74,6 +84,7 @@ class ImportController {
 
     public function update($input, $user, $id) {
         $db = $this->db();
+        $this->requireFeature($db, $user['clinicId']);
         $fields = [];
         $params = [];
         foreach (['sourceType','fileName','entityType','status','totalRows','validRows','duplicateRows','importedRows'] as $key) {
@@ -91,6 +102,7 @@ class ImportController {
 
     public function remove($input, $user, $id) {
         $db = $this->db();
+        $this->requireFeature($db, $user['clinicId']);
         $stmt = $db->prepare("DELETE FROM ImportJob WHERE id = ? AND clinicId = ?");
         $stmt->execute([$id, $user['clinicId']]);
         log_audit($user['clinicId'], $user['id'] ?? null, 'delete', 'ImportJob', $id);

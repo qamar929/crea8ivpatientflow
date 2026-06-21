@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Users, Search, Grid, List, Plus, Phone, Mail, BadgeDollarSign, Loader2, Pencil, Trash2, Save } from 'lucide-react';
 import { fetchApi } from '../config/api';
@@ -198,6 +198,7 @@ export default function Clients() {
   const [tierFilter, setTierFilter] = useState('all');
   const [viewMode, setViewMode] = useState('grid');
   const [clients, setClients] = useState([]);
+  const [pagination, setPagination] = useState({ total: 0, page: 1, pages: 1, limit: 50 });
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
@@ -206,11 +207,28 @@ export default function Clients() {
   const [deleting, setDeleting] = useState(false);
 
   const loadClients = async () => {
+    const params = new URLSearchParams({
+      page: String(pagination.page),
+      limit: String(pagination.limit),
+    });
+    if (search.trim()) params.set('search', search.trim());
+    if (statusFilter !== 'all') params.set('status', statusFilter);
+    if (tierFilter !== 'all') params.set('tier', tierFilter);
+
+    setLoading(true);
     try {
-      const data = await fetchApi('/clients');
+      const data = await fetchApi(`/clients?${params.toString()}`);
       // Defensive: backend returns { clients: [...] } but tolerate flat arrays too
       const list = Array.isArray(data) ? data : (data.clients ?? data.data ?? []);
       setClients(list);
+      if (!Array.isArray(data)) {
+        setPagination(current => ({
+          ...current,
+          total: Number(data.total || 0),
+          page: Number(data.page || current.page),
+          pages: Number(data.pages || 1),
+        }));
+      }
     } catch (err) {
       console.error('Failed to fetch clients:', err);
     } finally {
@@ -218,7 +236,11 @@ export default function Clients() {
     }
   };
 
-  useEffect(() => { loadClients(); }, []);
+  useEffect(() => {
+    const timer = setTimeout(() => loadClients(), search.trim() ? 250 : 0);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pagination.page, search, statusFilter, tierFilter]);
 
   const handleSave = async (formData) => {
     setSaving(true);
@@ -252,19 +274,10 @@ export default function Clients() {
     }
   };
 
-  const filtered = useMemo(() => {
-    return clients.filter(c => {
-      const name = (c.name || '').toLowerCase();
-      const phone = c.phone || '';
-      const email = (c.email || '').toLowerCase();
-      const patientNo = (c.patientNo || '').toLowerCase();
-      const s = search.toLowerCase();
-      if (search && !name.includes(s) && !phone.includes(search) && !email.includes(s) && !patientNo.includes(s)) return false;
-      if (statusFilter !== 'all' && c.status !== statusFilter) return false;
-      if (tierFilter !== 'all' && c.loyaltyTier !== tierFilter) return false;
-      return true;
-    });
-  }, [clients, search, statusFilter, tierFilter]);
+  const filtered = clients;
+  const goToPage = (nextPage) => {
+    setPagination(current => ({ ...current, page: Math.min(Math.max(1, nextPage), current.pages || 1) }));
+  };
 
   if (loading) {
     return (
@@ -280,17 +293,17 @@ export default function Clients() {
         <div className="flex items-center gap-3 flex-wrap">
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-            <input value={search} onChange={e => setSearch(e.target.value)}
+            <input value={search} onChange={e => { setSearch(e.target.value); goToPage(1); }}
               placeholder="Search patient no, name, phone..."
               className="pl-9 pr-4 py-2 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg text-sm text-gray-700 dark:text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-300 w-52" />
           </div>
-          <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)}
+          <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); goToPage(1); }}
             className="border border-gray-200 dark:border-white/10 rounded-lg px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white dark:bg-white/5">
             <option value="all">All Status</option>
             <option value="active">Active</option>
             <option value="inactive">Inactive</option>
           </select>
-          <select value={tierFilter} onChange={e => setTierFilter(e.target.value)}
+          <select value={tierFilter} onChange={e => { setTierFilter(e.target.value); goToPage(1); }}
             className="border border-gray-200 dark:border-white/10 rounded-lg px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white dark:bg-white/5">
             <option value="all">All Tiers</option>
             <option value="Platinum">Platinum</option>
@@ -316,7 +329,7 @@ export default function Clients() {
       </div>
 
       <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400 flex-wrap">
-        <span className="font-medium text-gray-700 dark:text-gray-200">{filtered.length} patients</span>
+        <span className="font-medium text-gray-700 dark:text-gray-200">Showing {filtered.length} of {pagination.total.toLocaleString()} patients</span>
         <span>·</span>
         <span>{filtered.filter(c => c.status === 'active').length} active</span>
         <span>·</span>
@@ -400,6 +413,16 @@ export default function Clients() {
           {filtered.length === 0 && (
             <div className="text-center py-12 text-gray-400 text-sm">No patients found</div>
           )}
+        </div>
+      )}
+
+      {pagination.total > 0 && (
+        <div className="flex flex-col gap-3 rounded-xl border border-gray-100 bg-white p-4 text-sm text-gray-600 shadow-sm dark:border-white/10 dark:bg-slate-900 dark:text-gray-300 sm:flex-row sm:items-center sm:justify-between">
+          <span>Page {pagination.page} of {pagination.pages}</span>
+          <div className="flex gap-2">
+            <Button variant="secondary" size="sm" disabled={pagination.page <= 1} onClick={() => goToPage(pagination.page - 1)}>Previous</Button>
+            <Button variant="secondary" size="sm" disabled={pagination.page >= pagination.pages} onClick={() => goToPage(pagination.page + 1)}>Next</Button>
+          </div>
         </div>
       )}
 

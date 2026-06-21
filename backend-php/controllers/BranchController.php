@@ -7,11 +7,11 @@ class BranchController {
         $db = DB::getConnection();
         
         $sql = "SELECT b.*,
-                       (SELECT COUNT(*) FROM Staff s WHERE s.branchId = b.id) as staffCount,
-                       (SELECT COUNT(*) FROM Appointment a WHERE a.branchId = b.id) as appointmentCount
+                       (SELECT COUNT(*) FROM Staff s WHERE s.branchId = b.id AND s.clinicId = b.clinicId AND s.status != 'inactive') as staffCount,
+                       (SELECT COUNT(*) FROM Appointment a WHERE a.branchId = b.id AND a.clinicId = b.clinicId) as appointmentCount
                 FROM Branch b
-                WHERE b.clinicId = ?";
-        
+                WHERE b.clinicId = ? AND (b.isActive IS NULL OR b.isActive = 1)";
+
         $stmt = $db->prepare($sql);
         $stmt->execute([$user['clinicId']]);
         $branches = $stmt->fetchAll();
@@ -48,8 +48,8 @@ class BranchController {
             $id, $user['clinicId'], $name, $address, $phone, $isActive
         ]);
 
-        $stmt = $db->prepare("SELECT * FROM Branch WHERE id = ?");
-        $stmt->execute([$id]);
+        $stmt = $db->prepare("SELECT * FROM Branch WHERE id = ? AND clinicId = ?");
+        $stmt->execute([$id, $user['clinicId']]);
         $branch = $stmt->fetch();
         $branch['isActive'] = !empty($branch['isActive']);
 
@@ -99,10 +99,10 @@ class BranchController {
 
         $stmtCounts = $db->prepare("
             SELECT
-                (SELECT COUNT(*) FROM Staff WHERE branchId = ?) as staffCount,
-                (SELECT COUNT(*) FROM Appointment WHERE branchId = ?) as appointmentCount
+                (SELECT COUNT(*) FROM Staff WHERE branchId = ? AND clinicId = ?) as staffCount,
+                (SELECT COUNT(*) FROM Appointment WHERE branchId = ? AND clinicId = ?) as appointmentCount
         ");
-        $stmtCounts->execute([$id, $id]);
+        $stmtCounts->execute([$id, $user['clinicId'], $id, $user['clinicId']]);
         $counts = $stmtCounts->fetch();
 
         if (intval($counts['staffCount'] ?? 0) === 0 && intval($counts['appointmentCount'] ?? 0) === 0) {

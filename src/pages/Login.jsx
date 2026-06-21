@@ -37,7 +37,7 @@ const FEATURES = [
 
 export default function Login() {
   const navigate = useNavigate();
-  const { clinicInfo } = useClinic();
+  const { clinicInfo, isPlatform } = useClinic();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
@@ -91,7 +91,7 @@ export default function Login() {
             </div>
 
             <div className="mb-5 sm:mb-6">
-              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--primary)]">Secure clinic access</p>
+              <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--primary)]">{isPlatform ? 'Platform administration' : 'Secure clinic access'}</p>
               <h2 className="mt-1 text-2xl font-black text-gray-950 dark:text-white">Welcome back</h2>
               <p className="text-gray-500 dark:text-gray-400 text-sm mt-1">Sign in to continue to your portal.</p>
             </div>
@@ -170,26 +170,28 @@ export default function Login() {
         {/* Features showcase */}
         <div className="order-2">
           <div className="mb-4 lg:hidden">
-            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--primary)]">Portal features</p>
+            <p className="text-[11px] font-bold uppercase tracking-[0.18em] text-[var(--primary)]">{isPlatform ? 'Platform' : 'Portal features'}</p>
             <h2 className="mt-1 text-xl font-black tracking-tight text-gray-900 dark:text-white">
-              Everything your clinic team needs.
+              {isPlatform ? 'Everything your clinics need.' : 'Everything your clinic team needs.'}
             </h2>
           </div>
           <div className="mb-6 lg:mb-8 hidden lg:block">
             <div className="inline-flex items-center gap-2 rounded-full border border-teal-200/60 dark:border-white/10 bg-white/60 dark:bg-white/[0.04] backdrop-blur px-3 py-1.5">
               <Sparkles className="w-3.5 h-3.5 text-[var(--primary)]" />
               <span className="text-xs font-semibold text-gray-700 dark:text-white/70">
-                Dental clinic operating system
+                {isPlatform ? 'Clinic management platform' : 'Dental clinic operating system'}
               </span>
             </div>
             <h2 className="mt-5 text-3xl sm:text-4xl font-black tracking-tight text-gray-900 dark:text-white leading-[1.1]">
-              Everything your dental practice needs,{' '}
+              {isPlatform ? 'Everything your clinics need,' : 'Everything your dental practice needs,'}{' '}
               <span className="bg-gradient-to-r from-[var(--primary)] to-[var(--secondary)] bg-clip-text text-transparent">
-                in one portal.
+                in one {isPlatform ? 'platform' : 'portal'}.
               </span>
             </h2>
             <p className="mt-3 text-sm text-gray-600 dark:text-gray-400 max-w-md">
-              From the front desk to the chair, manage your clinic with tools built specifically for modern dental teams.
+              {isPlatform
+                ? 'Manage every clinic on your platform — onboarding, branding, subscriptions and support — from one place.'
+                : 'From the front desk to the chair, manage your clinic with tools built specifically for modern dental teams.'}
             </p>
           </div>
 

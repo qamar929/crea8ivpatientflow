@@ -2,11 +2,155 @@
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../services/mailService.php';
+require_once __DIR__ . '/../services/metaWhatsAppService.php';
+require_once __DIR__ . '/../services/tenantFeatureService.php';
 
 const PLAN_MONTHLY_PKR = 30000;
 const PLAN_ANNUAL_PKR  = 240000; // 20,000/month billed yearly
 
 class AdminController {
+    private function ensureAiProviderSettings($db) {
+        if (DB_DRIVER === 'sqlite') {
+            $db->exec("CREATE TABLE IF NOT EXISTS AIProviderSetting (
+                id TEXT PRIMARY KEY,
+                clinicId TEXT NOT NULL,
+                provider TEXT NOT NULL,
+                apiKey TEXT,
+                enabled INTEGER DEFAULT 0,
+                model TEXT,
+                monthlyTokenLimit INTEGER DEFAULT 0,
+                tokenUsage INTEGER DEFAULT 0,
+                costEstimate REAL DEFAULT 0,
+                status TEXT DEFAULT 'not_configured',
+                updatedAt TEXT DEFAULT CURRENT_TIMESTAMP
+            )");
+            $db->exec("CREATE UNIQUE INDEX IF NOT EXISTS AIProviderSetting_clinic_provider ON AIProviderSetting(clinicId, provider)");
+        } else {
+            $db->exec("CREATE TABLE IF NOT EXISTS AIProviderSetting (
+                id VARCHAR(64) PRIMARY KEY,
+                clinicId VARCHAR(64) NOT NULL,
+                provider VARCHAR(40) NOT NULL,
+                apiKey TEXT,
+                enabled TINYINT DEFAULT 0,
+                model VARCHAR(120),
+                monthlyTokenLimit INT DEFAULT 0,
+                tokenUsage INT DEFAULT 0,
+                costEstimate DECIMAL(12,4) DEFAULT 0,
+                status VARCHAR(40) DEFAULT 'not_configured',
+                updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY AIProviderSetting_clinic_provider (clinicId, provider)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        }
+    }
+
+    private function ensurePlatformAiDefaults($db) {
+        $this->ensureAiProviderSettings($db);
+        $defaults = [
+            ['chatgpt', 'gpt-4o-mini'],
+            ['gemini', 'gemini-1.5-flash'],
+            ['claude', 'claude-3-5-sonnet'],
+        ];
+        foreach ($defaults as [$provider, $model]) {
+            $sql = DB_DRIVER === 'sqlite'
+                ? "INSERT OR IGNORE INTO AIProviderSetting (id, clinicId, provider, model, enabled, status) VALUES (?, 'platform', ?, ?, 0, 'not_configured')"
+                : "INSERT IGNORE INTO AIProviderSetting (id, clinicId, provider, model, enabled, status) VALUES (?, 'platform', ?, ?, 0, 'not_configured')";
+            $db->prepare($sql)->execute([generate_uuid(), $provider, $model]);
+        }
+    }
+
+    private function publicWhatsappSettings($settings) {
+        $settings['hasAccessToken'] = !empty($settings['accessToken']);
+        unset($settings['accessToken']);
+        return $settings;
+    }
+
+    // ---- Platform-wide settings (super admin): marketing branding + shared AI ----
+    private function ensurePlatformSettings($db) {
+        $sql = DB_DRIVER === 'sqlite'
+            ? "CREATE TABLE IF NOT EXISTS PlatformSetting (settingKey TEXT PRIMARY KEY, settingValue TEXT, updatedAt TEXT DEFAULT CURRENT_TIMESTAMP)"
+            : "CREATE TABLE IF NOT EXISTS PlatformSetting (settingKey VARCHAR(64) PRIMARY KEY, settingValue TEXT, updatedAt DATETIME DEFAULT CURRENT_TIMESTAMP)";
+        $db->exec($sql);
+    }
+
+    private function defaultBranding() {
+        return [
+            'brandName' => 'Crea8iv PatientFlow',
+            'tagline' => 'Clinic Management Platform',
+            'logoText' => 'PF',
+            'logoUrl' => '',
+            'primaryColor' => '#f97316',
+            'secondaryColor' => '#ea580c',
+            'heroTitle' => 'Run your whole clinic from one portal',
+            'heroSubtitle' => 'Appointments, patients, billing, WhatsApp and reporting — built for modern clinics.',
+            'supportEmail' => 'info@crea8ivmedia.com',
+            'supportPhone' => '+92 310 5704555',
+            'whatsapp' => '+92 310 5704555',
+        ];
+    }
+
+    private function getBranding($db) {
+        $this->ensurePlatformSettings($db);
+        $stmt = $db->prepare("SELECT settingValue FROM PlatformSetting WHERE settingKey = 'marketing_branding'");
+        $stmt->execute();
+        $saved = $stmt->fetchColumn();
+        $decoded = $saved ? (json_decode($saved, true) ?: []) : [];
+        return array_merge($this->defaultBranding(), $decoded);
+    }
+
+    public function getPlatform($input, $user) {
+        $db = DB::getConnection();
+        $this->ensurePlatformAiDefaults($db);
+        $stmt = $db->prepare("SELECT provider, enabled, model, monthlyTokenLimit, status, apiKey FROM AIProviderSetting WHERE clinicId = 'platform' ORDER BY provider");
+        $stmt->execute();
+        $providers = $stmt->fetchAll();
+        foreach ($providers as &$p) {
+            $p['hasApiKey'] = !empty($p['apiKey']);
+            $p['enabled'] = !empty($p['enabled']);
+            unset($p['apiKey']);
+        }
+        send_json(['branding' => $this->getBranding($db), 'aiProviders' => $providers]);
+    }
+
+    public function updatePlatform($input, $user) {
+        $db = DB::getConnection();
+        $this->ensurePlatformSettings($db);
+
+        if (isset($input['branding']) && is_array($input['branding'])) {
+            $allowed = array_keys($this->defaultBranding());
+            $merged = $this->getBranding($db);
+            foreach ($allowed as $k) {
+                if (array_key_exists($k, $input['branding'])) $merged[$k] = trim((string)$input['branding'][$k]);
+            }
+            $json = json_encode($merged);
+            $sql = DB_DRIVER === 'sqlite'
+                ? "INSERT INTO PlatformSetting (settingKey, settingValue) VALUES ('marketing_branding', ?) ON CONFLICT(settingKey) DO UPDATE SET settingValue=excluded.settingValue, updatedAt=CURRENT_TIMESTAMP"
+                : "INSERT INTO PlatformSetting (settingKey, settingValue) VALUES ('marketing_branding', ?) ON DUPLICATE KEY UPDATE settingValue=VALUES(settingValue), updatedAt=CURRENT_TIMESTAMP";
+            $db->prepare($sql)->execute([$json]);
+        }
+
+        if (isset($input['aiProviders']) && is_array($input['aiProviders'])) {
+            $this->ensurePlatformAiDefaults($db);
+            foreach ($input['aiProviders'] as $pi) {
+                $provider = strtolower($pi['provider'] ?? '');
+                if (!in_array($provider, ['chatgpt', 'gemini', 'claude'], true)) continue;
+                $existing = $db->prepare("SELECT apiKey FROM AIProviderSetting WHERE clinicId = 'platform' AND provider = ?");
+                $existing->execute([$provider]);
+                $currentKey = $existing->fetchColumn();
+                // Encrypt new keys at rest; keep the (already-encrypted) stored one otherwise.
+                $apiKey = !empty($pi['apiKey']) ? meta_encrypt_secret($pi['apiKey']) : ($currentKey ?: null);
+                $enabled = !empty($pi['enabled']) ? 1 : 0;
+                $model = trim((string)($pi['model'] ?? '')) ?: null;
+                $status = $enabled ? ($apiKey ? 'ready' : 'missing_key') : 'disabled';
+                $sql = DB_DRIVER === 'sqlite'
+                    ? "INSERT INTO AIProviderSetting (id, clinicId, provider, apiKey, enabled, model, status) VALUES (?, 'platform', ?, ?, ?, ?, ?) ON CONFLICT(clinicId, provider) DO UPDATE SET apiKey=excluded.apiKey, enabled=excluded.enabled, model=excluded.model, status=excluded.status, updatedAt=CURRENT_TIMESTAMP"
+                    : "INSERT INTO AIProviderSetting (id, clinicId, provider, apiKey, enabled, model, status) VALUES (?, 'platform', ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE apiKey=VALUES(apiKey), enabled=VALUES(enabled), model=VALUES(model), status=VALUES(status), updatedAt=CURRENT_TIMESTAMP";
+                $db->prepare($sql)->execute([generate_uuid(), $provider, $apiKey, $enabled, $model, $status]);
+            }
+        }
+
+        log_audit('platform', $user['id'], 'platform_settings_updated', 'PlatformSetting', 'marketing_branding', null, null);
+        $this->getPlatform([], $user);
+    }
 
     private function slugify($db, $name) {
         $base = strtolower(trim(preg_replace('/[^a-z0-9]+/i', '-', $name), '-'));
@@ -92,6 +236,7 @@ class AdminController {
 
     public function listTenants($input, $user) {
         $db = DB::getConnection();
+        tenant_features_ensure($db);
         $status = $_GET['status'] ?? '';
 
         $where = "WHERE c.id != 'platform'";
@@ -105,11 +250,18 @@ class AdminController {
             "SELECT c.id, c.name, c.slug, c.customDomain, c.domainStatus, c.sslStatus,
                     c.status, c.clinicType, c.trialEndsAt,
                     c.suspendedAt, c.suspensionReason, c.createdAt,
+                    COALESCE(fs.marketingEnabled, 0) AS marketingEnabled,
+                    COALESCE(fs.whatsappEnabled, 0) AS whatsappEnabled,
+                    COALESCE(fs.aiEnabled, 0) AS aiEnabled,
+                    COALESCE(fs.metaLeadsEnabled, 0) AS metaLeadsEnabled,
+                    COALESCE(fs.importsEnabled, 0) AS importsEnabled,
                     (SELECT COUNT(*) FROM User u WHERE u.clinicId = c.id) AS userCount,
                     (SELECT COUNT(*) FROM Client cl WHERE cl.clinicId = c.id) AS patientCount,
                     (SELECT MAX(s.expiresAt) FROM Subscription s
                       WHERE s.clinicId = c.id AND s.status = 'active') AS subscriptionExpiresAt
-             FROM Clinic c $where ORDER BY c.createdAt DESC"
+             FROM Clinic c
+             LEFT JOIN ClinicFeatureSetting fs ON fs.clinicId = c.id
+             $where ORDER BY c.createdAt DESC"
         );
         $stmt->execute($params);
         send_json($stmt->fetchAll());
@@ -136,6 +288,118 @@ class AdminController {
         $clinic['users'] = $stmt->fetchAll();
 
         send_json($clinic);
+    }
+
+    public function getTenantAutomation($input, $user, $id) {
+        $db = DB::getConnection();
+        $stmt = $db->prepare("SELECT id, name FROM Clinic WHERE id = ? AND id != 'platform'");
+        $stmt->execute([$id]);
+        $clinic = $stmt->fetch();
+        if (!$clinic) send_error('Tenant not found', 404);
+
+        tenant_features_ensure($db);
+        $features = tenant_features_get($db, $id);
+
+        $stmt = $db->prepare("SELECT * FROM WhatsAppSetting WHERE clinicId = ?");
+        $stmt->execute([$id]);
+        $whatsapp = $stmt->fetch() ?: ['clinicId' => $id, 'simulationMode' => 1, 'apiVersion' => 'v23.0'];
+
+        $this->ensurePlatformAiDefaults($db);
+        $stmt = $db->prepare("SELECT provider, enabled, model, monthlyTokenLimit, tokenUsage, costEstimate, status, apiKey FROM AIProviderSetting WHERE clinicId = 'platform' ORDER BY provider");
+        $stmt->execute();
+        $providers = $stmt->fetchAll();
+        foreach ($providers as &$provider) {
+            $provider['hasApiKey'] = !empty($provider['apiKey']);
+            $provider['enabled'] = !empty($provider['enabled']);
+            unset($provider['apiKey']);
+        }
+
+        send_json([
+            'clinic' => $clinic,
+            'features' => $features,
+            'whatsapp' => $this->publicWhatsappSettings($whatsapp),
+            'platformAiProviders' => $providers,
+            'package' => pf_package_get($db, $id),
+            'packages' => array_values(pf_packages()),
+        ]);
+    }
+
+    // Assign / change / upgrade / downgrade a clinic's package (super admin).
+    public function setPackage($input, $user, $id) {
+        $db = DB::getConnection();
+        $stmt = $db->prepare("SELECT id FROM Clinic WHERE id = ? AND id != 'platform'");
+        $stmt->execute([$id]);
+        if (!$stmt->fetch()) send_error('Tenant not found', 404);
+
+        $key = strtolower(trim($input['package'] ?? ''));
+        try {
+            $applied = pf_package_set($db, $id, $key);
+        } catch (Exception $e) {
+            send_error($e->getMessage(), 400);
+        }
+        log_audit($id, $user['id'], 'tenant_package_changed', 'Clinic', $id, null, ['package' => $applied]);
+        send_json(['package' => $applied, 'features' => tenant_features_get($db, $id)]);
+    }
+
+    public function updateTenantAutomation($input, $user, $id) {
+        $db = DB::getConnection();
+        $stmt = $db->prepare("SELECT id FROM Clinic WHERE id = ? AND id != 'platform'");
+        $stmt->execute([$id]);
+        if (!$stmt->fetch()) send_error('Tenant not found', 404);
+
+        $features = tenant_features_save($db, $id, $input['features'] ?? []);
+
+        if (isset($input['whatsapp']) && is_array($input['whatsapp'])) {
+            $w = $input['whatsapp'];
+            $currentStmt = $db->prepare("SELECT accessToken, webhookVerifyToken FROM WhatsAppSetting WHERE clinicId = ?");
+            $currentStmt->execute([$id]);
+            $current = $currentStmt->fetch() ?: [];
+            $token = !empty($w['accessToken']) ? meta_encrypt_secret($w['accessToken']) : ($current['accessToken'] ?? null);
+            $verifyToken = array_key_exists('webhookVerifyToken', $w) && $w['webhookVerifyToken'] !== ''
+                ? trim((string)$w['webhookVerifyToken'])
+                : ($current['webhookVerifyToken'] ?? null);
+            $sql = DB_DRIVER === 'sqlite'
+                ? "INSERT INTO WhatsAppSetting(clinicId, phoneNumberId, businessAccountId, accessToken, webhookVerifyToken, apiVersion, simulationMode, quietHoursStart, quietHoursEnd)
+                   VALUES(?,?,?,?,?,?,?,?,?)
+                   ON CONFLICT(clinicId) DO UPDATE SET phoneNumberId=excluded.phoneNumberId, businessAccountId=excluded.businessAccountId, accessToken=excluded.accessToken, webhookVerifyToken=excluded.webhookVerifyToken, apiVersion=excluded.apiVersion, simulationMode=excluded.simulationMode, quietHoursStart=excluded.quietHoursStart, quietHoursEnd=excluded.quietHoursEnd, updatedAt=CURRENT_TIMESTAMP"
+                : "INSERT INTO WhatsAppSetting(clinicId, phoneNumberId, businessAccountId, accessToken, webhookVerifyToken, apiVersion, simulationMode, quietHoursStart, quietHoursEnd)
+                   VALUES(?,?,?,?,?,?,?,?,?)
+                   ON DUPLICATE KEY UPDATE phoneNumberId=VALUES(phoneNumberId), businessAccountId=VALUES(businessAccountId), accessToken=VALUES(accessToken), webhookVerifyToken=VALUES(webhookVerifyToken), apiVersion=VALUES(apiVersion), simulationMode=VALUES(simulationMode), quietHoursStart=VALUES(quietHoursStart), quietHoursEnd=VALUES(quietHoursEnd), updatedAt=CURRENT_TIMESTAMP";
+            $db->prepare($sql)->execute([
+                $id,
+                trim((string)($w['phoneNumberId'] ?? '')) ?: null,
+                trim((string)($w['businessAccountId'] ?? '')) ?: null,
+                $token,
+                $verifyToken,
+                trim((string)($w['apiVersion'] ?? 'v23.0')) ?: 'v23.0',
+                !empty($w['simulationMode']) ? 1 : 0,
+                trim((string)($w['quietHoursStart'] ?? '21:00')) ?: '21:00',
+                trim((string)($w['quietHoursEnd'] ?? '09:00')) ?: '09:00',
+            ]);
+        }
+
+        if (isset($input['platformAiProviders']) && is_array($input['platformAiProviders'])) {
+            $this->ensurePlatformAiDefaults($db);
+            foreach ($input['platformAiProviders'] as $providerInput) {
+                $provider = strtolower($providerInput['provider'] ?? '');
+                if (!in_array($provider, ['chatgpt', 'gemini', 'claude'], true)) continue;
+                $existing = $db->prepare("SELECT apiKey FROM AIProviderSetting WHERE clinicId = 'platform' AND provider = ?");
+                $existing->execute([$provider]);
+                $currentKey = $existing->fetchColumn();
+                $apiKey = !empty($providerInput['apiKey']) ? meta_encrypt_secret($providerInput['apiKey']) : ($currentKey ?: null);
+                $enabled = !empty($providerInput['enabled']) ? 1 : 0;
+                $model = trim((string)($providerInput['model'] ?? '')) ?: null;
+                $limit = max(0, intval($providerInput['monthlyTokenLimit'] ?? 0));
+                $status = $enabled ? ($apiKey ? 'ready' : 'missing_key') : 'disabled';
+                $sql = DB_DRIVER === 'sqlite'
+                    ? "INSERT INTO AIProviderSetting (id, clinicId, provider, apiKey, enabled, model, monthlyTokenLimit, status) VALUES (?, 'platform', ?, ?, ?, ?, ?, ?) ON CONFLICT(clinicId, provider) DO UPDATE SET apiKey=excluded.apiKey, enabled=excluded.enabled, model=excluded.model, monthlyTokenLimit=excluded.monthlyTokenLimit, status=excluded.status, updatedAt=CURRENT_TIMESTAMP"
+                    : "INSERT INTO AIProviderSetting (id, clinicId, provider, apiKey, enabled, model, monthlyTokenLimit, status) VALUES (?, 'platform', ?, ?, ?, ?, ?, ?) ON DUPLICATE KEY UPDATE apiKey=VALUES(apiKey), enabled=VALUES(enabled), model=VALUES(model), monthlyTokenLimit=VALUES(monthlyTokenLimit), status=VALUES(status), updatedAt=CURRENT_TIMESTAMP";
+                $db->prepare($sql)->execute([generate_uuid(), $provider, $apiKey, $enabled, $model, $limit, $status]);
+            }
+        }
+
+        log_audit($id, $user['id'], 'tenant_automation_updated', 'ClinicFeatureSetting', $id, null, $features);
+        $this->getTenantAutomation([], $user, $id);
     }
 
     public function activateTenant($input, $user, $id) {
@@ -275,6 +539,227 @@ class AdminController {
         log_audit($id, $user['id'], 'tenant_extended', 'Clinic', $id, null,
                   ['months' => $months, 'newExpiry' => $newExpiry]);
         send_json(['message' => "Subscription extended by $months month(s)", 'expiresAt' => $newExpiry]);
+    }
+
+    // Superadmin "manage clinic": mint a real owner session for the clinic so
+    // the platform admin can step in and configure everything (staff, services,
+    // branding, appointments) exactly as the owner would, then return to /admin.
+    public function impersonateTenant($input, $user, $id) {
+        $db = DB::getConnection();
+
+        $stmt = $db->prepare("SELECT id, name, status FROM Clinic WHERE id = ? AND id != 'platform'");
+        $stmt->execute([$id]);
+        $clinic = $stmt->fetch();
+        if (!$clinic) send_error('Tenant not found', 404);
+
+        // Prefer an active owner; fall back to any active user on the clinic.
+        $stmt = $db->prepare(
+            "SELECT * FROM User WHERE clinicId = ? AND isActive = 1
+             ORDER BY (role = 'owner') DESC, (role = 'manager') DESC, createdAt ASC LIMIT 1"
+        );
+        $stmt->execute([$id]);
+        $target = $stmt->fetch();
+        if (!$target) send_error('This clinic has no active user to sign in as. Create an owner first.', 400);
+
+        // Mirror AuthController::issueTokens so the session is indistinguishable
+        // from a normal login for the clinic portal.
+        $payload = [
+            'id' => $target['id'],
+            'clinicId' => $target['clinicId'],
+            'role' => $target['role'],
+            'name' => $target['name'],
+        ];
+        $accessToken = jwt_sign_access($payload);
+        $refreshToken = jwt_sign_refresh(['id' => $target['id'], 'jti' => bin2hex(random_bytes(8))]);
+        $expiresAt = date('Y-m-d H:i:s', time() + JWT_REFRESH_EXPIRES_IN);
+        $db->prepare("INSERT INTO RefreshToken (id, token, userId, expiresAt) VALUES (?, ?, ?, ?)")
+           ->execute([generate_uuid(), $refreshToken, $target['id'], $expiresAt]);
+
+        log_audit($id, $user['id'], 'tenant_impersonated', 'Clinic', $id, null,
+                  ['asUser' => $target['id'], 'asEmail' => $target['email']]);
+
+        send_json([
+            'accessToken' => $accessToken,
+            'refreshToken' => $refreshToken,
+            'user' => [
+                'id' => $target['id'],
+                'name' => $target['name'],
+                'email' => $target['email'],
+                'role' => $target['role'],
+                'ledgerMode' => $target['ledgerMode'] ?? 'actual',
+                'clinicId' => $target['clinicId'],
+            ],
+            'clinic' => ['id' => $clinic['id'], 'name' => $clinic['name']],
+        ]);
+    }
+
+    // Normalize + validate a custom domain; returns the cleaned domain or sends an error.
+    private function normalizeDomain($db, $domain, $excludeClinicId = null) {
+        $domain = strtolower(trim($domain));
+        if ($domain === '') return null;
+        if (strpos($domain, '://') !== false) $domain = parse_url($domain, PHP_URL_HOST) ?: $domain;
+        $domain = preg_replace('/[\/:].*$/', '', $domain);
+        $domain = preg_replace('/^www\./', '', $domain);
+        if (!preg_match('/^(?=.{1,253}$)([a-z0-9](-?[a-z0-9])*\.)+[a-z]{2,}$/', $domain)) {
+            send_error('Enter a valid domain like portal.yourclinic.com', 400);
+        }
+        if ($domain === 'crea8ivmedia.com' || str_ends_with($domain, '.crea8ivmedia.com')) {
+            send_error('Platform domains cannot be used as a clinic custom domain', 400);
+        }
+        $sql = "SELECT id FROM Clinic WHERE LOWER(customDomain) = ?" . ($excludeClinicId ? " AND id != ?" : "");
+        $stmt = $db->prepare($sql);
+        $stmt->execute($excludeClinicId ? [$domain, $excludeClinicId] : [$domain]);
+        if ($stmt->fetch()) send_error('That domain is already assigned to another clinic', 409);
+        return $domain;
+    }
+
+    // Full clinic provisioning from the superadmin: clinic details + initial
+    // owner account (password set directly, or a set-password invite emailed)
+    // + optional custom domain + branding colors + initial status.
+    public function createTenant($input, $user) {
+        $db = DB::getConnection();
+
+        $name           = trim($input['name'] ?? '');
+        $email          = strtolower(trim($input['email'] ?? ''));
+        $phone          = trim($input['phone'] ?? '');
+        $clinicType     = in_array($input['clinicType'] ?? 'dental', ['dental','aesthetic','general','clinic','spa','salon'], true) ? $input['clinicType'] : 'dental';
+        $address        = trim($input['address'] ?? '');
+        $status         = in_array($input['status'] ?? 'trial', ['trial','active','pending'], true) ? $input['status'] : 'trial';
+        $primaryColor   = trim($input['primaryColor'] ?? '#0f766e');
+        $secondaryColor = trim($input['secondaryColor'] ?? '#14b8a6');
+
+        $owner          = is_array($input['owner'] ?? null) ? $input['owner'] : [];
+        $ownerName      = trim($owner['name'] ?? '');
+        $ownerEmail     = strtolower(trim($owner['email'] ?? $email));
+        $ownerPassword  = (string)($owner['password'] ?? '');
+
+        if ($name === '') send_error('Clinic name is required', 400);
+        if ($ownerEmail === '' || !filter_var($ownerEmail, FILTER_VALIDATE_EMAIL)) send_error('A valid owner email is required', 400);
+        if ($ownerName === '') $ownerName = $name . ' Owner';
+        if ($ownerPassword !== '' && strlen($ownerPassword) < 8) send_error('Owner password must be at least 8 characters', 400);
+
+        $stmt = $db->prepare("SELECT id FROM User WHERE email = ?");
+        $stmt->execute([$ownerEmail]);
+        if ($stmt->fetch()) send_error('A user with this email already exists', 409);
+
+        $customDomain = $this->normalizeDomain($db, $input['customDomain'] ?? '', null);
+
+        $sendInvite = ($ownerPassword === '');
+        $rawToken = null;
+
+        try {
+            $db->beginTransaction();
+
+            $clinicId = generate_uuid();
+            $slug = $this->slugify($db, $name);
+            $trialEndsAt = $status === 'trial'
+                ? date('Y-m-d H:i:s', strtotime('+' . max(1, (int)($input['trialDays'] ?? 14)) . ' days'))
+                : null;
+
+            $db->prepare("INSERT INTO Clinic (id, name, email, phone, address, status, clinicType, slug, primaryColor, secondaryColor, trialEndsAt, customDomain, domainStatus) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
+               ->execute([$clinicId, $name, $email, $phone, $address, $status, $clinicType, $slug,
+                          $primaryColor, $secondaryColor, $trialEndsAt,
+                          $customDomain, $customDomain ? 'pending' : 'none']);
+
+            $ownerId = generate_uuid();
+            $hash = $sendInvite
+                ? password_hash(bin2hex(random_bytes(24)), PASSWORD_BCRYPT, ['cost' => 12])
+                : password_hash($ownerPassword, PASSWORD_BCRYPT, ['cost' => 12]);
+            $db->prepare("INSERT INTO User (id, clinicId, name, email, password, role) VALUES (?, ?, ?, ?, ?, 'owner')")
+               ->execute([$ownerId, $clinicId, $ownerName, $ownerEmail, $hash]);
+
+            if ($sendInvite) {
+                $rawToken = bin2hex(random_bytes(32));
+                $db->prepare("INSERT INTO PasswordReset (id, userId, tokenHash, expiresAt) VALUES (?, ?, ?, ?)")
+                   ->execute([generate_uuid(), $ownerId, hash('sha256', $rawToken),
+                              date('Y-m-d H:i:s', time() + 72 * 3600)]);
+            }
+
+            $db->commit();
+        } catch (Exception $e) {
+            $db->rollBack();
+            error_log('createTenant failed: ' . $e->getMessage());
+            send_error('Clinic creation failed', 500);
+        }
+
+        if ($sendInvite) {
+            $setupUrl = rtrim(CLIENT_URL, '/') . '/reset-password?token=' . $rawToken;
+            send_app_email($ownerEmail, 'Your clinic portal is ready — set your password',
+                           password_reset_email_html($ownerName, $setupUrl, 72 * 60));
+        }
+
+        log_audit($clinicId, $user['id'], 'tenant_created', 'Clinic', $clinicId, null,
+                  ['slug' => $slug, 'status' => $status, 'ownerEmail' => $ownerEmail, 'invite' => $sendInvite]);
+
+        send_json([
+            'message'  => $sendInvite
+                ? 'Clinic created. A set-password invite was emailed to the owner.'
+                : 'Clinic created. The owner can log in immediately with the password you set.',
+            'clinicId' => $clinicId,
+            'slug'     => $slug,
+            'ownerEmail' => $ownerEmail,
+        ], 201);
+    }
+
+    // Edit a clinic's core details + branding (superadmin).
+    public function updateTenant($input, $user, $id) {
+        $db = DB::getConnection();
+        $stmt = $db->prepare("SELECT id FROM Clinic WHERE id = ? AND id != 'platform'");
+        $stmt->execute([$id]);
+        if (!$stmt->fetch()) send_error('Tenant not found', 404);
+
+        $allowed = ['name','email','phone','address','clinicType','primaryColor','secondaryColor','tagline','website','whatsapp'];
+        $sets = []; $params = [];
+        foreach ($allowed as $f) {
+            if (array_key_exists($f, $input)) { $sets[] = "$f = ?"; $params[] = trim((string)$input[$f]); }
+        }
+        if (!$sets) send_error('No fields to update', 400);
+        $params[] = $id;
+        $db->prepare("UPDATE Clinic SET " . implode(', ', $sets) . " WHERE id = ?")->execute($params);
+
+        log_audit($id, $user['id'], 'tenant_updated', 'Clinic', $id, null, array_intersect_key($input, array_flip($allowed)));
+        send_json(['message' => 'Clinic updated']);
+    }
+
+    // Permanently delete a clinic and ALL of its data (superadmin). Destructive.
+    public function deleteTenant($input, $user, $id) {
+        if ($id === 'platform') send_error('The platform tenant cannot be deleted', 400);
+
+        $db = DB::getConnection();
+        $stmt = $db->prepare("SELECT name FROM Clinic WHERE id = ?");
+        $stmt->execute([$id]);
+        $clinic = $stmt->fetch();
+        if (!$clinic) send_error('Tenant not found', 404);
+
+        try {
+            $db->beginTransaction();
+
+            // Child rows that reference users/clients/packages/etc. of this clinic
+            $db->prepare("DELETE FROM RefreshToken WHERE userId IN (SELECT id FROM User WHERE clinicId = ?)")->execute([$id]);
+            $db->prepare("DELETE FROM PasswordReset WHERE userId IN (SELECT id FROM User WHERE clinicId = ?)")->execute([$id]);
+            $db->prepare("DELETE FROM SupportMessage WHERE ticketId IN (SELECT id FROM SupportTicket WHERE clinicId = ?)")->execute([$id]);
+            $db->prepare("DELETE FROM PackageItem WHERE packageId IN (SELECT id FROM Package WHERE clinicId = ?)")->execute([$id]);
+            $db->prepare("DELETE FROM ClientPackage WHERE clientId IN (SELECT id FROM Client WHERE clinicId = ?)")->execute([$id]);
+            $db->prepare("DELETE FROM InventoryTransaction WHERE itemId IN (SELECT id FROM InventoryItem WHERE clinicId = ?)")->execute([$id]);
+            $db->prepare("DELETE FROM GalleryItem WHERE clientId IN (SELECT id FROM Client WHERE clinicId = ?)")->execute([$id]);
+
+            // Tables that carry clinicId directly
+            foreach (['Appointment','Invoice','Feedback','Campaign','Notification','Payment','Subscription',
+                      'SupportTicket','RegistrationLead','InventoryItem','Package','Service','Staff','Client',
+                      'Branch','PublicSiteConfig','AuditLog','User'] as $t) {
+                $db->prepare("DELETE FROM $t WHERE clinicId = ?")->execute([$id]);
+            }
+            $db->prepare("DELETE FROM Clinic WHERE id = ?")->execute([$id]);
+
+            $db->commit();
+        } catch (Exception $e) {
+            $db->rollBack();
+            error_log('deleteTenant failed: ' . $e->getMessage());
+            send_error('Delete failed: ' . $e->getMessage(), 500);
+        }
+
+        log_audit('platform', $user['id'], 'tenant_deleted', 'Clinic', $id, ['name' => $clinic['name']], null);
+        send_json(['message' => 'Clinic "' . $clinic['name'] . '" and all of its data were permanently deleted']);
     }
 
     // ------------------------------------------------------------------

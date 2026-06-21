@@ -127,8 +127,8 @@ class UserController {
         $stmt->execute($params);
 
         // Fetch updated user
-        $stmt = $db->prepare("SELECT id, name, email, role, ledgerMode, isActive FROM User WHERE id = ?");
-        $stmt->execute([$id]);
+        $stmt = $db->prepare("SELECT id, name, email, role, ledgerMode, isActive FROM User WHERE id = ? AND clinicId = ?");
+        $stmt->execute([$id, $user['clinicId']]);
         $updatedUser = $stmt->fetch();
 
         send_json($updatedUser);
@@ -140,8 +140,8 @@ class UserController {
         }
 
         $newPassword = $input['newPassword'] ?? '';
-        if (empty($newPassword) || strlen($newPassword) < 6) {
-            send_error('newPassword must be at least 6 characters', 400);
+        if (empty($newPassword) || strlen($newPassword) < 10) {
+            send_error('newPassword must be at least 10 characters', 400);
         }
 
         $db = DB::getConnection();
@@ -152,8 +152,8 @@ class UserController {
         }
 
         $hash = password_hash($newPassword, PASSWORD_BCRYPT, ['cost' => 12]);
-        $stmt = $db->prepare("UPDATE User SET password = ? WHERE id = ?");
-        $stmt->execute([$hash, $id]);
+        $stmt = $db->prepare("UPDATE User SET password = ? WHERE id = ? AND clinicId = ?");
+        $stmt->execute([$hash, $id, $user['clinicId']]);
 
         // Revoke all refresh tokens
         $stmt = $db->prepare("DELETE FROM RefreshToken WHERE userId = ?");
@@ -181,8 +181,8 @@ class UserController {
         $stmt = $db->prepare("DELETE FROM RefreshToken WHERE userId = ?");
         $stmt->execute([$id]);
 
-        $stmt = $db->prepare("DELETE FROM User WHERE id = ?");
-        $stmt->execute([$id]);
+        $stmt = $db->prepare("DELETE FROM User WHERE id = ? AND clinicId = ?");
+        $stmt->execute([$id, $user['clinicId']]);
 
         send_json(['message' => 'User deleted']);
     }

@@ -3,18 +3,46 @@ require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../helpers.php';
 
 class FeedbackController {
-    private function recalculateStaffRating($db, $staffId) {
+    private function assertClientInClinic($db, $clientId, $clinicId) {
+        $stmt = $db->prepare("SELECT id FROM Client WHERE id = ? AND clinicId = ? AND status != 'inactive'");
+        $stmt->execute([$clientId, $clinicId]);
+        if (!$stmt->fetch()) {
+            send_error('Client not found', 404);
+        }
+    }
+
+    private function assertStaffInClinic($db, $staffId, $clinicId) {
+        if (empty($staffId)) return;
+        $stmt = $db->prepare("SELECT id FROM Staff WHERE id = ? AND clinicId = ?");
+        $stmt->execute([$staffId, $clinicId]);
+        if (!$stmt->fetch()) {
+            send_error('Staff not found', 404);
+        }
+    }
+
+    private function appointmentStaff($db, $appointmentId, $clinicId) {
+        if (empty($appointmentId)) return null;
+        $stmt = $db->prepare("SELECT staffId FROM Appointment WHERE id = ? AND clinicId = ?");
+        $stmt->execute([$appointmentId, $clinicId]);
+        $staffId = $stmt->fetchColumn();
+        if ($staffId === false) {
+            send_error('Appointment not found', 404);
+        }
+        return $staffId ?: null;
+    }
+
+    private function recalculateStaffRating($db, $staffId, $clinicId) {
         if (empty($staffId)) {
             return;
         }
 
-        $stmtAvg = $db->prepare("SELECT AVG(overallRating) FROM Feedback WHERE staffId = ?");
-        $stmtAvg->execute([$staffId]);
+        $stmtAvg = $db->prepare("SELECT AVG(overallRating) FROM Feedback WHERE staffId = ? AND clinicId = ?");
+        $stmtAvg->execute([$staffId, $clinicId]);
         $avg = $stmtAvg->fetchColumn();
         $rating = $avg === null ? 0 : round(floatval($avg), 1);
 
-        $stmtUpdate = $db->prepare("UPDATE Staff SET rating = ? WHERE id = ?");
-        $stmtUpdate->execute([$rating, $staffId]);
+        $stmtUpdate = $db->prepare("UPDATE Staff SET rating = ? WHERE id = ? AND clinicId = ?");
+        $stmtUpdate->execute([$rating, $staffId, $clinicId]);
     }
 
     public function list($input, $user) {
@@ -42,10 +70,10 @@ class FeedbackController {
                        s.id as staffId, s.name as staffName, s.role as staffRole,
                        srv.id as serviceId, srv.name as serviceName
                 FROM Feedback f
-                LEFT JOIN Client c ON f.clientId = c.id
-                LEFT JOIN Appointment a ON f.appointmentId = a.id
-                LEFT JOIN Staff s ON f.staffId = s.id
-                LEFT JOIN Service srv ON a.serviceId = srv.id
+                LEFT JOIN Client c ON f.clientId = c.id AND c.clinicId = f.clinicId
+                LEFT JOIN Appointment a ON f.appointmentId = a.id AND a.clinicId = f.clinicId
+                LEFT JOIN Staff s ON f.staffId = s.id AND s.clinicId = f.clinicId
+                LEFT JOIN Service srv ON a.serviceId = srv.id AND srv.clinicId = f.clinicId
                 WHERE $whereSql
                 ORDER BY f.createdAt DESC";
 
@@ -110,13 +138,13 @@ class FeedbackController {
         if (empty($clientId)) {
             send_error('clientId is required', 400);
         }
+        $this->assertClientInClinic($db, $clientId, $user['clinicId']);
 
         // If appointment provided, find staffId if not provided
         if (empty($staffId) && !empty($appointmentId)) {
-            $stmtAppt = $db->prepare("SELECT staffId FROM Appointment WHERE id = ?");
-            $stmtAppt->execute([$appointmentId]);
-            $staffId = $stmtAppt->fetchColumn() ?: null;
+            $staffId = $this->appointmentStaff($db, $appointmentId, $user['clinicId']);
         }
+        $this->assertStaffInClinic($db, $staffId, $user['clinicId']);
 
         try {
             $db->beginTransaction();
@@ -126,12 +154,12 @@ class FeedbackController {
                 $id, $user['clinicId'], $clientId, $appointmentId, $staffRating, $serviceRating, $overallRating, $comment, $wouldRecommend, $isPublic, $staffId
             ]);
 
-            $this->recalculateStaffRating($db, $staffId);
+            $this->recalculateStaffRating($db, $staffId, $user['clinicId']);
 
             $db->commit();
 
-            $stmtFetch = $db->prepare("SELECT * FROM Feedback WHERE id = ?");
-            $stmtFetch->execute([$id]);
+            $stmtFetch = $db->prepare("SELECT * FROM Feedback WHERE id = ? AND clinicId = ?");
+            $stmtFetch->execute([$id, $user['clinicId']]);
             $fb = $stmtFetch->fetch();
 
             send_json($fb, 201);
@@ -165,12 +193,14 @@ class FeedbackController {
         if (empty($clientId)) {
             send_error('clientId is required', 400);
         }
+        $this->assertClientInClinic($db, $clientId, $user['clinicId']);
 
         if (empty($staffId) && !empty($appointmentId)) {
-            $stmtAppt = $db->prepare("SELECT staffId FROM Appointment WHERE id = ? AND clinicId = ?");
-            $stmtAppt->execute([$appointmentId, $user['clinicId']]);
-            $staffId = $stmtAppt->fetchColumn() ?: null;
+            $staffId = $this->appointmentStaff($db, $appointmentId, $user['clinicId']);
+        } elseif (!empty($appointmentId)) {
+            $this->appointmentStaff($db, $appointmentId, $user['clinicId']);
         }
+        $this->assertStaffInClinic($db, $staffId, $user['clinicId']);
 
         try {
             $db->beginTransaction();
@@ -184,15 +214,15 @@ class FeedbackController {
                 $clientId, $appointmentId, $staffRating, $serviceRating, $overallRating, $comment, $wouldRecommend, $isPublic, $staffId, $id, $user['clinicId']
             ]);
 
-            $this->recalculateStaffRating($db, $existing['staffId']);
+            $this->recalculateStaffRating($db, $existing['staffId'], $user['clinicId']);
             if ($staffId !== $existing['staffId']) {
-                $this->recalculateStaffRating($db, $staffId);
+                $this->recalculateStaffRating($db, $staffId, $user['clinicId']);
             }
 
             $db->commit();
 
-            $stmtFetch = $db->prepare("SELECT * FROM Feedback WHERE id = ?");
-            $stmtFetch->execute([$id]);
+            $stmtFetch = $db->prepare("SELECT * FROM Feedback WHERE id = ? AND clinicId = ?");
+            $stmtFetch->execute([$id, $user['clinicId']]);
             send_json($stmtFetch->fetch());
         } catch (Exception $e) {
             $db->rollBack();
@@ -217,7 +247,7 @@ class FeedbackController {
             $stmtDelete = $db->prepare("DELETE FROM Feedback WHERE id = ? AND clinicId = ?");
             $stmtDelete->execute([$id, $user['clinicId']]);
 
-            $this->recalculateStaffRating($db, $existing['staffId']);
+            $this->recalculateStaffRating($db, $existing['staffId'], $user['clinicId']);
 
             $db->commit();
             send_json(['message' => 'Deleted']);

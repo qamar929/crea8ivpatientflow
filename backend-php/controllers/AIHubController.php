@@ -1,6 +1,7 @@
 <?php
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../helpers.php';
+require_once __DIR__ . '/../services/tenantFeatureService.php';
 
 class AIHubController {
     private function db() {
@@ -47,6 +48,16 @@ class AIHubController {
         ];
     }
 
+    private function ensureDefaultsForClinic($db, $clinicId) {
+        foreach ($this->defaults($clinicId) as $provider) {
+            $sql = DB_DRIVER === 'sqlite'
+                ? "INSERT OR IGNORE INTO AIProviderSetting (id, clinicId, provider, model, enabled, status) VALUES (?, ?, ?, ?, ?, ?)"
+                : "INSERT IGNORE INTO AIProviderSetting (id, clinicId, provider, model, enabled, status) VALUES (?, ?, ?, ?, ?, ?)";
+            $stmt = $db->prepare($sql);
+            $stmt->execute([$provider['id'], $provider['clinicId'], $provider['provider'], $provider['model'], $provider['enabled'], $provider['status']]);
+        }
+    }
+
     private function providerStatus($row) {
         if (empty($row['enabled'])) return 'disabled';
         if (empty($row['apiKey'])) return 'missing_key';
@@ -55,21 +66,21 @@ class AIHubController {
 
     public function overview($input, $user) {
         $db = $this->db();
-        foreach ($this->defaults($user['clinicId']) as $provider) {
-            $sql = DB_DRIVER === 'sqlite'
-                ? "INSERT OR IGNORE INTO AIProviderSetting (id, clinicId, provider, model, enabled, status) VALUES (?, ?, ?, ?, ?, ?)"
-                : "INSERT IGNORE INTO AIProviderSetting (id, clinicId, provider, model, enabled, status) VALUES (?, ?, ?, ?, ?, ?)";
-            $stmt = $db->prepare($sql);
-            $stmt->execute([$provider['id'], $provider['clinicId'], $provider['provider'], $provider['model'], $provider['enabled'], $provider['status']]);
+        $this->ensureDefaultsForClinic($db, 'platform');
+        $this->ensureDefaultsForClinic($db, $user['clinicId']);
+        $features = tenant_features_get($db, $user['clinicId']);
+        if (empty($features['aiEnabled'])) {
+            send_error('Contact Support to activate AI Hub.', 403, ['code' => 'feature_inactive']);
         }
 
-        $stmt = $db->prepare("SELECT * FROM AIProviderSetting WHERE clinicId = ? ORDER BY provider");
-        $stmt->execute([$user['clinicId']]);
+        $stmt = $db->prepare("SELECT * FROM AIProviderSetting WHERE clinicId = 'platform' ORDER BY provider");
+        $stmt->execute();
         $providers = $stmt->fetchAll();
         foreach ($providers as &$provider) {
             $provider['hasApiKey'] = !empty($provider['apiKey']);
-            $provider['enabled'] = !empty($provider['enabled']);
+            $provider['enabled'] = !empty($provider['enabled']) && !empty($features['aiEnabled']);
             $provider['health'] = $this->providerStatus($provider);
+            if (empty($features['aiEnabled'])) $provider['health'] = 'disabled_by_plan';
             unset($provider['apiKey']);
         }
 
@@ -78,6 +89,13 @@ class AIHubController {
 
         send_json([
             'providers' => $providers,
+            'managedByPlatform' => true,
+            'features' => [
+                'aiEnabled' => !empty($features['aiEnabled']),
+                'aiAutoReplyEnabled' => !empty($features['aiAutoReplyEnabled']),
+                'aiHumanApprovalRequired' => !empty($features['aiHumanApprovalRequired']),
+                'monthlyAiTokenLimit' => intval($features['monthlyAiTokenLimit'] ?? 0),
+            ],
             'metrics' => [
                 'enabledProviders' => count($enabled),
                 'readyProviders' => count($ready),
@@ -94,6 +112,9 @@ class AIHubController {
     }
 
     public function saveProvider($input, $user, $provider) {
+        if ((getenv('ALLOW_CLINIC_AI_KEYS') ?: '0') !== '1') {
+            send_error('AI providers are managed by the platform superadmin for this SaaS.', 403);
+        }
         $db = $this->db();
         $provider = strtolower($provider);
         if (!in_array($provider, ['chatgpt', 'gemini', 'claude'])) send_error('Unsupported AI provider', 400);

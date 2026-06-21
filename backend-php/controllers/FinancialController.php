@@ -6,25 +6,17 @@ class FinancialController {
     public function getSummary($input, $user) {
         $db = DB::getConnection();
         
-        // Paid invoices
-        $stmtPaid = $db->prepare("SELECT total FROM Invoice WHERE clinicId = ? AND status = 'paid'");
-        $stmtPaid->execute([$user['clinicId']]);
-        $paidInvoices = $stmtPaid->fetchAll();
-
-        // Pending invoices
-        $stmtPending = $db->prepare("SELECT total FROM Invoice WHERE clinicId = ? AND status = 'pending'");
-        $stmtPending->execute([$user['clinicId']]);
-        $pendingInvoices = $stmtPending->fetchAll();
-
-        $totalRevenue = 0.0;
-        foreach ($paidInvoices as $inv) {
-            $totalRevenue += floatval($inv['total']);
-        }
-
-        $outstandingPayments = 0.0;
-        foreach ($pendingInvoices as $inv) {
-            $outstandingPayments += floatval($inv['total']);
-        }
+        $stmt = $db->prepare("
+            SELECT
+                COALESCE(SUM(CASE WHEN status != 'refunded' THEN amountPaid ELSE 0 END), 0) AS totalRevenue,
+                COALESCE(SUM(CASE WHEN status IN ('pending', 'partial') THEN balanceDue ELSE 0 END), 0) AS outstandingPayments
+            FROM Invoice
+            WHERE clinicId = ?
+        ");
+        $stmt->execute([$user['clinicId']]);
+        $summary = $stmt->fetch();
+        $totalRevenue = floatval($summary['totalRevenue'] ?? 0);
+        $outstandingPayments = floatval($summary['outstandingPayments'] ?? 0);
 
         send_json([
             'totalRevenue' => $totalRevenue,
@@ -41,10 +33,10 @@ class FinancialController {
         $db = DB::getConnection();
         
         $stmt = $db->prepare("
-            SELECT i.total, i.createdAt, a.specialty
+            SELECT i.amountPaid, i.createdAt, a.specialty
             FROM Invoice i
-            LEFT JOIN Appointment a ON i.appointmentId = a.id
-            WHERE i.clinicId = ? AND i.status = 'paid'
+            LEFT JOIN Appointment a ON i.appointmentId = a.id AND a.clinicId = i.clinicId
+            WHERE i.clinicId = ? AND i.status != 'refunded' AND i.amountPaid > 0
         ");
         $stmt->execute([$user['clinicId']]);
         $invoices = $stmt->fetchAll();
@@ -67,8 +59,8 @@ class FinancialController {
                 $monthly[$month][$specialty] = 0.0;
             }
             
-            $monthly[$month][$specialty] += floatval($inv['total']);
-            $monthly[$month]['total'] += floatval($inv['total']);
+            $monthly[$month][$specialty] += floatval($inv['amountPaid']);
+            $monthly[$month]['total'] += floatval($inv['amountPaid']);
         }
 
         // Return list of grouped values
@@ -76,8 +68,8 @@ class FinancialController {
     }
 
     public function getTransactions($input, $user) {
-        $page = isset($_GET['page']) ? intval($_GET['page']) : 1;
-        $limit = isset($_GET['limit']) ? intval($_GET['limit']) : 20;
+        $page = max(1, isset($_GET['page']) ? intval($_GET['page']) : 1);
+        $limit = min(100, max(1, isset($_GET['limit']) ? intval($_GET['limit']) : 20));
         $offset = ($page - 1) * $limit;
 
         $db = DB::getConnection();
@@ -87,9 +79,9 @@ class FinancialController {
                        a.specialty, 
                        srv.name as serviceName
                 FROM Invoice i
-                LEFT JOIN Client c ON i.clientId = c.id
-                LEFT JOIN Appointment a ON i.appointmentId = a.id
-                LEFT JOIN Service srv ON a.serviceId = srv.id
+                LEFT JOIN Client c ON i.clientId = c.id AND c.clinicId = i.clinicId
+                LEFT JOIN Appointment a ON i.appointmentId = a.id AND a.clinicId = i.clinicId
+                LEFT JOIN Service srv ON a.serviceId = srv.id AND srv.clinicId = i.clinicId
                 WHERE i.clinicId = ?
                 ORDER BY i.createdAt DESC
                 LIMIT ? OFFSET ?";

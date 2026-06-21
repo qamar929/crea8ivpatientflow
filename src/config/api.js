@@ -1,4 +1,9 @@
 export const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:4000/api/v1';
+const APP_BASE = (import.meta.env.BASE_URL || '/').replace(/\/$/, '');
+
+export function appPath(path) {
+  return `${APP_BASE}${path.startsWith('/') ? path : `/${path}`}` || '/';
+}
 
 function clearSession() {
   localStorage.removeItem('clinic_auth');
@@ -78,10 +83,10 @@ export async function fetchApi(endpoint, options = {}) {
   if (!response.ok) {
     if (response.status === 401) {
       clearSession();
-      window.location.href = '/login';
+      window.location.href = appPath('/login');
     }
     if (response.status === 402 && data.code === 'subscription_inactive') {
-      window.location.href = '/subscription-inactive';
+      window.location.href = appPath('/subscription-inactive');
     }
     throw new Error(data.message || data.error || 'API request failed');
   }

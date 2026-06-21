@@ -1,18 +1,38 @@
 <?php
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../helpers.php';
+require_once __DIR__ . '/../services/tenantFeatureService.php';
 
 class MarketingController {
+    private function marketingEnabled($db, $clinicId) {
+        $features = tenant_features_get($db, $clinicId);
+        return !empty($features['marketingEnabled']);
+    }
+
+    private function requireMarketing($db, $clinicId) {
+        if (!$this->marketingEnabled($db, $clinicId)) {
+            send_error('Contact Support to activate Marketing Growth.', 403, ['code' => 'marketing_growth_inactive']);
+        }
+    }
+
     public function list($input, $user) {
         $db = DB::getConnection();
+        if (!$this->marketingEnabled($db, $user['clinicId'])) {
+            send_json([
+                'enabled' => false,
+                'message' => 'Contact Support to activate Marketing Growth.',
+                'campaigns' => [],
+            ]);
+        }
         $stmt = $db->prepare("SELECT * FROM Campaign WHERE clinicId = ? ORDER BY createdAt DESC");
         $stmt->execute([$user['clinicId']]);
         $campaigns = $stmt->fetchAll();
-        send_json($campaigns);
+        send_json(['enabled' => true, 'campaigns' => $campaigns]);
     }
 
     public function getById($input, $user, $id) {
         $db = DB::getConnection();
+        $this->requireMarketing($db, $user['clinicId']);
         $stmt = $db->prepare("SELECT * FROM Campaign WHERE id = ? AND clinicId = ?");
         $stmt->execute([$id, $user['clinicId']]);
         $campaign = $stmt->fetch();
@@ -24,6 +44,7 @@ class MarketingController {
 
     public function create($input, $user) {
         $db = DB::getConnection();
+        $this->requireMarketing($db, $user['clinicId']);
 
         $id = generate_uuid();
         $name = $input['name'] ?? '';
@@ -42,8 +63,8 @@ class MarketingController {
             $id, $user['clinicId'], $name, $type, $trigger, $subject, $body, $status
         ]);
 
-        $stmt = $db->prepare("SELECT * FROM Campaign WHERE id = ?");
-        $stmt->execute([$id]);
+        $stmt = $db->prepare("SELECT * FROM Campaign WHERE id = ? AND clinicId = ?");
+        $stmt->execute([$id, $user['clinicId']]);
         $campaign = $stmt->fetch();
 
         send_json($campaign, 201);
@@ -51,6 +72,7 @@ class MarketingController {
 
     public function update($input, $user, $id) {
         $db = DB::getConnection();
+        $this->requireMarketing($db, $user['clinicId']);
         $stmt = $db->prepare("SELECT id FROM Campaign WHERE id = ? AND clinicId = ?");
         $stmt->execute([$id, $user['clinicId']]);
         if (!$stmt->fetch()) {
@@ -84,6 +106,7 @@ class MarketingController {
 
     public function remove($input, $user, $id) {
         $db = DB::getConnection();
+        $this->requireMarketing($db, $user['clinicId']);
         $stmt = $db->prepare("DELETE FROM Campaign WHERE id = ? AND clinicId = ?");
         $stmt->execute([$id, $user['clinicId']]);
         send_json(['message' => 'Deleted']);
@@ -91,6 +114,7 @@ class MarketingController {
 
     public function send($input, $user, $id) {
         $db = DB::getConnection();
+        $this->requireMarketing($db, $user['clinicId']);
         
         // Find Campaign
         $stmt = $db->prepare("SELECT * FROM Campaign WHERE id = ? AND clinicId = ?");
@@ -100,8 +124,15 @@ class MarketingController {
             send_error('Campaign not found', 404);
         }
 
-        // Find active clients
-        $stmtClients = $db->prepare("SELECT name, phone, email FROM Client WHERE clinicId = ? AND status = 'active'");
+        // Find active clients. WhatsApp marketing campaigns must respect the
+        // patient-level consent flag used by the WhatsApp center.
+        if ($campaign['type'] === 'whatsapp') {
+            $stmtClients = $db->prepare("SELECT name, phone, email FROM Client WHERE clinicId = ? AND status = 'active' AND whatsappMarketingOptIn = 1 AND phone IS NOT NULL");
+        } elseif ($campaign['type'] === 'email') {
+            $stmtClients = $db->prepare("SELECT name, phone, email FROM Client WHERE clinicId = ? AND status = 'active' AND email IS NOT NULL AND email != ''");
+        } else {
+            send_error('Unsupported campaign type', 400);
+        }
         $stmtClients->execute([$user['clinicId']]);
         $clients = $stmtClients->fetchAll();
 
@@ -121,16 +152,12 @@ class MarketingController {
                            "Content-Type: text/html; charset=UTF-8\r\n";
                 @mail($client['email'], $subject, $personalizedBody, $headers);
                 $sentCount++;
-            } else {
-                // Fallback / Log
-                error_log("Campaign sent to " . $client['name'] . ": " . substr($personalizedBody, 0, 50));
-                $sentCount++;
             }
         }
 
         // Update Campaign status
-        $stmtUpdate = $db->prepare("UPDATE Campaign SET sentCount = sentCount + ?, status = 'completed' WHERE id = ?");
-        $stmtUpdate->execute([$sentCount, $id]);
+        $stmtUpdate = $db->prepare("UPDATE Campaign SET sentCount = sentCount + ?, status = 'completed' WHERE id = ? AND clinicId = ?");
+        $stmtUpdate->execute([$sentCount, $id, $user['clinicId']]);
 
         send_json([
             'message' => "Campaign sent to $sentCount clients",

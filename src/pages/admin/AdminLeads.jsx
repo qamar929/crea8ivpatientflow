@@ -6,15 +6,15 @@ const STATUSES = ['new', 'contacted', 'demo_given', 'payment_pending', 'payment_
 
 const STATUS_STYLES = {
   new: 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300',
-  contacted: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300',
-  demo_given: 'bg-violet-100 text-violet-700 dark:bg-violet-900/40 dark:text-violet-300',
+  contacted: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300',
+  demo_given: 'bg-orange-100 text-orange-600 dark:bg-orange-800/40 dark:text-orange-300',
   payment_pending: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
   payment_review: 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300',
   converted: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
   rejected: 'bg-gray-100 text-gray-500 dark:bg-white/5 dark:text-gray-400',
 };
 
-const inputCls = 'w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-500/40';
+const inputCls = 'w-full px-3 py-2 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] text-sm text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-orange-500/40';
 
 const EMPTY_FORM = { clinicName: '', contactName: '', email: '', phone: '', whatsapp: '', city: '', clinicType: 'dental', branches: 1 };
 
@@ -83,7 +83,7 @@ export default function AdminLeads() {
         </div>
         <button
           onClick={() => setShowAdd(!showAdd)}
-          className="inline-flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-indigo-600/20 transition-colors"
+          className="inline-flex items-center gap-2 bg-orange-600 hover:bg-orange-700 text-white text-sm font-bold px-4 py-2.5 rounded-xl shadow-lg shadow-orange-600/20 transition-colors"
         >
           {showAdd ? <X className="w-4 h-4" /> : <Plus className="w-4 h-4" />}
           {showAdd ? 'Cancel' : 'Add Lead'}
@@ -106,7 +106,7 @@ export default function AdminLeads() {
             <option value="medical">Medical</option>
             <option value="multi">Multi-specialty</option>
           </select>
-          <button disabled={busy === 'add'} className="bg-indigo-600 hover:bg-indigo-700 disabled:opacity-60 text-white text-sm font-bold rounded-lg px-4 py-2 transition-colors">
+          <button disabled={busy === 'add'} className="bg-orange-600 hover:bg-orange-700 disabled:opacity-60 text-white text-sm font-bold rounded-lg px-4 py-2 transition-colors">
             {busy === 'add' ? 'Saving...' : 'Save Lead'}
           </button>
         </form>

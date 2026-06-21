@@ -2,6 +2,7 @@ import { Link } from 'react-router-dom';
 import { AlertTriangle, MessageCircle, LogOut } from 'lucide-react';
 import { useClinic } from '../context/ClinicContext';
 import ClinicLogoMark from '../components/branding/ClinicLogoMark';
+import { appPath } from '../config/api';
 
 export default function SubscriptionInactive() {
   const { clinicInfo } = useClinic();
@@ -11,7 +12,7 @@ export default function SubscriptionInactive() {
     localStorage.removeItem('clinic_token');
     localStorage.removeItem('clinic_refresh');
     localStorage.removeItem('clinic_user');
-    window.location.href = '/login';
+    window.location.href = appPath('/login');
   };
 
   return (

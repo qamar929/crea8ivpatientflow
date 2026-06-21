@@ -3,6 +3,22 @@ require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../helpers.php';
 
 class PackageController {
+    private function assertClientInClinic($db, $clientId, $clinicId) {
+        $stmt = $db->prepare("SELECT id FROM Client WHERE id = ? AND clinicId = ? AND status != 'inactive'");
+        $stmt->execute([$clientId, $clinicId]);
+        if (!$stmt->fetch()) {
+            send_error('Client not found', 404);
+        }
+    }
+
+    private function assertServiceInClinic($db, $serviceId, $clinicId) {
+        $stmt = $db->prepare("SELECT id FROM Service WHERE id = ? AND clinicId = ? AND isActive = 1");
+        $stmt->execute([$serviceId, $clinicId]);
+        if (!$stmt->fetch()) {
+            send_error('Package service not found for this clinic', 400);
+        }
+    }
+
     public function list($input, $user) {
         $db = DB::getConnection();
         
@@ -16,9 +32,9 @@ class PackageController {
                        s.id as serviceId, s.name as serviceName, s.price as servicePrice, s.duration as serviceDuration
                 FROM PackageItem pi
                 JOIN Service s ON pi.serviceId = s.id
-                WHERE pi.packageId = ?
+                WHERE pi.packageId = ? AND s.clinicId = ?
             ");
-            $stmtItems->execute([$pkg['id']]);
+            $stmtItems->execute([$pkg['id'], $user['clinicId']]);
             $items = $stmtItems->fetchAll();
             
             // Format to match prisma nesting
@@ -66,6 +82,7 @@ class PackageController {
                     $itemId = generate_uuid();
                     $serviceId = $item['serviceId'];
                     $sessions = intval($item['sessions'] ?? 1);
+                    $this->assertServiceInClinic($db, $serviceId, $user['clinicId']);
                     
                     $stmtItem = $db->prepare("INSERT INTO PackageItem (id, packageId, serviceId, sessions) VALUES (?, ?, ?, ?)");
                     $stmtItem->execute([$itemId, $id, $serviceId, $sessions]);
@@ -75,8 +92,8 @@ class PackageController {
             $db->commit();
 
             // Fetch package with items
-            $stmt = $db->prepare("SELECT * FROM Package WHERE id = ?");
-            $stmt->execute([$id]);
+            $stmt = $db->prepare("SELECT * FROM Package WHERE id = ? AND clinicId = ?");
+            $stmt->execute([$id, $user['clinicId']]);
             $pkg = $stmt->fetch();
 
             $stmtItems = $db->prepare("
@@ -84,9 +101,9 @@ class PackageController {
                        s.id as serviceId, s.name as serviceName, s.price as servicePrice, s.duration as serviceDuration
                 FROM PackageItem pi
                 JOIN Service s ON pi.serviceId = s.id
-                WHERE pi.packageId = ?
+                WHERE pi.packageId = ? AND s.clinicId = ?
             ");
-            $stmtItems->execute([$id]);
+            $stmtItems->execute([$id, $user['clinicId']]);
             $createdItems = $stmtItems->fetchAll();
 
             foreach ($createdItems as &$item) {
@@ -171,6 +188,7 @@ class PackageController {
         if (!$pkg) {
             send_error('Package not found', 404);
         }
+        $this->assertClientInClinic($db, $clientId, $user['clinicId']);
 
         // Get total sessions
         $stmtSessions = $db->prepare("SELECT SUM(sessions) FROM PackageItem WHERE packageId = ?");
@@ -191,13 +209,13 @@ class PackageController {
             ]);
 
             // Update client total spent
-            $stmtClient = $db->prepare("UPDATE Client SET totalSpent = totalSpent + ? WHERE id = ?");
-            $stmtClient->execute([$finalAmountPaid, $clientId]);
+            $stmtClient = $db->prepare("UPDATE Client SET totalSpent = totalSpent + ? WHERE id = ? AND clinicId = ?");
+            $stmtClient->execute([$finalAmountPaid, $clientId, $user['clinicId']]);
 
             $db->commit();
 
-            $stmtFetch = $db->prepare("SELECT * FROM ClientPackage WHERE id = ?");
-            $stmtFetch->execute([$cpId]);
+            $stmtFetch = $db->prepare("SELECT cp.* FROM ClientPackage cp JOIN Client c ON c.id = cp.clientId JOIN Package p ON p.id = cp.packageId WHERE cp.id = ? AND c.clinicId = ? AND p.clinicId = ?");
+            $stmtFetch->execute([$cpId, $user['clinicId'], $user['clinicId']]);
             $cp = $stmtFetch->fetch();
 
             send_json($cp, 201);
@@ -209,16 +227,17 @@ class PackageController {
 
     public function getClientPackages($input, $user, $clientId) {
         $db = DB::getConnection();
+        $this->assertClientInClinic($db, $clientId, $user['clinicId']);
         
         $stmt = $db->prepare("
             SELECT cp.*,
                    p.name as packageName, p.description as packageDescription, p.totalPrice as packagePrice
             FROM ClientPackage cp
             JOIN Package p ON cp.packageId = p.id
-            WHERE cp.clientId = ?
+            WHERE cp.clientId = ? AND p.clinicId = ?
             ORDER BY cp.purchaseDate DESC
         ");
-        $stmt->execute([$clientId]);
+        $stmt->execute([$clientId, $user['clinicId']]);
         $clientPackages = $stmt->fetchAll();
 
         foreach ($clientPackages as &$cp) {

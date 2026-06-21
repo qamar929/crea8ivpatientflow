@@ -1,6 +1,8 @@
 <?php
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../helpers.php';
+require_once __DIR__ . '/../services/metaWhatsAppService.php';
+require_once __DIR__ . '/../services/tenantFeatureService.php';
 
 class MetaLeadController {
     private function db() {
@@ -63,8 +65,16 @@ class MetaLeadController {
         return $db;
     }
 
+    private function requireFeature($db, $clinicId) {
+        $features = tenant_features_get($db, $clinicId);
+        if (empty($features['metaLeadsEnabled'])) {
+            send_error('Contact Support to activate Meta Leads.', 403, ['code' => 'feature_inactive']);
+        }
+    }
+
     public function settings($input, $user) {
         $db = $this->db();
+        $this->requireFeature($db, $user['clinicId']);
         $stmt = $db->prepare("SELECT * FROM MetaLeadSetting WHERE clinicId = ?");
         $stmt->execute([$user['clinicId']]);
         $settings = $stmt->fetch() ?: ['clinicId' => $user['clinicId'], 'syncEnabled' => 0];
@@ -75,10 +85,11 @@ class MetaLeadController {
 
     public function saveSettings($input, $user) {
         $db = $this->db();
+        $this->requireFeature($db, $user['clinicId']);
         $existing = $db->prepare("SELECT accessToken FROM MetaLeadSetting WHERE clinicId = ?");
         $existing->execute([$user['clinicId']]);
         $currentToken = $existing->fetchColumn();
-        $token = !empty($input['accessToken']) ? $input['accessToken'] : $currentToken;
+        $token = !empty($input['accessToken']) ? meta_encrypt_secret($input['accessToken']) : $currentToken;
         $sync = !empty($input['syncEnabled']) ? 1 : 0;
 
         $sql = DB_DRIVER === 'sqlite'
@@ -92,6 +103,7 @@ class MetaLeadController {
 
     public function list($input, $user) {
         $db = $this->db();
+        $this->requireFeature($db, $user['clinicId']);
         $status = $_GET['status'] ?? '';
         $where = ['clinicId = ?'];
         $params = [$user['clinicId']];
@@ -103,18 +115,20 @@ class MetaLeadController {
 
     public function create($input, $user) {
         $db = $this->db();
+        $this->requireFeature($db, $user['clinicId']);
         if (empty($input['patientName'])) send_error('patientName is required', 400);
         $id = generate_uuid();
         $stmt = $db->prepare("INSERT INTO MetaLead (id, clinicId, patientName, phone, email, source, campaignName, adName, formName, branchId, status, notes) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute([$id, $user['clinicId'], $input['patientName'], $input['phone'] ?? null, $input['email'] ?? null, $input['source'] ?? 'Meta Lead Ads', $input['campaignName'] ?? null, $input['adName'] ?? null, $input['formName'] ?? null, $input['branchId'] ?? null, $input['status'] ?? 'new', $input['notes'] ?? null]);
         log_audit($user['clinicId'], $user['id'] ?? null, 'create', 'MetaLead', $id, null, $input);
-        $stmt = $db->prepare("SELECT * FROM MetaLead WHERE id = ?");
-        $stmt->execute([$id]);
+        $stmt = $db->prepare("SELECT * FROM MetaLead WHERE id = ? AND clinicId = ?");
+        $stmt->execute([$id, $user['clinicId']]);
         send_json($stmt->fetch(), 201);
     }
 
     public function update($input, $user, $id) {
         $db = $this->db();
+        $this->requireFeature($db, $user['clinicId']);
         $fields = [];
         $params = [];
         foreach (['patientName','phone','email','source','campaignName','adName','formName','branchId','status','notes'] as $key) {
@@ -130,6 +144,7 @@ class MetaLeadController {
 
     public function remove($input, $user, $id) {
         $db = $this->db();
+        $this->requireFeature($db, $user['clinicId']);
         $stmt = $db->prepare("DELETE FROM MetaLead WHERE id = ? AND clinicId = ?");
         $stmt->execute([$id, $user['clinicId']]);
         log_audit($user['clinicId'], $user['id'] ?? null, 'delete', 'MetaLead', $id);
@@ -138,6 +153,7 @@ class MetaLeadController {
 
     public function convert($input, $user, $id) {
         $db = $this->db();
+        $this->requireFeature($db, $user['clinicId']);
         $stmt = $db->prepare("SELECT * FROM MetaLead WHERE id = ? AND clinicId = ?");
         $stmt->execute([$id, $user['clinicId']]);
         $lead = $stmt->fetch();
@@ -155,8 +171,8 @@ class MetaLeadController {
         try {
             $stmt = $db->prepare("INSERT INTO Client (id, clinicId, patientNo, name, phone, email, specialty, medicalHistory, avatarColor, initials, notes, referredBy) VALUES (?, ?, ?, ?, ?, ?, '[]', '[]', '#0f766e', ?, ?, ?)");
             $stmt->execute([$clientId, $user['clinicId'], $patientNo, $lead['patientName'], $lead['phone'], $lead['email'], substr($initials, 0, 2), $lead['notes'], 'Meta Lead Ads']);
-            $stmt = $db->prepare("UPDATE MetaLead SET status = 'converted', clientId = ? WHERE id = ?");
-            $stmt->execute([$clientId, $id]);
+            $stmt = $db->prepare("UPDATE MetaLead SET status = 'converted', clientId = ? WHERE id = ? AND clinicId = ?");
+            $stmt->execute([$clientId, $id, $user['clinicId']]);
             $db->commit();
             log_audit($user['clinicId'], $user['id'] ?? null, 'create', 'Client', $clientId, null, ['fromLead' => $id]);
             send_json(['message' => 'Converted to patient', 'clientId' => $clientId], 201);

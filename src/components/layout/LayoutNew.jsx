@@ -1,6 +1,7 @@
 import SidebarNew from './SidebarNew';
 import Header from './Header';
 import MobileQuickActions from './MobileQuickActions';
+import ImpersonationBanner from '../ImpersonationBanner';
 import { useEffect } from 'react';
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { Calendar, ClipboardList, FileBarChart, LayoutDashboard, Receipt, Stethoscope, Users } from 'lucide-react';
@@ -51,6 +52,7 @@ export default function LayoutNew() {
           <SidebarNew />
         </div>
         <div className="flex flex-col flex-1 min-w-0">
+          <ImpersonationBanner />
           <Header />
           <main className="flex-1 overflow-y-auto p-4 pb-24 md:pb-6 md:p-6">
             <Outlet />

@@ -1,36 +1,92 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
-import { fetchPublicApi } from '../config/api';
+import { fetchApi, fetchPublicApi } from '../config/api';
 import { syncBrandingMetadata } from '../utils/branding';
+
+// A signed-in clinic user (not the platform superadmin) should always see
+// their own clinic's saved branding, regardless of which domain they use.
+function isClinicUserSession() {
+  if (localStorage.getItem('clinic_auth') !== 'true') return false;
+  try {
+    const role = JSON.parse(localStorage.getItem('clinic_user') || '{}').role || '';
+    return role !== '' && role !== 'superadmin';
+  } catch (_) {
+    return false;
+  }
+}
+
+function currentSessionClinicId() {
+  try {
+    return JSON.parse(localStorage.getItem('clinic_user') || '{}').clinicId || '';
+  } catch (_) {
+    return '';
+  }
+}
+
+// Drop null/undefined so sparse DB rows don't blank out sensible defaults.
+function compact(obj) {
+  return Object.fromEntries(Object.entries(obj || {}).filter(([, v]) => v !== null && v !== undefined));
+}
 
 const ClinicContext = createContext(null);
 
+// Platform brand shown on the shared/superadmin login at crea8ivmedia.com and
+// on any domain not claimed by a clinic. White-label clinic domains override
+// this via the /public/branding lookup below.
 const defaultClinicInfo = {
-  name: 'The Smile Expert',
-  tagline: 'Premium Dental Care Portal',
-  logo: 'SE',
-  address: 'Dental Clinic, Lahore, Pakistan',
-  phone: '+92 42 111 764 533',
-  whatsapp: '+92 300 764 5330',
-  email: 'care@thesmileexpert.com',
-  website: 'portal.thesmileexpert.com',
-  registrationNo: 'DENT-LHR-2026-001',
-  invoicePrefix: 'TSE',
-  invoiceFooter: 'Thank you for choosing The Smile Expert. Keep smiling with precise dental care and transparent billing.',
+  name: 'Crea8iv PatientFlow',
+  tagline: 'Clinic Management Platform',
+  logo: 'PF',
+  address: 'Crea8iv Media, Islamabad, Pakistan',
+  phone: '+92 310 5704555',
+  whatsapp: '+92 310 5704555',
+  email: 'info@crea8ivmedia.com',
+  website: 'crea8ivmedia.com',
+  registrationNo: '',
+  invoicePrefix: 'PF',
+  invoiceFooter: 'Powered by Crea8iv PatientFlow.',
   paymentTerms: 'Pending balances are shown on every invoice and should be cleared before the next appointment unless approved by admin.',
-  mission: 'Deliver premium, transparent, and patient-friendly dental care through organized digital operations.',
-  vision: 'To become the most trusted dental clinic experience for families, smile makeovers, implants, and preventive care.',
-  servicesOverview: 'Dental checkups, scaling, whitening, fillings, root canals, crowns, veneers, implants, aligners, extractions, and follow-up care.',
-  branches: ['The Smile Expert Main Branch'],
-  activeBranch: 'Main Dental Clinic',
+  mission: 'Help clinics run premium, transparent, patient-friendly operations through one digital platform.',
+  vision: 'To be the operating system modern clinics rely on every day.',
+  servicesOverview: 'Appointments, patient records, billing, inventory, staff, marketing and reporting — in one portal.',
+  branches: [],
+  activeBranch: '',
   specialties: ['dental'],
+  primaryColor: '#f97316',
+  secondaryColor: '#ea580c',
+};
+
+const defaultFeatures = {
+  marketingEnabled: false,
+  metaLeadsEnabled: false,
+  importsEnabled: false,
+  whatsappEnabled: false,
+  whatsappMarketingEnabled: false,
+  whatsappAutomationEnabled: false,
+  aiEnabled: false,
+  aiAutoReplyEnabled: false,
+  aiHumanApprovalRequired: true,
+  monthlyAiTokenLimit: 0,
+  monthlyWhatsAppLimit: 0,
 };
 
 export function ClinicProvider({ children }) {
   const [activeSpecialty, setActiveSpecialty] = useState('all');
+  // True once /public/branding confirms a clinic owns this domain. While false
+  // (e.g. the platform domain crea8ivmedia.com) the portal shows PatientFlow.
+  const [clinicMatched, setClinicMatched] = useState(false);
+  const [features, setFeatures] = useState(defaultFeatures);
   const [clinicInfo, setClinicInfo] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('clinic_branding') || 'null');
-      if (!saved || saved.name !== defaultClinicInfo.name) return defaultClinicInfo;
+      // Trust the cache only when (a) a clinic user is signed in, or (b) this
+      // domain was previously confirmed as a white-label clinic domain.
+      // Otherwise (e.g. logged-out platform login) show the platform brand.
+      const sessionClinicId = currentSessionClinicId();
+      const trusted = saved && (
+        (isClinicUserSession() && saved._clinicId && saved._clinicId === sessionClinicId) ||
+        saved._matchedDomain === window.location.hostname
+      );
+      if (!trusted) return defaultClinicInfo;
       return { ...defaultClinicInfo, ...saved, specialties: ['dental'] };
     } catch (_) {
       return defaultClinicInfo;
@@ -55,7 +111,35 @@ export function ClinicProvider({ children }) {
     fetchPublicApi(`/public/branding?domain=${encodeURIComponent(domain)}`)
       .then((data) => {
         if (data?.matched && data.clinic) {
-          setClinicInfo((current) => ({ ...current, ...data.clinic }));
+          setClinicMatched(true);
+          setClinicInfo((current) => ({
+            ...current,
+            ...compact(data.clinic),
+            _matchedDomain: window.location.hostname,
+          }));
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    if (!isClinicUserSession()) return;
+    fetchApi('/features')
+      .then((data) => setFeatures((current) => ({ ...current, ...data })))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    // Signed-in clinic users: hydrate from the server-saved clinic settings
+    // (the Clinic table) so edits persist across logins on ANY domain —
+    // including the shared platform domain where /public/branding matches
+    // nothing. Roles without access to this endpoint just keep domain branding.
+    if (!isClinicUserSession()) return;
+    fetchApi('/settings/public-site')
+      .then((data) => {
+        if (data?.clinic) {
+          setClinicMatched(true);
+          setClinicInfo((current) => ({ ...current, ...compact(data.clinic), _clinicId: data.clinic.id }));
         }
       })
       .catch(() => {});
@@ -69,8 +153,11 @@ export function ClinicProvider({ children }) {
     activeSpecialty,
     setActiveSpecialty,
     clinicInfo,
+    features,
     updateClinicInfo,
-  }), [activeSpecialty, clinicInfo]);
+    clinicMatched,
+    isPlatform: !clinicMatched,
+  }), [activeSpecialty, clinicInfo, clinicMatched, features]);
 
   return (
     <ClinicContext.Provider value={value}>

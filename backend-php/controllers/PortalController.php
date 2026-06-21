@@ -4,6 +4,49 @@ require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../services/pdfService.php';
 
 class PortalController {
+    private function clientIp() {
+        foreach (['HTTP_CF_CONNECTING_IP', 'HTTP_X_FORWARDED_FOR', 'REMOTE_ADDR'] as $key) {
+            if (!empty($_SERVER[$key])) {
+                $ip = explode(',', $_SERVER[$key])[0];
+                return substr(trim($ip), 0, 45);
+            }
+        }
+        return 'unknown';
+    }
+
+    private function recordLoginAttempt($db, $email, $success) {
+        $stmt = $db->prepare("INSERT INTO LoginAttempt (email, ip, success, createdAt) VALUES (?, ?, ?, ?)");
+        $stmt->execute(['portal:' . strtolower($email), $this->clientIp(), $success ? 1 : 0, date('Y-m-d H:i:s')]);
+    }
+
+    private function assertNotRateLimited($db, $email) {
+        $windowEmail = date('Y-m-d H:i:s', time() - 15 * 60);
+        $stmt = $db->prepare("SELECT COUNT(*) FROM LoginAttempt WHERE email = ? AND success = 0 AND createdAt > ?");
+        $stmt->execute(['portal:' . strtolower($email), $windowEmail]);
+        if ((int)$stmt->fetchColumn() >= LOGIN_MAX_ATTEMPTS_EMAIL) {
+            send_error('Too many failed attempts. Please try again in 15 minutes.', 429);
+        }
+
+        $windowIp = date('Y-m-d H:i:s', time() - 60 * 60);
+        $stmt = $db->prepare("SELECT COUNT(*) FROM LoginAttempt WHERE ip = ? AND success = 0 AND createdAt > ?");
+        $stmt->execute([$this->clientIp(), $windowIp]);
+        if ((int)$stmt->fetchColumn() >= LOGIN_MAX_ATTEMPTS_IP) {
+            send_error('Too many requests from this network. Please try again later.', 429);
+        }
+    }
+
+    private function assertClinicRecord($db, $table, $id, $clinicId, $extraWhere = '') {
+        if ($id === null || $id === '') return;
+        $sql = "SELECT * FROM $table WHERE id = ? AND clinicId = ?" . $extraWhere;
+        $stmt = $db->prepare($sql);
+        $stmt->execute([$id, $clinicId]);
+        $row = $stmt->fetch();
+        if (!$row) {
+            send_error('Selected record is unavailable', 400);
+        }
+        return $row;
+    }
+
     public function login($input, $user) {
         $email = $input['email'] ?? '';
         $password = $input['password'] ?? '';
@@ -13,17 +56,21 @@ class PortalController {
         }
 
         $db = DB::getConnection();
+        $this->assertNotRateLimited($db, $email);
         $stmt = $db->prepare("SELECT * FROM Client WHERE portalEmail = ?");
         $stmt->execute([$email]);
         $client = $stmt->fetch();
 
         if (!$client || empty($client['portalPasswordHash'])) {
+            $this->recordLoginAttempt($db, $email, false);
             send_error('Invalid credentials', 401);
         }
 
         if (!password_verify($password, $client['portalPasswordHash'])) {
+            $this->recordLoginAttempt($db, $email, false);
             send_error('Invalid credentials', 401);
         }
+        $this->recordLoginAttempt($db, $email, true);
 
         $tokenPayload = [
             'id' => $client['id'],
@@ -52,12 +99,12 @@ class PortalController {
                    s.name as staffName, s.role as staffRole,
                    srv.name as serviceName
             FROM Appointment a
-            LEFT JOIN Staff s ON a.staffId = s.id
-            LEFT JOIN Service srv ON a.serviceId = srv.id
-            WHERE a.clientId = ?
+            LEFT JOIN Staff s ON a.staffId = s.id AND s.clinicId = a.clinicId
+            LEFT JOIN Service srv ON a.serviceId = srv.id AND srv.clinicId = a.clinicId
+            WHERE a.clientId = ? AND a.clinicId = ?
             ORDER BY a.date DESC, a.startTime DESC
         ");
-        $stmt->execute([$user['id']]);
+        $stmt->execute([$user['id'], $user['clinicId']]);
         $appointments = $stmt->fetchAll();
 
         $formatted = [];
@@ -82,7 +129,7 @@ class PortalController {
         $startTime = $input['startTime'] ?? '';
         $endTime = $input['endTime'] ?? '';
         $duration = intval($input['duration'] ?? 0);
-        $price = floatval($input['price'] ?? 0);
+        $price = 0;
         $specialty = $input['specialty'] ?? '';
         $notes = $input['notes'] ?? null;
         $room = $input['room'] ?? null;
@@ -90,14 +137,39 @@ class PortalController {
         if (empty($staffId) || empty($date) || empty($startTime) || empty($endTime)) {
             send_error('staffId, date, startTime, and endTime are required', 400);
         }
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date) || !preg_match('/^\d{2}:\d{2}$/', $startTime) || !preg_match('/^\d{2}:\d{2}$/', $endTime)) {
+            send_error('Invalid date, startTime, or endTime format', 400);
+        }
+        if (strtotime("$date $startTime") <= time() || strtotime("$date $endTime") <= strtotime("$date $startTime")) {
+            send_error('Please choose a valid future appointment slot.', 400);
+        }
+
+        $staff = $this->assertClinicRecord($db, 'Staff', $staffId, $user['clinicId'], " AND status = 'active'");
+        if (!empty($branchId)) {
+            $this->assertClinicRecord($db, 'Branch', $branchId, $user['clinicId'], " AND isActive = 1");
+        }
+        if (!empty($serviceId)) {
+            $service = $this->assertClinicRecord($db, 'Service', $serviceId, $user['clinicId'], " AND isActive = 1");
+            $duration = $duration > 0 ? $duration : intval($service['duration'] ?? 0);
+            $price = floatval($service['price'] ?? 0);
+            $specialty = $service['specialty'] ?: $specialty;
+        } else {
+            $specialty = $staff['specialty'] ?: $specialty ?: 'general';
+        }
+
+        $stmtConflict = $db->prepare("SELECT COUNT(*) FROM Appointment WHERE clinicId = ? AND staffId = ? AND date = ? AND status IN ('confirmed', 'pending') AND startTime < ? AND endTime > ?");
+        $stmtConflict->execute([$user['clinicId'], $staffId, $date, $endTime, $startTime]);
+        if (intval($stmtConflict->fetchColumn()) > 0) {
+            send_error('This slot has just been booked. Please choose another time.', 409);
+        }
 
         $stmt = $db->prepare("INSERT INTO Appointment (id, clinicId, branchId, clientId, staffId, serviceId, date, startTime, endTime, duration, status, room, notes, price, specialty) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?, ?)");
         $stmt->execute([
             $id, $user['clinicId'], $branchId, $user['id'], $staffId, $serviceId, $date, $startTime, $endTime, $duration, $room, $notes, $price, $specialty
         ]);
 
-        $stmt = $db->prepare("SELECT * FROM Appointment WHERE id = ?");
-        $stmt->execute([$id]);
+        $stmt = $db->prepare("SELECT * FROM Appointment WHERE id = ? AND clinicId = ?");
+        $stmt->execute([$id, $user['clinicId']]);
         $appt = $stmt->fetch();
 
         send_json($appt, 201);
@@ -105,8 +177,8 @@ class PortalController {
 
     public function getMyInvoices($input, $user) {
         $db = DB::getConnection();
-        $stmt = $db->prepare("SELECT * FROM Invoice WHERE clientId = ? ORDER BY createdAt DESC");
-        $stmt->execute([$user['id']]);
+        $stmt = $db->prepare("SELECT * FROM Invoice WHERE clientId = ? AND clinicId = ? ORDER BY createdAt DESC");
+        $stmt->execute([$user['id'], $user['clinicId']]);
         $invoices = $stmt->fetchAll();
 
         foreach ($invoices as &$inv) {
@@ -119,16 +191,16 @@ class PortalController {
         $db = DB::getConnection();
         
         // Find invoice
-        $stmtInvoice = $db->prepare("SELECT * FROM Invoice WHERE id = ? AND clientId = ?");
-        $stmtInvoice->execute([$id, $user['id']]);
+        $stmtInvoice = $db->prepare("SELECT * FROM Invoice WHERE id = ? AND clientId = ? AND clinicId = ?");
+        $stmtInvoice->execute([$id, $user['id'], $user['clinicId']]);
         $invoice = $stmtInvoice->fetch();
         if (!$invoice) {
             send_error('Invoice not found', 404);
         }
 
         // Find client
-        $stmtClient = $db->prepare("SELECT * FROM Client WHERE id = ?");
-        $stmtClient->execute([$user['id']]);
+        $stmtClient = $db->prepare("SELECT * FROM Client WHERE id = ? AND clinicId = ?");
+        $stmtClient->execute([$user['id'], $user['clinicId']]);
         $client = $stmtClient->fetch();
 
         // Find clinic
@@ -156,9 +228,9 @@ class PortalController {
                    p.name as packageName, p.description as packageDescription, p.totalPrice as packagePrice
             FROM ClientPackage cp
             JOIN Package p ON cp.packageId = p.id
-            WHERE cp.clientId = ?
+            WHERE cp.clientId = ? AND p.clinicId = ?
         ");
-        $stmt->execute([$user['id']]);
+        $stmt->execute([$user['id'], $user['clinicId']]);
         $clientPackages = $stmt->fetchAll();
 
         foreach ($clientPackages as &$cp) {
@@ -187,9 +259,12 @@ class PortalController {
 
         $staffId = null;
         if (!empty($appointmentId)) {
-            $stmtAppt = $db->prepare("SELECT staffId FROM Appointment WHERE id = ?");
-            $stmtAppt->execute([$appointmentId]);
+            $stmtAppt = $db->prepare("SELECT staffId FROM Appointment WHERE id = ? AND clientId = ? AND clinicId = ?");
+            $stmtAppt->execute([$appointmentId, $user['id'], $user['clinicId']]);
             $staffId = $stmtAppt->fetchColumn() ?: null;
+            if ($staffId === null) {
+                send_error('Appointment not found', 404);
+            }
         }
 
         $stmt = $db->prepare("INSERT INTO Feedback (id, clinicId, clientId, appointmentId, staffRating, serviceRating, overallRating, comment, wouldRecommend, isPublic, staffId) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
@@ -197,8 +272,8 @@ class PortalController {
             $id, $user['clinicId'], $user['id'], $appointmentId, $staffRating, $serviceRating, $overallRating, $comment, $wouldRecommend, $isPublic, $staffId
         ]);
 
-        $stmtFetch = $db->prepare("SELECT * FROM Feedback WHERE id = ?");
-        $stmtFetch->execute([$id]);
+        $stmtFetch = $db->prepare("SELECT * FROM Feedback WHERE id = ? AND clinicId = ?");
+        $stmtFetch->execute([$id, $user['clinicId']]);
         $fb = $stmtFetch->fetch();
 
         send_json($fb, 201);

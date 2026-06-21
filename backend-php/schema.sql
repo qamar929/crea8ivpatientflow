@@ -4,6 +4,7 @@
 SET FOREIGN_KEY_CHECKS = 0;
 DROP TABLE IF EXISTS `Notification`;
 DROP TABLE IF EXISTS `PublicSiteConfig`;
+DROP TABLE IF EXISTS `ClinicFeatureSetting`;
 DROP TABLE IF EXISTS `AuditLog`;
 DROP TABLE IF EXISTS `Campaign`;
 DROP TABLE IF EXISTS `GalleryItem`;
@@ -57,6 +58,25 @@ CREATE TABLE `PublicSiteConfig` (
   `updatedAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`clinicId`),
   CONSTRAINT `FK_PublicSiteConfig_Clinic` FOREIGN KEY (`clinicId`) REFERENCES `Clinic` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- SaaS feature controls managed by platform superadmin
+CREATE TABLE `ClinicFeatureSetting` (
+  `clinicId` VARCHAR(64) NOT NULL,
+  `marketingEnabled` TINYINT(1) NOT NULL DEFAULT 0,
+  `metaLeadsEnabled` TINYINT(1) NOT NULL DEFAULT 0,
+  `importsEnabled` TINYINT(1) NOT NULL DEFAULT 0,
+  `whatsappEnabled` TINYINT(1) NOT NULL DEFAULT 0,
+  `whatsappMarketingEnabled` TINYINT(1) NOT NULL DEFAULT 0,
+  `whatsappAutomationEnabled` TINYINT(1) NOT NULL DEFAULT 0,
+  `aiEnabled` TINYINT(1) NOT NULL DEFAULT 0,
+  `aiAutoReplyEnabled` TINYINT(1) NOT NULL DEFAULT 0,
+  `aiHumanApprovalRequired` TINYINT(1) NOT NULL DEFAULT 1,
+  `monthlyAiTokenLimit` INT NOT NULL DEFAULT 0,
+  `monthlyWhatsAppLimit` INT NOT NULL DEFAULT 0,
+  `updatedAt` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  PRIMARY KEY (`clinicId`),
+  CONSTRAINT `FK_ClinicFeatureSetting_Clinic` FOREIGN KEY (`clinicId`) REFERENCES `Clinic` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Branch Table
@@ -166,6 +186,8 @@ CREATE TABLE `Client` (
   `createdAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
   UNIQUE KEY `UK_Client_Clinic_PatientNo` (`clinicId`, `patientNo`),
+  KEY `IX_Client_Clinic_Status_Created` (`clinicId`, `status`, `createdAt`),
+  KEY `IX_Client_Clinic_Name` (`clinicId`, `name`),
   CONSTRAINT `FK_Client_Clinic` FOREIGN KEY (`clinicId`) REFERENCES `Clinic` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -208,6 +230,8 @@ CREATE TABLE `Appointment` (
   `qrCode` TEXT DEFAULT NULL,
   `createdAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
+  KEY `IX_Appt_Clinic_Date_Status_Staff` (`clinicId`, `date`, `status`, `staffId`),
+  KEY `IX_Appt_Clinic_Client_Date` (`clinicId`, `clientId`, `date`),
   CONSTRAINT `FK_Appointment_Clinic` FOREIGN KEY (`clinicId`) REFERENCES `Clinic` (`id`) ON DELETE CASCADE,
   CONSTRAINT `FK_Appointment_Branch` FOREIGN KEY (`branchId`) REFERENCES `Branch` (`id`) ON DELETE SET NULL,
   CONSTRAINT `FK_Appointment_Client` FOREIGN KEY (`clientId`) REFERENCES `Client` (`id`) ON DELETE CASCADE,
@@ -282,6 +306,9 @@ CREATE TABLE `Invoice` (
   PRIMARY KEY (`id`),
   UNIQUE KEY `UK_Invoice_InvoiceNo` (`invoiceNo`),
   UNIQUE KEY `UK_Invoice_AppointmentId` (`appointmentId`),
+  KEY `IX_Invoice_Clinic_Created` (`clinicId`, `createdAt`),
+  KEY `IX_Invoice_Clinic_Client_Created` (`clinicId`, `clientId`, `createdAt`),
+  KEY `IX_Invoice_Clinic_Status_Due` (`clinicId`, `status`, `dueDate`),
   CONSTRAINT `FK_Invoice_Clinic` FOREIGN KEY (`clinicId`) REFERENCES `Clinic` (`id`) ON DELETE CASCADE,
   CONSTRAINT `FK_Invoice_Client` FOREIGN KEY (`clientId`) REFERENCES `Client` (`id`) ON DELETE CASCADE,
   CONSTRAINT `FK_Invoice_Appointment` FOREIGN KEY (`appointmentId`) REFERENCES `Appointment` (`id`) ON DELETE SET NULL
@@ -303,6 +330,7 @@ CREATE TABLE `InventoryItem` (
   `isActive` TINYINT(1) NOT NULL DEFAULT 1,
   `createdAt` DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`),
+  KEY `IX_Inventory_Clinic_Active_Qty` (`clinicId`, `isActive`, `quantity`),
   CONSTRAINT `FK_InventoryItem_Clinic` FOREIGN KEY (`clinicId`) REFERENCES `Clinic` (`id`) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -419,7 +447,7 @@ INSERT INTO `Branch` (`id`, `clinicId`, `name`, `address`, `phone`, `isActive`) 
 ('branch-smile-expert-main', 'clinic-smile-expert-001', 'The Smile Expert Main Branch', 'Dental Clinic, Lahore, Pakistan', '+92 42 111 764 533', 1);
 
 -- 3. Users
--- passwords are: owner123, reception123, staff123
+-- Demo hashes only. For production, create users through set-password invites.
 INSERT INTO `User` (`id`, `clinicId`, `name`, `email`, `password`, `role`, `ledgerMode`, `staffId`, `isActive`, `twoFAEnabled`) VALUES
 ('u001', 'clinic-smile-expert-001', 'Owner', 'owner@thesmileexpert.com', '$2a$12$8yjoCY6.jkDF0GXsQa84ROL9sgOW69v.7IMJiQqNOqUZZt6yRNLXe', 'owner', 'actual', 's001', 1, 0),
 ('u002', 'clinic-smile-expert-001', 'Reception Desk', 'reception@thesmileexpert.com', '$2a$12$Jtzc5HWi7dSkaKDXFQ1M6.pWr29l6v4b5v8PiANXq0QCtvffBCo.m', 'receptionist', 'actual', 's004', 1, 0),

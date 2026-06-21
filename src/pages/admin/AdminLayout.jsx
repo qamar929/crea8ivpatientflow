@@ -1,6 +1,6 @@
 import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import {
-  LayoutDashboard, Users, Building2, Receipt, LogOut, Rocket, LifeBuoy,
+  LayoutDashboard, Users, Building2, Receipt, LogOut, Rocket, LifeBuoy, SlidersHorizontal,
 } from 'lucide-react';
 
 const NAV = [
@@ -9,6 +9,7 @@ const NAV = [
   { to: '/admin/tenants', label: 'Clinics', icon: Building2 },
   { to: '/admin/payments', label: 'Payments', icon: Receipt },
   { to: '/admin/support', label: 'Support', icon: LifeBuoy },
+  { to: '/admin/platform', label: 'Platform', icon: SlidersHorizontal },
 ];
 
 export default function AdminLayout() {
@@ -24,16 +25,16 @@ export default function AdminLayout() {
   };
 
   return (
-    <div className="min-h-screen flex bg-gradient-to-br from-slate-50 via-white to-indigo-50 dark:from-[#0a0e18] dark:via-[#0f1420] dark:to-[#100a1f]">
+    <div className="min-h-screen flex bg-gradient-to-br from-slate-50 via-white to-orange-50 dark:from-[#0a0e18] dark:via-[#0f1420] dark:to-[#100a1f]">
       {/* Sidebar */}
       <aside className="w-60 shrink-0 hidden md:flex flex-col border-r border-gray-200/70 dark:border-white/10 bg-white/70 dark:bg-white/[0.03] backdrop-blur-xl">
         <div className="p-5 flex items-center gap-3 border-b border-gray-200/70 dark:border-white/10">
-          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg bg-gradient-to-br from-indigo-600 to-violet-600">
+          <div className="w-10 h-10 rounded-xl flex items-center justify-center text-white shadow-lg bg-gradient-to-br from-orange-600 to-orange-500">
             <Rocket className="w-5 h-5" />
           </div>
           <div>
             <p className="text-sm font-black text-gray-900 dark:text-white leading-tight">Crea8iv PatientFlow</p>
-            <p className="text-[10px] font-bold uppercase tracking-wider text-indigo-500">Owner Portal</p>
+            <p className="text-[10px] font-bold uppercase tracking-wider text-orange-500">Owner Portal</p>
           </div>
         </div>
 
@@ -46,7 +47,7 @@ export default function AdminLayout() {
               className={({ isActive }) =>
                 `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-colors ${
                   isActive
-                    ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-600/20'
+                    ? 'bg-orange-600 text-white shadow-lg shadow-orange-600/20'
                     : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-white/5'
                 }`
               }
@@ -87,7 +88,7 @@ export default function AdminLayout() {
               end={end}
               className={({ isActive }) =>
                 `px-3 py-1.5 rounded-lg text-xs font-bold whitespace-nowrap ${
-                  isActive ? 'bg-indigo-600 text-white' : 'text-gray-600 dark:text-gray-300'
+                  isActive ? 'bg-orange-600 text-white' : 'text-gray-600 dark:text-gray-300'
                 }`
               }
             >

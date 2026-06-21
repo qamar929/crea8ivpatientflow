@@ -1,14 +1,43 @@
-import { useEffect, useState } from 'react';
-import { Loader2, PlayCircle, PauseCircle, CalendarPlus, Globe, ShieldCheck } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Loader2, PlayCircle, PauseCircle, CalendarPlus, Globe, ShieldCheck, Plus, Pencil, Trash2, LogIn, Search, Copy, Check, X, Users as UsersIcon, Building2, CreditCard, Clock, MessageCircle, Bot, KeyRound, Megaphone, Facebook, Database } from 'lucide-react';
+import { fetchApi } from '../../config/api';
+import Modal from '../../components/ui/Modal';
+import ColorPicker from '../../components/ui/ColorPicker';
+import { enterImpersonation } from '../../config/impersonation';
+
+// Days until a date (negative = already past). Null-safe.
+function daysLeft(date) {
+  if (!date) return null;
+  const ms = new Date(String(date).replace(' ', 'T')).getTime() - Date.now();
+  return Math.ceil(ms / 86400000);
+}
+
+// Small coloured pill summarising how long is left on a subscription.
+function ExpiryBadge({ date, status }) {
+  if (!date) return <span className="text-gray-400">—</span>;
+  const d = daysLeft(date);
+  const ymd = String(date).slice(0, 10);
+  let tone = 'text-gray-500';
+  let note = '';
+  if (d < 0) { tone = 'text-rose-600 font-bold'; note = `expired ${Math.abs(d)}d ago`; }
+  else if (d <= 7) { tone = 'text-rose-600 font-bold'; note = `${d}d left`; }
+  else if (d <= 30) { tone = 'text-amber-600 font-semibold'; note = `${d}d left`; }
+  else { note = `${d}d left`; }
+  return (
+    <span className="whitespace-nowrap">
+      <span className="text-gray-600 dark:text-gray-300">{ymd}</span>
+      <span className={`block text-[11px] ${tone}`}>{note}</span>
+    </span>
+  );
+}
 
 const DOMAIN_STATUS = {
   pending: 'text-amber-600',
   dns_verified: 'text-sky-600',
-  awaiting_ssl: 'text-indigo-600',
+  awaiting_ssl: 'text-orange-600',
   connected: 'text-emerald-600',
   failed: 'text-rose-600',
 };
-import { fetchApi } from '../../config/api';
 
 const STATUS_STYLES = {
   active: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/40 dark:text-emerald-300',
@@ -18,13 +47,85 @@ const STATUS_STYLES = {
   pending: 'bg-gray-100 text-gray-500 dark:bg-white/5 dark:text-gray-400',
 };
 
+const CLINIC_TYPES = ['dental', 'aesthetic', 'general', 'clinic', 'spa', 'salon'];
+
+const field = 'w-full border border-gray-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm bg-white dark:bg-white/5 focus:outline-none focus:ring-2 focus:ring-orange-300 text-gray-900 dark:text-gray-100';
+const labelCls = 'block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1';
+
+const FILTERS = [
+  { key: 'all', label: 'All' },
+  { key: 'active', label: 'Active' },
+  { key: 'trial', label: 'Trial' },
+  { key: 'grace', label: 'Grace' },
+  { key: 'suspended', label: 'Suspended' },
+  { key: 'pending', label: 'Pending' },
+  { key: 'expiring', label: 'Expiring ≤30d' },
+];
+
+const GROWTH_MODULES = [
+  { key: 'marketingEnabled', label: 'Marketing', icon: Megaphone },
+  { key: 'whatsappEnabled', label: 'WhatsApp', icon: MessageCircle },
+  { key: 'aiEnabled', label: 'AI', icon: Bot },
+  { key: 'metaLeadsEnabled', label: 'Meta', icon: Facebook },
+  { key: 'importsEnabled', label: 'Imports', icon: Database },
+];
+
 export default function AdminTenants() {
   const [tenants, setTenants] = useState(null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState('');
+  const [showCreate, setShowCreate] = useState(false);
+  const [editTenant, setEditTenant] = useState(null);
+  const [deleteTenant, setDeleteTenant] = useState(null);
+  const [drawerId, setDrawerId] = useState(null);
+  const [query, setQuery] = useState('');
+  const [filter, setFilter] = useState('all');
+  const [copiedId, setCopiedId] = useState('');
 
   const load = () => fetchApi('/admin/tenants').then(setTenants).catch((e) => setError(e.message));
   useEffect(() => { load(); }, []);
+
+  const counts = useMemo(() => {
+    const c = { all: tenants?.length || 0, expiring: 0 };
+    (tenants || []).forEach((t) => {
+      c[t.status] = (c[t.status] || 0) + 1;
+      const d = daysLeft(t.subscriptionExpiresAt);
+      if (d !== null && d >= 0 && d <= 30) c.expiring += 1;
+    });
+    return c;
+  }, [tenants]);
+
+  const filtered = useMemo(() => {
+    let list = tenants || [];
+    if (filter === 'expiring') {
+      list = list.filter((t) => { const d = daysLeft(t.subscriptionExpiresAt); return d !== null && d >= 0 && d <= 30; });
+    } else if (filter !== 'all') {
+      list = list.filter((t) => t.status === filter);
+    }
+    const q = query.trim().toLowerCase();
+    if (q) {
+      list = list.filter((t) =>
+        [t.name, t.slug, t.customDomain, t.clinicType].filter(Boolean).some((v) => String(v).toLowerCase().includes(q))
+      );
+    }
+    return list;
+  }, [tenants, filter, query]);
+
+  const manage = (t) => {
+    if (!window.confirm(`Open ${t.name}'s portal as superadmin?\n\nYou'll be signed in as its owner to manage staff, services, branding and settings. A banner lets you exit back to admin anytime.`)) return;
+    run(t.id, async () => {
+      const res = await fetchApi(`/admin/tenants/${t.id}/impersonate`, { method: 'POST' });
+      enterImpersonation({ accessToken: res.accessToken, refreshToken: res.refreshToken, user: res.user, clinicName: res.clinic?.name || t.name });
+      window.location.assign(import.meta.env.BASE_URL + 'dashboard');
+    });
+  };
+
+  const copyLoginLink = async (t) => {
+    const base = t.customDomain ? `https://${t.customDomain}` : (window.location.origin + import.meta.env.BASE_URL.replace(/\/$/, ''));
+    const url = `${base}/login`;
+    try { await navigator.clipboard.writeText(url); setCopiedId(t.id); setTimeout(() => setCopiedId(''), 1500); }
+    catch (_) { window.prompt('Copy this login link:', url); }
+  };
 
   const run = async (id, fn) => {
     setBusy(id);
@@ -46,7 +147,7 @@ export default function AdminTenants() {
   };
 
   const suspend = (t) => {
-    const reason = window.prompt(`Suspend "${t.name}"? Enter a reason:`, 'Subscription unpaid');
+    const reason = window.prompt(`Deactivate "${t.name}"? Enter a reason:`, 'Subscription unpaid');
     if (reason === null) return;
     run(t.id, () => fetchApi(`/admin/tenants/${t.id}/suspend`, { method: 'POST', body: JSON.stringify({ reason }) }));
   };
@@ -66,8 +167,24 @@ export default function AdminTenants() {
     run(t.id, () => fetchApi(`/admin/tenants/${t.id}/domain`, { method: 'PUT', body: JSON.stringify({ customDomain }) }));
   };
 
+  const toggleGrowthFeature = (t, key) => {
+    const next = !Number(t[key] || 0);
+    run(t.id, async () => {
+      const current = await fetchApi(`/admin/tenants/${t.id}/automation`);
+      await fetchApi(`/admin/tenants/${t.id}/automation`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          features: {
+            ...(current.features || {}),
+            [key]: next,
+          },
+        }),
+      });
+    });
+  };
+
   const markConnected = (t) => {
-    if (!window.confirm(`Confirm SSL is issued for ${t.customDomain} and mark it Connected? The clinic's portal will go live on this domain.`)) return;
+    if (!window.confirm(`Mark ${t.customDomain} as connected?\n\nOnly do this AFTER you have:\n1. Pointed its DNS to the server\n2. Issued an SSL certificate in hosting\n3. Deployed the portal to its folder\n\nThis flips the platform record to "connected".`)) return;
     run(t.id, () => fetchApi(`/admin/tenants/${t.id}/domain/ssl`, { method: 'PUT', body: JSON.stringify({ action: 'connect' }) }));
   };
 
@@ -77,15 +194,48 @@ export default function AdminTenants() {
 
   return (
     <div className="space-y-5">
-      <div>
-        <h1 className="text-2xl font-black text-gray-950 dark:text-white">Clinics</h1>
-        <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Every tenant on the platform — activate, suspend, or extend.</p>
+      <div className="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <h1 className="text-2xl font-black text-gray-950 dark:text-white">Clinics</h1>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Create, edit, activate, deactivate, or remove any tenant on the platform.</p>
+        </div>
+        <button
+          onClick={() => setShowCreate(true)}
+          className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-sm font-bold shadow-sm transition-colors"
+        >
+          <Plus className="w-4 h-4" /> New Clinic
+        </button>
       </div>
 
       {error && <div className="rounded-xl border border-red-200 bg-red-50 text-red-700 px-4 py-3 text-sm">{error}</div>}
 
+      {/* Search + status filter tabs */}
+      <div className="flex items-center gap-3 flex-wrap">
+        <div className="relative flex-1 min-w-[220px]">
+          <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+          <input
+            data-global-search
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search clinics by name, domain, type…"
+            className="w-full pl-9 pr-3 py-2 rounded-xl border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-sm focus:outline-none focus:ring-2 focus:ring-orange-300 text-gray-900 dark:text-gray-100"
+          />
+        </div>
+        <div className="flex items-center gap-1 flex-wrap">
+          {FILTERS.map((f) => (
+            <button
+              key={f.key}
+              onClick={() => setFilter(f.key)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-colors ${filter === f.key ? 'bg-orange-600 text-white' : 'bg-gray-100 dark:bg-white/5 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-white/10'}`}
+            >
+              {f.label}{counts[f.key] ? <span className="ml-1 opacity-70">{counts[f.key]}</span> : ''}
+            </button>
+          ))}
+        </div>
+      </div>
+
       <div className="rounded-2xl border border-gray-200/70 dark:border-white/10 bg-white/80 dark:bg-white/[0.04] overflow-x-auto">
-        <table className="w-full text-sm min-w-[820px]">
+        <table className="w-full text-sm min-w-[900px]">
           <thead>
             <tr className="text-left text-xs uppercase tracking-wider text-gray-400 border-b border-gray-100 dark:border-white/5">
               <th className="px-4 py-3">Clinic</th>
@@ -93,17 +243,20 @@ export default function AdminTenants() {
               <th className="px-4 py-3">Subscription ends</th>
               <th className="px-4 py-3">Users</th>
               <th className="px-4 py-3">Patients</th>
+              <th className="px-4 py-3">Growth</th>
               <th className="px-4 py-3 text-right">Actions</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-gray-100 dark:divide-white/5">
-            {tenants.length === 0 && (
-              <tr><td colSpan={6} className="px-4 py-10 text-center text-gray-400">No clinics yet.</td></tr>
+            {filtered.length === 0 && (
+              <tr><td colSpan={7} className="px-4 py-10 text-center text-gray-400">{tenants.length === 0 ? 'No clinics yet. Click “New Clinic” to add one.' : 'No clinics match this filter.'}</td></tr>
             )}
-            {tenants.map((t) => (
-              <tr key={t.id}>
+            {filtered.map((t) => (
+              <tr key={t.id} className="hover:bg-gray-50/70 dark:hover:bg-white/[0.03]">
                 <td className="px-4 py-3">
-                  <p className="font-bold text-gray-900 dark:text-white">{t.name}</p>
+                  <button onClick={() => setDrawerId(t.id)} className="text-left group">
+                    <p className="font-bold text-gray-900 dark:text-white group-hover:text-orange-600 group-hover:underline">{t.name}</p>
+                  </button>
                   <p className="text-xs text-gray-400">{t.slug ? `${t.slug} · ` : ''}{t.clinicType}</p>
                   {t.customDomain && (
                     <p className="text-[11px] font-semibold mt-0.5 flex items-center gap-1">
@@ -123,40 +276,59 @@ export default function AdminTenants() {
                     <p className="text-[10px] text-gray-400 mt-1 max-w-[180px] truncate">{t.suspensionReason}</p>
                   )}
                 </td>
-                <td className="px-4 py-3 text-gray-600 dark:text-gray-300">
-                  {t.subscriptionExpiresAt ? String(t.subscriptionExpiresAt).slice(0, 10) : '—'}
+                <td className="px-4 py-3">
+                  <ExpiryBadge date={t.subscriptionExpiresAt} status={t.status} />
                 </td>
                 <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{t.userCount}</td>
                 <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{t.patientCount}</td>
                 <td className="px-4 py-3">
-                  <div className="flex items-center justify-end gap-3">
+                  <button
+                    onClick={() => setDrawerId(t.id)}
+                    title={GROWTH_MODULES.map((m) => `${m.label}: ${Number(t[m.key] || 0) ? 'on' : 'off'}`).join('\n')}
+                    className="inline-flex items-center gap-1.5 rounded-full border border-gray-200 dark:border-white/10 px-2.5 py-1 text-[11px] font-bold text-gray-600 dark:text-gray-300 hover:border-orange-300 hover:text-orange-600"
+                  >
+                    <span className="flex gap-0.5">
+                      {GROWTH_MODULES.map((m) => (
+                        <span key={m.key} className={`w-1.5 h-1.5 rounded-full ${Number(t[m.key] || 0) ? 'bg-emerald-500' : 'bg-gray-300 dark:bg-white/20'}`} />
+                      ))}
+                    </span>
+                    {GROWTH_MODULES.filter((m) => Number(t[m.key] || 0)).length}/{GROWTH_MODULES.length}
+                  </button>
+                </td>
+                <td className="px-4 py-3">
+                  <div className="flex items-center justify-end gap-1">
                     {busy === t.id ? (
                       <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
                     ) : (
                       <>
-                        {(t.status === 'pending' || t.status === 'suspended' || t.status === 'grace') && (
-                          <button onClick={() => activate(t)} title="Activate (new subscription)" className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 hover:text-emerald-700">
-                            <PlayCircle className="w-4 h-4" /> Activate
-                          </button>
-                        )}
-                        {t.subscriptionExpiresAt && t.status !== 'pending' && (
-                          <button onClick={() => extend(t)} title="Extend subscription" className="inline-flex items-center gap-1 text-xs font-bold text-indigo-600 hover:text-indigo-700">
-                            <CalendarPlus className="w-4 h-4" /> Extend
-                          </button>
-                        )}
-                        {(t.status === 'active' || t.status === 'trial' || t.status === 'grace') && (
-                          <button onClick={() => suspend(t)} title="Suspend access" className="inline-flex items-center gap-1 text-xs font-bold text-rose-600 hover:text-rose-700">
-                            <PauseCircle className="w-4 h-4" /> Suspend
-                          </button>
-                        )}
-                        <button onClick={() => setDomain(t)} title="Set white-label domain" className="inline-flex items-center gap-1 text-xs font-bold text-gray-500 hover:text-indigo-600">
-                          <Globe className="w-4 h-4" /> Domain
+                        <button onClick={() => manage(t)} title="Sign in to this clinic's portal as superadmin" className="inline-flex items-center gap-1.5 rounded-lg bg-orange-600 hover:bg-orange-700 px-2.5 py-1.5 text-xs font-bold text-white">
+                          <LogIn className="w-3.5 h-3.5" /> Manage
                         </button>
-                        {t.domainStatus === 'awaiting_ssl' && (
-                          <button onClick={() => markConnected(t)} title="Mark SSL active / Connected" className="inline-flex items-center gap-1 text-xs font-bold text-emerald-600 hover:text-emerald-700">
-                            <ShieldCheck className="w-4 h-4" /> Activate SSL
-                          </button>
-                        )}
+                        {(() => {
+                          const iconBtn = "p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10";
+                          return (
+                            <div className="flex items-center">
+                              <button onClick={() => copyLoginLink(t)} title="Copy login link" className={iconBtn}>
+                                {copiedId === t.id ? <Check className="w-4 h-4 text-emerald-600" /> : <Copy className="w-4 h-4 hover:text-orange-600" />}
+                              </button>
+                              {(t.status === 'pending' || t.status === 'suspended' || t.status === 'grace') && (
+                                <button onClick={() => activate(t)} title="Activate (new subscription)" className={`${iconBtn} hover:text-emerald-600`}><PlayCircle className="w-4 h-4" /></button>
+                              )}
+                              {t.subscriptionExpiresAt && t.status !== 'pending' && (
+                                <button onClick={() => extend(t)} title="Extend subscription" className={`${iconBtn} hover:text-orange-600`}><CalendarPlus className="w-4 h-4" /></button>
+                              )}
+                              {(t.status === 'active' || t.status === 'trial' || t.status === 'grace') && (
+                                <button onClick={() => suspend(t)} title="Deactivate access" className={`${iconBtn} hover:text-rose-600`}><PauseCircle className="w-4 h-4" /></button>
+                              )}
+                              <button onClick={() => setEditTenant(t)} title="Edit clinic details" className={`${iconBtn} hover:text-orange-600`}><Pencil className="w-4 h-4" /></button>
+                              <button onClick={() => setDomain(t)} title="Set white-label domain" className={`${iconBtn} hover:text-orange-600`}><Globe className="w-4 h-4" /></button>
+                              {t.customDomain && t.domainStatus && !['none', 'connected'].includes(t.domainStatus) && (
+                                <button onClick={() => markConnected(t)} title="Mark domain connected (after DNS + SSL)" className={`${iconBtn} hover:text-emerald-600`}><ShieldCheck className="w-4 h-4" /></button>
+                              )}
+                              <button onClick={() => setDeleteTenant(t)} title="Delete clinic permanently" className={`${iconBtn} hover:text-rose-600`}><Trash2 className="w-4 h-4" /></button>
+                            </div>
+                          );
+                        })()}
                       </>
                     )}
                   </div>
@@ -166,6 +338,505 @@ export default function AdminTenants() {
           </tbody>
         </table>
       </div>
+
+      {showCreate && (
+        <CreateClinicModal
+          onClose={() => setShowCreate(false)}
+          onCreated={() => { setShowCreate(false); load(); }}
+        />
+      )}
+      {editTenant && (
+        <EditClinicModal
+          tenant={editTenant}
+          onClose={() => setEditTenant(null)}
+          onSaved={() => { setEditTenant(null); load(); }}
+        />
+      )}
+      {deleteTenant && (
+        <DeleteClinicModal
+          tenant={deleteTenant}
+          onClose={() => setDeleteTenant(null)}
+          onDeleted={() => { setDeleteTenant(null); load(); }}
+        />
+      )}
+      {drawerId && (
+        <TenantDrawer
+          id={drawerId}
+          onClose={() => setDrawerId(null)}
+          onManage={(t) => { setDrawerId(null); manage(t); }}
+          onEdit={(t) => { setDrawerId(null); setEditTenant(t); }}
+        />
+      )}
     </div>
+  );
+}
+
+// ----------------------------------------------------------------------
+// Slide-over detail panel: owner(s), domain/SSL, subscription, usage counts.
+function TenantDrawer({ id, onClose, onManage, onEdit }) {
+  const [data, setData] = useState(null);
+  const [err, setErr] = useState('');
+
+  useEffect(() => {
+    setData(null); setErr('');
+    fetchApi(`/admin/tenants/${id}`).then(setData).catch((e) => setErr(e.message));
+  }, [id]);
+
+  const owner = data?.users?.find((u) => u.role === 'owner') || data?.users?.[0];
+  const expiry = data?.subscriptions?.find((s) => s.status === 'active')?.expiresAt;
+
+  const Row = ({ label, children }) => (
+    <div className="flex items-start justify-between gap-4 py-2 border-b border-gray-100 dark:border-white/5 last:border-0">
+      <span className="text-xs font-semibold uppercase tracking-wide text-gray-400 pt-0.5">{label}</span>
+      <span className="text-sm text-gray-800 dark:text-gray-100 text-right break-words">{children}</span>
+    </div>
+  );
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end">
+      <div className="absolute inset-0 bg-black/40" onClick={onClose} />
+      <div className="relative w-full max-w-md h-full bg-white dark:bg-slate-900 shadow-2xl overflow-y-auto">
+        <div className="sticky top-0 z-10 flex items-center justify-between px-5 py-4 bg-white dark:bg-slate-900 border-b border-gray-100 dark:border-white/10">
+          <h2 className="text-lg font-black text-gray-900 dark:text-white truncate">{data?.name || 'Clinic'}</h2>
+          <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 text-gray-500"><X className="w-5 h-5" /></button>
+        </div>
+
+        {err && <div className="m-5 rounded-lg border border-red-200 bg-red-50 text-red-700 px-3 py-2 text-sm">{err}</div>}
+        {!data && !err && <div className="flex items-center justify-center gap-2 py-20 text-sm text-gray-500"><Loader2 className="h-4 w-4 animate-spin" /> Loading…</div>}
+
+        {data && (
+          <div className="p-5 space-y-5">
+            <div className="grid grid-cols-3 gap-2">
+              {[
+                { icon: UsersIcon, label: 'Patients', value: data.patientCount ?? (data.clients ?? '—') },
+                { icon: Building2, label: 'Users', value: data.users?.length ?? '—' },
+                { icon: CreditCard, label: 'Status', value: data.status },
+              ].map((s) => (
+                <div key={s.label} className="rounded-xl border border-gray-200/70 dark:border-white/10 p-3 text-center">
+                  <s.icon className="w-4 h-4 mx-auto text-orange-500" />
+                  <p className="text-sm font-black text-gray-900 dark:text-white mt-1 capitalize">{s.value}</p>
+                  <p className="text-[11px] text-gray-400">{s.label}</p>
+                </div>
+              ))}
+            </div>
+
+            <section className="rounded-xl border border-gray-200/70 dark:border-white/10 px-4 py-2">
+              <Row label="Type">{data.clinicType || '—'}</Row>
+              <Row label="Email">{data.email || '—'}</Row>
+              <Row label="Phone">{data.phone || '—'}</Row>
+              <Row label="Owner">{owner ? <>{owner.name}<span className="block text-xs text-gray-400">{owner.email}</span></> : 'No owner'}</Row>
+              <Row label="Domain">{data.customDomain ? <>{data.customDomain}<span className="block text-xs text-gray-400">{data.domainStatus} · SSL {data.sslStatus || 'n/a'}</span></> : 'Platform subdomain'}</Row>
+              <Row label="Subscription">{expiry ? <span className="inline-flex items-center gap-1"><Clock className="w-3.5 h-3.5 text-gray-400" /><ExpiryBadge date={expiry} status={data.status} /></span> : '—'}</Row>
+              <Row label="Created">{data.createdAt ? String(data.createdAt).slice(0, 10) : '—'}</Row>
+            </section>
+
+            <TenantAutomationControls tenantId={data.id} />
+
+            {data.users?.length > 0 && (
+              <section>
+                <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 mb-2">Team ({data.users.length})</h3>
+                <div className="space-y-1">
+                  {data.users.map((u) => (
+                    <div key={u.id} className="flex items-center justify-between text-sm px-3 py-2 rounded-lg bg-gray-50 dark:bg-white/5">
+                      <span className="text-gray-800 dark:text-gray-100">{u.name} <span className="text-xs text-gray-400">· {u.role}</span></span>
+                      <span className="text-[11px] text-gray-400">{u.lastLogin ? `seen ${String(u.lastLogin).slice(0, 10)}` : 'never'}</span>
+                    </div>
+                  ))}
+                </div>
+              </section>
+            )}
+
+            <div className="flex gap-2 pt-1">
+              <button onClick={() => onManage({ id: data.id, name: data.name })} className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-orange-600 hover:bg-orange-700 text-white text-sm font-bold">
+                <LogIn className="w-4 h-4" /> Manage clinic
+              </button>
+              <button onClick={() => onEdit(data)} className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl border border-gray-200 dark:border-white/10 text-sm font-bold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/5">
+                <Pencil className="w-4 h-4" /> Edit
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function TenantAutomationControls({ tenantId }) {
+  const [data, setData] = useState(null);
+  const [draft, setDraft] = useState(null);
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+  const [notice, setNotice] = useState('');
+
+  useEffect(() => {
+    setData(null); setDraft(null); setErr(''); setNotice('');
+    fetchApi(`/admin/tenants/${tenantId}/automation`).then((res) => {
+      setData(res);
+      setDraft({
+        features: {
+          marketingEnabled: !!Number(res.features?.marketingEnabled),
+          metaLeadsEnabled: !!Number(res.features?.metaLeadsEnabled),
+          importsEnabled: !!Number(res.features?.importsEnabled),
+          whatsappEnabled: !!Number(res.features?.whatsappEnabled),
+          whatsappMarketingEnabled: !!Number(res.features?.whatsappMarketingEnabled),
+          whatsappAutomationEnabled: !!Number(res.features?.whatsappAutomationEnabled),
+          aiEnabled: !!Number(res.features?.aiEnabled),
+          aiAutoReplyEnabled: !!Number(res.features?.aiAutoReplyEnabled),
+          aiHumanApprovalRequired: Number(res.features?.aiHumanApprovalRequired ?? 1) ? true : false,
+          monthlyAiTokenLimit: Number(res.features?.monthlyAiTokenLimit || 0),
+          monthlyWhatsAppLimit: Number(res.features?.monthlyWhatsAppLimit || 0),
+        },
+        whatsapp: {
+          phoneNumberId: res.whatsapp?.phoneNumberId || '',
+          businessAccountId: res.whatsapp?.businessAccountId || '',
+          accessToken: '',
+          webhookVerifyToken: '',
+          apiVersion: res.whatsapp?.apiVersion || 'v23.0',
+          simulationMode: Number(res.whatsapp?.simulationMode ?? 1) ? true : false,
+          quietHoursStart: res.whatsapp?.quietHoursStart || '21:00',
+          quietHoursEnd: res.whatsapp?.quietHoursEnd || '09:00',
+        },
+        platformAiProviders: (res.platformAiProviders || []).map((p) => ({ ...p, apiKey: '' })),
+      });
+    }).catch((e) => setErr(e.message));
+  }, [tenantId]);
+
+  const setFeature = (key, value) => setDraft((d) => ({ ...d, features: { ...d.features, [key]: value } }));
+  const setWhatsapp = (key, value) => setDraft((d) => ({ ...d, whatsapp: { ...d.whatsapp, [key]: value } }));
+  const setProvider = (idx, key, value) => setDraft((d) => ({
+    ...d,
+    platformAiProviders: d.platformAiProviders.map((p, i) => i === idx ? { ...p, [key]: value } : p),
+  }));
+
+  const save = async () => {
+    setSaving(true); setErr(''); setNotice('');
+    try {
+      const res = await fetchApi(`/admin/tenants/${tenantId}/automation`, { method: 'PUT', body: JSON.stringify(draft) });
+      setData(res);
+      setDraft((d) => ({
+        ...d,
+        whatsapp: { ...d.whatsapp, accessToken: '', webhookVerifyToken: '' },
+        platformAiProviders: d.platformAiProviders.map((p) => ({ ...p, apiKey: '' })),
+      }));
+      setNotice('Automation controls saved.');
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const changePackage = async (key) => {
+    if (key === data.package) return;
+    setSaving(true); setErr(''); setNotice('');
+    try {
+      await fetchApi(`/admin/tenants/${tenantId}/package`, { method: 'PUT', body: JSON.stringify({ package: key }) });
+      const res = await fetchApi(`/admin/tenants/${tenantId}/automation`);
+      setData(res);
+      setDraft((d) => ({
+        ...d,
+        features: {
+          ...d.features,
+          marketingEnabled: !!Number(res.features?.marketingEnabled),
+          metaLeadsEnabled: !!Number(res.features?.metaLeadsEnabled),
+          importsEnabled: !!Number(res.features?.importsEnabled),
+          whatsappEnabled: !!Number(res.features?.whatsappEnabled),
+          whatsappMarketingEnabled: !!Number(res.features?.whatsappMarketingEnabled),
+          whatsappAutomationEnabled: !!Number(res.features?.whatsappAutomationEnabled),
+          aiEnabled: !!Number(res.features?.aiEnabled),
+          aiAutoReplyEnabled: !!Number(res.features?.aiAutoReplyEnabled),
+        },
+      }));
+      setNotice(`Package changed to ${key === 'ai' ? 'PatientFlow AI' : 'PatientFlow Core'}.`);
+    } catch (e) { setErr(e.message); } finally { setSaving(false); }
+  };
+
+  if (!data || !draft) {
+    return <section className="rounded-xl border border-gray-200/70 p-4 text-sm text-gray-400 dark:border-white/10"><Loader2 className="mr-2 inline h-4 w-4 animate-spin" /> Loading automation controls…</section>;
+  }
+
+  return (
+    <section className="rounded-xl border border-gray-200/70 p-4 dark:border-white/10">
+      <div className="mb-4 rounded-xl border border-orange-200 bg-orange-50/60 dark:border-orange-500/30 dark:bg-orange-500/10 p-3">
+        <p className="text-xs font-black uppercase tracking-wider text-orange-700 dark:text-orange-300">Subscription package</p>
+        <p className="text-[11px] text-gray-500 dark:text-gray-400 mb-2">One active package — controls which modules this clinic sees &amp; uses.</p>
+        <div className="flex flex-wrap gap-2">
+          {(data.packages || []).map((p) => (
+            <button
+              key={p.key}
+              onClick={() => changePackage(p.key)}
+              disabled={saving}
+              className={`rounded-lg px-3 py-1.5 text-xs font-bold border transition-colors disabled:opacity-60 ${data.package === p.key ? 'bg-orange-600 text-white border-orange-600' : 'border-gray-200 dark:border-white/10 text-gray-600 dark:text-gray-300 hover:border-orange-300 hover:text-orange-600'}`}
+            >
+              {data.package === p.key ? '✓ ' : ''}{p.name} · PKR {Number(p.pricePKR).toLocaleString()}/mo
+            </button>
+          ))}
+        </div>
+      </div>
+      <div className="flex items-center justify-between gap-3">
+        <div>
+          <h3 className="text-sm font-black text-gray-900 dark:text-white">Automation & AI</h3>
+          <p className="mt-1 text-xs text-gray-400">Fine-tune individual features (the package sets these automatically).</p>
+        </div>
+        <button onClick={save} disabled={saving} className="inline-flex items-center gap-2 rounded-lg bg-orange-600 px-3 py-2 text-xs font-bold text-white disabled:opacity-50">
+          {saving && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Save
+        </button>
+      </div>
+      {err && <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700">{err}</div>}
+      {notice && <div className="mt-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-700">{notice}</div>}
+
+      <div className="mt-4 grid gap-3">
+        <div className="rounded-xl bg-gray-50 p-3 dark:bg-white/5">
+          <div className="mb-3 flex items-center gap-2 text-xs font-black uppercase tracking-wider text-gray-400"><Megaphone className="h-4 w-4" /> Growth modules</div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {GROWTH_MODULES.map(({ key, label, icon: Icon }) => (
+              <label key={key} className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-bold dark:border-white/10 dark:bg-slate-900">
+                <input type="checkbox" checked={!!draft.features[key]} onChange={(e) => setFeature(key, e.target.checked)} />
+                <Icon className="h-4 w-4 text-gray-400" />
+                {label}
+              </label>
+            ))}
+          </div>
+          <p className="mt-2 text-xs text-gray-400">Controls the five Growth menu items shown in the clinic portal sidebar.</p>
+        </div>
+
+        <div className="rounded-xl bg-gray-50 p-3 dark:bg-white/5">
+          <div className="mb-3 flex items-center gap-2 text-xs font-black uppercase tracking-wider text-gray-400"><MessageCircle className="h-4 w-4" /> WhatsApp package</div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {[
+              ['whatsappEnabled', 'Enable WhatsApp'],
+              ['whatsappMarketingEnabled', 'Marketing broadcasts'],
+              ['whatsappAutomationEnabled', 'Journeys / automations'],
+            ].map(([key, label]) => (
+              <label key={key} className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-bold dark:border-white/10 dark:bg-slate-900">
+                <input type="checkbox" checked={!!draft.features[key]} onChange={(e) => setFeature(key, e.target.checked)} /> {label}
+              </label>
+            ))}
+            <label className="text-xs font-semibold text-gray-500">Monthly message limit<input className={field} type="number" min="0" value={draft.features.monthlyWhatsAppLimit} onChange={(e) => setFeature('monthlyWhatsAppLimit', Number(e.target.value))} /></label>
+          </div>
+          <div className="mt-3 grid gap-2 sm:grid-cols-2">
+            <input className={field} placeholder="Phone Number ID" value={draft.whatsapp.phoneNumberId} onChange={(e) => setWhatsapp('phoneNumberId', e.target.value)} />
+            <input className={field} placeholder="WhatsApp Business Account ID" value={draft.whatsapp.businessAccountId} onChange={(e) => setWhatsapp('businessAccountId', e.target.value)} />
+            <input className={field} placeholder={data.whatsapp?.hasAccessToken ? 'Access token saved - enter to replace' : 'Permanent access token'} type="password" value={draft.whatsapp.accessToken} onChange={(e) => setWhatsapp('accessToken', e.target.value)} />
+            <input className={field} placeholder="Webhook verify token" value={draft.whatsapp.webhookVerifyToken} onChange={(e) => setWhatsapp('webhookVerifyToken', e.target.value)} />
+            <input className={field} placeholder="Graph API version" value={draft.whatsapp.apiVersion} onChange={(e) => setWhatsapp('apiVersion', e.target.value)} />
+            <label className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-bold dark:border-white/10 dark:bg-slate-900"><input type="checkbox" checked={draft.whatsapp.simulationMode} onChange={(e) => setWhatsapp('simulationMode', e.target.checked)} /> Simulation mode</label>
+          </div>
+        </div>
+
+        <div className="rounded-xl bg-gray-50 p-3 dark:bg-white/5">
+          <div className="mb-3 flex items-center gap-2 text-xs font-black uppercase tracking-wider text-gray-400"><Bot className="h-4 w-4" /> AI package</div>
+          <div className="grid gap-2 sm:grid-cols-2">
+            {[
+              ['aiEnabled', 'Enable AI hub'],
+              ['aiAutoReplyEnabled', 'Auto-reply draft engine'],
+              ['aiHumanApprovalRequired', 'Require human approval'],
+            ].map(([key, label]) => (
+              <label key={key} className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-bold dark:border-white/10 dark:bg-slate-900">
+                <input type="checkbox" checked={!!draft.features[key]} onChange={(e) => setFeature(key, e.target.checked)} /> {label}
+              </label>
+            ))}
+            <label className="text-xs font-semibold text-gray-500">Monthly token limit<input className={field} type="number" min="0" value={draft.features.monthlyAiTokenLimit} onChange={(e) => setFeature('monthlyAiTokenLimit', Number(e.target.value))} /></label>
+          </div>
+          <div className="mt-3 space-y-2">
+            {draft.platformAiProviders.map((provider, idx) => (
+              <div key={provider.provider} className="grid gap-2 rounded-lg border border-gray-200 bg-white p-2 dark:border-white/10 dark:bg-slate-900 sm:grid-cols-[90px_1fr_1fr]">
+                <label className="flex items-center gap-2 text-xs font-bold capitalize"><input type="checkbox" checked={!!provider.enabled} onChange={(e) => setProvider(idx, 'enabled', e.target.checked)} /> {provider.provider}</label>
+                <input className={field} placeholder="Model" value={provider.model || ''} onChange={(e) => setProvider(idx, 'model', e.target.value)} />
+                <div className="relative">
+                  <KeyRound className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
+                  <input className={`${field} pl-9`} type="password" placeholder={provider.hasApiKey ? 'API key saved - enter to replace' : 'API key'} value={provider.apiKey || ''} onChange={(e) => setProvider(idx, 'apiKey', e.target.value)} />
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+// ----------------------------------------------------------------------
+function CreateClinicModal({ onClose, onCreated }) {
+  const [f, setF] = useState({
+    name: '', email: '', phone: '', clinicType: 'dental', address: '',
+    status: 'trial', trialDays: 14, customDomain: '',
+    primaryColor: '#0f766e', secondaryColor: '#14b8a6',
+    ownerName: '', ownerEmail: '', ownerPassword: '',
+  });
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+  const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
+
+  const submit = async () => {
+    setErr(''); setSaving(true);
+    try {
+      const body = {
+        name: f.name, email: f.email, phone: f.phone, clinicType: f.clinicType, address: f.address,
+        status: f.status, trialDays: Number(f.trialDays) || 14,
+        customDomain: f.customDomain, primaryColor: f.primaryColor, secondaryColor: f.secondaryColor,
+        owner: { name: f.ownerName, email: f.ownerEmail || f.email, password: f.ownerPassword },
+      };
+      const res = await fetchApi('/admin/tenants', { method: 'POST', body: JSON.stringify(body) });
+      window.alert(res.message || 'Clinic created.');
+      onCreated();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal isOpen onClose={onClose} title="New Clinic" size="lg">
+      <div className="space-y-5">
+        {err && <div className="rounded-lg border border-red-200 bg-red-50 text-red-700 px-3 py-2 text-sm">{err}</div>}
+
+        <section className="space-y-3">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400">Clinic details</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div className="sm:col-span-2"><label className={labelCls}>Clinic name *</label><input className={field} value={f.name} onChange={(e) => set('name', e.target.value)} placeholder="The Smile Experts" /></div>
+            <div><label className={labelCls}>Clinic email</label><input className={field} value={f.email} onChange={(e) => set('email', e.target.value)} placeholder="hello@clinic.com" /></div>
+            <div><label className={labelCls}>Phone</label><input className={field} value={f.phone} onChange={(e) => set('phone', e.target.value)} placeholder="+92 300 ..." /></div>
+            <div><label className={labelCls}>Type</label>
+              <select className={field} value={f.clinicType} onChange={(e) => set('clinicType', e.target.value)}>
+                {CLINIC_TYPES.map((c) => <option key={c} value={c}>{c}</option>)}
+              </select>
+            </div>
+            <div><label className={labelCls}>Custom domain (optional)</label><input className={field} value={f.customDomain} onChange={(e) => set('customDomain', e.target.value)} placeholder="portal.clinic.com" /></div>
+            <div className="sm:col-span-2"><label className={labelCls}>Address</label><input className={field} value={f.address} onChange={(e) => set('address', e.target.value)} /></div>
+          </div>
+        </section>
+
+        <section className="space-y-3">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400">Initial owner account</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div><label className={labelCls}>Owner name</label><input className={field} value={f.ownerName} onChange={(e) => set('ownerName', e.target.value)} placeholder="Dr. Name" /></div>
+            <div><label className={labelCls}>Owner login email *</label><input className={field} value={f.ownerEmail} onChange={(e) => set('ownerEmail', e.target.value)} placeholder="owner@clinic.com" /></div>
+            <div className="sm:col-span-2">
+              <label className={labelCls}>Initial password</label>
+              <input className={field} type="text" value={f.ownerPassword} onChange={(e) => set('ownerPassword', e.target.value)} placeholder="Leave blank to email a set-password invite" />
+              <p className="text-[11px] text-gray-400 mt-1">Set a password so the owner can log in immediately (min 8 chars), or leave blank to email them a secure set-password link.</p>
+            </div>
+          </div>
+        </section>
+
+        <section className="space-y-3">
+          <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400">Activation & branding</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div><label className={labelCls}>Initial status</label>
+              <select className={field} value={f.status} onChange={(e) => set('status', e.target.value)}>
+                <option value="trial">Trial</option>
+                <option value="active">Active</option>
+                <option value="pending">Pending</option>
+              </select>
+            </div>
+            {f.status === 'trial' && (
+              <div><label className={labelCls}>Trial days</label><input className={field} type="number" min="1" value={f.trialDays} onChange={(e) => set('trialDays', e.target.value)} /></div>
+            )}
+          </div>
+          <ColorPicker label="Primary color" value={f.primaryColor} onChange={(v) => set('primaryColor', v)} />
+          <ColorPicker label="Accent color" value={f.secondaryColor} onChange={(v) => set('secondaryColor', v)} />
+        </section>
+
+        <div className="flex justify-end gap-2 pt-1">
+          <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-100 dark:hover:bg-white/10">Cancel</button>
+          <button onClick={submit} disabled={saving || !f.name || !(f.ownerEmail || f.email)} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white text-sm font-bold">
+            {saving && <Loader2 className="w-4 h-4 animate-spin" />} Create clinic
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ----------------------------------------------------------------------
+function EditClinicModal({ tenant, onClose, onSaved }) {
+  const [f, setF] = useState({
+    name: tenant.name || '', email: tenant.email || '', phone: tenant.phone || '',
+    clinicType: tenant.clinicType || 'dental', address: tenant.address || '',
+    primaryColor: tenant.primaryColor || '#0f766e', secondaryColor: tenant.secondaryColor || '#14b8a6',
+  });
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+  const set = (k, v) => setF((p) => ({ ...p, [k]: v }));
+
+  const submit = async () => {
+    setErr(''); setSaving(true);
+    try {
+      await fetchApi(`/admin/tenants/${tenant.id}`, { method: 'PUT', body: JSON.stringify(f) });
+      onSaved();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal isOpen onClose={onClose} title={`Edit — ${tenant.name}`} size="lg">
+      <div className="space-y-5">
+        {err && <div className="rounded-lg border border-red-200 bg-red-50 text-red-700 px-3 py-2 text-sm">{err}</div>}
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div className="sm:col-span-2"><label className={labelCls}>Clinic name</label><input className={field} value={f.name} onChange={(e) => set('name', e.target.value)} /></div>
+          <div><label className={labelCls}>Clinic email</label><input className={field} value={f.email} onChange={(e) => set('email', e.target.value)} /></div>
+          <div><label className={labelCls}>Phone</label><input className={field} value={f.phone} onChange={(e) => set('phone', e.target.value)} /></div>
+          <div><label className={labelCls}>Type</label>
+            <select className={field} value={f.clinicType} onChange={(e) => set('clinicType', e.target.value)}>
+              {CLINIC_TYPES.map((c) => <option key={c} value={c}>{c}</option>)}
+            </select>
+          </div>
+          <div className="sm:col-span-2"><label className={labelCls}>Address</label><input className={field} value={f.address} onChange={(e) => set('address', e.target.value)} /></div>
+        </div>
+        <ColorPicker label="Primary color" value={f.primaryColor} onChange={(v) => set('primaryColor', v)} />
+        <ColorPicker label="Accent color" value={f.secondaryColor} onChange={(v) => set('secondaryColor', v)} />
+        <div className="flex justify-end gap-2 pt-1">
+          <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-100 dark:hover:bg-white/10">Cancel</button>
+          <button onClick={submit} disabled={saving} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-orange-600 hover:bg-orange-700 disabled:opacity-50 text-white text-sm font-bold">
+            {saving && <Loader2 className="w-4 h-4 animate-spin" />} Save changes
+          </button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
+// ----------------------------------------------------------------------
+function DeleteClinicModal({ tenant, onClose, onDeleted }) {
+  const [confirm, setConfirm] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState('');
+
+  const submit = async () => {
+    setErr(''); setSaving(true);
+    try {
+      await fetchApi(`/admin/tenants/${tenant.id}`, { method: 'DELETE' });
+      onDeleted();
+    } catch (e) {
+      setErr(e.message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal isOpen onClose={onClose} title="Delete clinic permanently" size="md">
+      <div className="space-y-4">
+        {err && <div className="rounded-lg border border-red-200 bg-red-50 text-red-700 px-3 py-2 text-sm">{err}</div>}
+        <div className="rounded-lg border border-rose-200 bg-rose-50 text-rose-700 px-3 py-3 text-sm">
+          This permanently deletes <b>{tenant.name}</b> and <b>all</b> of its data — patients, appointments, invoices, staff, and users. This cannot be undone.
+        </div>
+        <div>
+          <label className={labelCls}>Type the clinic name to confirm</label>
+          <input className={field} value={confirm} onChange={(e) => setConfirm(e.target.value)} placeholder={tenant.name} />
+        </div>
+        <div className="flex justify-end gap-2">
+          <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-100 dark:hover:bg-white/10">Cancel</button>
+          <button onClick={submit} disabled={saving || confirm !== tenant.name} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white text-sm font-bold">
+            {saving && <Loader2 className="w-4 h-4 animate-spin" />} Delete permanently
+          </button>
+        </div>
+      </div>
+    </Modal>
   );
 }

@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { Calendar as CalendarIcon, List, Plus, X, ChevronRight, Pencil, Trash2, Save, Loader2, MessageCircle } from 'lucide-react';
+import { Calendar as CalendarIcon, List, Plus, X, ChevronRight, Pencil, Trash2, Save, Loader2, MessageCircle, CalendarClock } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Calendar, momentLocalizer } from 'react-big-calendar';
 import moment from 'moment';
@@ -9,6 +9,7 @@ import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import Table from '../components/ui/Table';
+import PatientSearchSelect from '../components/ui/PatientSearchSelect';
 
 const localizer = momentLocalizer(moment);
 
@@ -29,7 +30,7 @@ const computeEndTime = (start, durationMins) => {
   return `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}`;
 };
 
-function AppointmentDetail({ appt, onClose, onEdit, onDelete, onWhatsApp }) {
+function AppointmentDetail({ appt, onClose, onEdit, onDelete, onWhatsApp, onReschedule }) {
   if (!appt) return null;
   const name = apptClientName(appt);
   return (
@@ -78,16 +79,21 @@ function AppointmentDetail({ appt, onClose, onEdit, onDelete, onWhatsApp }) {
           </div>
         )}
       </div>
-      <div className="p-6 border-t border-gray-100 dark:border-white/10 flex gap-2">
-        <Button variant="secondary" size="sm" className="justify-center" onClick={() => onWhatsApp(appt)}>
-          <MessageCircle className="w-4 h-4" /> WhatsApp
+      <div className="p-6 border-t border-gray-100 dark:border-white/10 space-y-2">
+        <Button variant="secondary" size="sm" className="w-full justify-center" onClick={() => onReschedule(appt)}>
+          <CalendarClock className="w-4 h-4" /> Reschedule
         </Button>
-        <Button variant="primary" size="sm" className="flex-1 justify-center" onClick={() => onEdit(appt)}>
-          <Pencil className="w-4 h-4" /> Edit
-        </Button>
-        <Button variant="danger" size="sm" className="flex-1 justify-center" onClick={() => onDelete(appt)}>
-          <Trash2 className="w-4 h-4" /> Cancel
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="secondary" size="sm" className="justify-center" onClick={() => onWhatsApp(appt)}>
+            <MessageCircle className="w-4 h-4" /> WhatsApp
+          </Button>
+          <Button variant="primary" size="sm" className="flex-1 justify-center" onClick={() => onEdit(appt)}>
+            <Pencil className="w-4 h-4" /> Edit
+          </Button>
+          <Button variant="danger" size="sm" className="flex-1 justify-center" onClick={() => onDelete(appt)}>
+            <Trash2 className="w-4 h-4" /> Cancel
+          </Button>
+        </div>
       </div>
     </div>
   );
@@ -172,10 +178,14 @@ function AppointmentFormModal({ isOpen, onClose, onSave, target, clients, staff,
       <div className="space-y-4">
         <div>
           <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Patient *</label>
-          <select className={inputCls} value={form.clientId} onChange={e => set('clientId', e.target.value)}>
-            <option value="">Select patient...</option>
-            {clients.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
+          <PatientSearchSelect
+            value={form.clientId}
+            onChange={(id) => set('clientId', id)}
+            initialLabel={target?.clientName || target?.client?.name || ''}
+            fallbackClients={clients}
+            inputClassName={inputCls}
+          />
+          <p className="mt-1 text-[11px] text-gray-400">Type a name, phone number, or patient # (e.g. PT-0042).</p>
         </div>
         <div>
           <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Treatment Service *</label>
@@ -275,6 +285,61 @@ function DeleteConfirmModal({ isOpen, onClose, onConfirm, name, deleting }) {
   );
 }
 
+function RescheduleModal({ appt, onClose, onDone }) {
+  const [date, setDate] = useState('');
+  const [time, setTime] = useState('');
+  const [notify, setNotify] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const navigate = useNavigate();
+
+  useEffect(() => {
+    if (appt) {
+      setDate(appt.date ? String(appt.date).slice(0, 10) : new Date().toISOString().slice(0, 10));
+      setTime(appt.startTime || '10:00');
+      setNotify(true); setErr('');
+    }
+  }, [appt]);
+
+  if (!appt) return null;
+  const name = apptClientName(appt);
+
+  const submit = async () => {
+    setBusy(true); setErr('');
+    try {
+      await fetchApi(`/appointments/${appt.id}/reschedule`, { method: 'PUT', body: JSON.stringify({ date, startTime: time }) });
+      const clientId = appt.clientId || appt.client?.id;
+      if (notify && clientId) navigate(`/whatsapp?client=${clientId}`);
+      onDone();
+    } catch (e) {
+      setErr(e.message || 'Could not reschedule.');
+    } finally { setBusy(false); }
+  };
+
+  const inputCls = "w-full border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300";
+
+  return (
+    <Modal isOpen={!!appt} onClose={onClose} title="Reschedule Appointment" size="sm">
+      <div className="space-y-4">
+        <p className="text-sm text-gray-500 dark:text-gray-400">Move <span className="font-semibold text-gray-800 dark:text-gray-100">{name}</span>'s appointment to a new date/time.</p>
+        {err && <div className="rounded-lg border border-red-200 bg-red-50 text-red-700 px-3 py-2 text-sm">{err}</div>}
+        <div className="grid grid-cols-2 gap-3">
+          <div><label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">New date</label><input type="date" className={inputCls} value={date} onChange={e => setDate(e.target.value)} /></div>
+          <div><label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">New time</label><input type="time" className={inputCls} value={time} onChange={e => setTime(e.target.value)} /></div>
+        </div>
+        <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
+          <input type="checkbox" checked={notify} onChange={e => setNotify(e.target.checked)} />
+          Open WhatsApp to notify the patient
+        </label>
+        <div className="flex justify-end gap-2 pt-1">
+          <Button variant="secondary" onClick={onClose} disabled={busy}>Cancel</Button>
+          <Button onClick={submit} disabled={busy || !date || !time}>{busy ? 'Rescheduling…' : 'Reschedule'}</Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 export default function Appointments() {
   const navigate = useNavigate();
   const [appointments, setAppointments] = useState([]);
@@ -284,10 +349,12 @@ export default function Appointments() {
   const [loading, setLoading] = useState(true);
   const [view, setView] = useState('list');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [sort, setSort] = useState('date_desc'); // default: most recent date first
   const [selectedAppt, setSelectedAppt] = useState(null);
   const [showFormModal, setShowFormModal] = useState(false);
   const [editTarget, setEditTarget] = useState(null);
   const [deleteTarget, setDeleteTarget] = useState(null);
+  const [rescheduleTarget, setRescheduleTarget] = useState(null);
   const [saving, setSaving] = useState(false);
   const [deleting, setDeleting] = useState(false);
 
@@ -356,11 +423,20 @@ export default function Appointments() {
   };
 
   const filtered = useMemo(() => {
+    const byDate = (a, b) => (a.date || '').localeCompare(b.date || '') || (a.startTime || '').localeCompare(b.startTime || '');
+    const name = (a) => (a.clientName || a.client?.name || '').toLowerCase();
+    const sorters = {
+      date_desc: (a, b) => byDate(b, a),
+      date_asc: byDate,
+      patient_asc: (a, b) => name(a).localeCompare(name(b)) || byDate(b, a),
+      doctor_asc: (a, b) => (a.staffName || '').localeCompare(b.staffName || '') || byDate(b, a),
+      amount_desc: (a, b) => (Number(b.price) || 0) - (Number(a.price) || 0),
+    };
     return appointments.filter(a => {
       if (statusFilter !== 'all' && a.status !== statusFilter) return false;
       return true;
-    }).sort((a, b) => (a.date || '').localeCompare(b.date || '') || (a.startTime || '').localeCompare(b.startTime || ''));
-  }, [appointments, statusFilter]);
+    }).sort(sorters[sort] || sorters.date_desc);
+  }, [appointments, statusFilter, sort]);
 
   const calendarEvents = useMemo(() => {
     return appointments.map(a => ({
@@ -439,6 +515,14 @@ export default function Appointments() {
             <option value="completed">Completed</option>
             <option value="cancelled">Cancelled</option>
           </select>
+          <select value={sort} onChange={e => setSort(e.target.value)} title="Sort appointments"
+            className="border border-gray-200 dark:border-white/10 rounded-lg px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white dark:bg-white/5">
+            <option value="date_desc">Date — newest first</option>
+            <option value="date_asc">Date — oldest first</option>
+            <option value="patient_asc">Patient — A to Z</option>
+            <option value="doctor_asc">Doctor — A to Z</option>
+            <option value="amount_desc">Fee — high to low</option>
+          </select>
         </div>
         <Button onClick={() => { setEditTarget(null); setShowFormModal(true); }} size="sm">
           <Plus className="w-4 h-4" /> New Appointment
@@ -477,10 +561,17 @@ export default function Appointments() {
             onClose={() => setSelectedAppt(null)}
             onEdit={(a) => { setEditTarget(a); setShowFormModal(true); }}
             onDelete={(a) => setDeleteTarget(a)}
+            onReschedule={(a) => { setRescheduleTarget(a); setSelectedAppt(null); }}
             onWhatsApp={(a) => navigate(`/whatsapp?client=${a.clientId || a.client?.id}`)}
           />
         </>
       )}
+
+      <RescheduleModal
+        appt={rescheduleTarget}
+        onClose={() => setRescheduleTarget(null)}
+        onDone={() => { setRescheduleTarget(null); loadAppointments(); }}
+      />
 
       <AppointmentFormModal
         isOpen={showFormModal}

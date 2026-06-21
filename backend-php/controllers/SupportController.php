@@ -63,8 +63,8 @@ class SupportController {
         $db->prepare("INSERT INTO SupportMessage (id, ticketId, senderType, senderId, body) VALUES (?, ?, 'clinic', ?, ?)")
            ->execute([generate_uuid(), $id, $user['id'], $body]);
         // A clinic reply reopens a waiting/resolved ticket
-        $db->prepare("UPDATE SupportTicket SET status = CASE WHEN status IN ('resolved','closed') THEN 'open' ELSE status END, updatedAt = ? WHERE id = ?")
-           ->execute([date('Y-m-d H:i:s'), $id]);
+        $db->prepare("UPDATE SupportTicket SET status = CASE WHEN status IN ('resolved','closed') THEN 'open' ELSE status END, updatedAt = ? WHERE id = ? AND clinicId = ?")
+           ->execute([date('Y-m-d H:i:s'), $id, $user['clinicId']]);
 
         send_json(['message' => 'Reply sent']);
     }

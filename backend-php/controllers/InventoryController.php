@@ -74,8 +74,8 @@ class InventoryController {
             $id, $user['clinicId'], $name, $category, $specialty, $quantity, $unit, $reorderLevel, $costPerUnit, $supplier, $expiryDate, $isActive
         ]);
 
-        $stmt = $db->prepare("SELECT * FROM InventoryItem WHERE id = ?");
-        $stmt->execute([$id]);
+        $stmt = $db->prepare("SELECT * FROM InventoryItem WHERE id = ? AND clinicId = ?");
+        $stmt->execute([$id, $user['clinicId']]);
         $createdItem = $stmt->fetch();
 
         send_json($createdItem, 201);
@@ -119,8 +119,8 @@ class InventoryController {
         $quantity = floatval($input['quantity'] ?? 0);
         $reason = $input['reason'] ?? null;
 
-        if (empty($type) || $quantity <= 0) {
-            send_error('type and positive quantity are required', 400);
+        if (!in_array($type, ['in', 'out'], true) || $quantity <= 0) {
+            send_error('type must be in or out and quantity must be positive', 400);
         }
 
         $db = DB::getConnection();
@@ -133,14 +133,17 @@ class InventoryController {
         }
 
         $currentQty = floatval($item['quantity']);
+        if ($type === 'out' && $quantity > $currentQty) {
+            send_error('Insufficient stock for this adjustment', 409);
+        }
         $newQty = $type === 'in' ? $currentQty + $quantity : max(0.0, $currentQty - $quantity);
 
         try {
             $db->beginTransaction();
 
             // Update item quantity
-            $stmtUpdate = $db->prepare("UPDATE InventoryItem SET quantity = ? WHERE id = ?");
-            $stmtUpdate->execute([$newQty, $id]);
+            $stmtUpdate = $db->prepare("UPDATE InventoryItem SET quantity = ? WHERE id = ? AND clinicId = ?");
+            $stmtUpdate->execute([$newQty, $id, $user['clinicId']]);
 
             // Log transaction
             $txId = generate_uuid();
