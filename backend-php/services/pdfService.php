@@ -250,5 +250,28 @@ function generateInvoicePDF($invoice, $client, $clinic) {
     $pdf->Cell(45, 6, 'Balance Due', 0, 0, 'R');
     $pdf->Cell(30, 6, 'PKR ' . number_format($invoice['balanceDue']) . '  ', 0, 1, 'R');
 
+    // Payment / account details (clinic-configured in Settings)
+    $payLines = [];
+    if (!empty($clinic['bankName']))      $payLines[] = 'Bank: ' . $clinic['bankName'];
+    if (!empty($clinic['accountTitle']))  $payLines[] = 'Account Title: ' . $clinic['accountTitle'];
+    if (!empty($clinic['accountNumber'])) $payLines[] = 'Account Number: ' . $clinic['accountNumber'];
+    if (!empty($clinic['iban']))          $payLines[] = 'IBAN: ' . $clinic['iban'];
+    if (!empty($payLines) || !empty($clinic['paymentNote'])) {
+        $startY = $pdf->GetY() + 8;
+        if ($startY > 240) { $pdf->AddPage(); $startY = 55; }
+        $pdf->SetXY(15, $startY);
+        $pdf->SetTextColor($r, $g, $b);
+        $pdf->SetFont('Helvetica', 'B', 9);
+        $pdf->Cell(0, 5, 'PAYMENT DETAILS', 0, 1, 'L');
+        $pdf->SetTextColor(30, 41, 59);
+        $pdf->SetFont('Helvetica', '', 9);
+        foreach ($payLines as $line) { $pdf->SetX(15); $pdf->Cell(0, 5, $line, 0, 1, 'L'); }
+        if (!empty($clinic['paymentNote'])) {
+            $pdf->SetX(15);
+            $pdf->SetTextColor(100, 116, 139);
+            $pdf->MultiCell(150, 5, $clinic['paymentNote'], 0, 'L');
+        }
+    }
+
     return $pdf->Output('S');
 }

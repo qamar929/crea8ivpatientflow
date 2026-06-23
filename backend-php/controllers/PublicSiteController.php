@@ -3,6 +3,26 @@ require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../helpers.php';
 
 class PublicSiteController {
+    // Additive, idempotent: clinic bank/account details shown on invoices.
+    private function ensureClinicPaymentColumns($db) {
+        $cols = ['bankName', 'accountTitle', 'accountNumber', 'iban', 'paymentNote'];
+        if (DB_DRIVER === 'sqlite') {
+            $existing = array_column($db->query("PRAGMA table_info(Clinic)")->fetchAll(), 'name');
+            foreach ($cols as $c) {
+                if (!in_array($c, $existing, true)) $db->exec("ALTER TABLE Clinic ADD COLUMN $c TEXT");
+            }
+        } else {
+            foreach ($cols as $c) {
+                $stmt = $db->prepare("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Clinic' AND COLUMN_NAME = ?");
+                $stmt->execute([$c]);
+                if (!(int)$stmt->fetchColumn()) {
+                    $type = $c === 'paymentNote' ? 'TEXT' : 'VARCHAR(191)';
+                    $db->exec("ALTER TABLE Clinic ADD COLUMN $c $type NULL");
+                }
+            }
+        }
+    }
+
     private function getClinic($db, $clinicId = null) {
         if ($clinicId) {
             $stmt = $db->prepare("SELECT * FROM Clinic WHERE id = ?");
@@ -168,16 +188,18 @@ class PublicSiteController {
 
     public function getSettings($input, $user) {
         $db = DB::getConnection();
+        $this->ensureClinicPaymentColumns($db);
         $clinic = $this->getClinic($db, $user['clinicId']);
         send_json(['clinic' => $this->cleanClinic($clinic), 'config' => $this->getConfig($db, $clinic)]);
     }
 
     public function updateSettings($input, $user) {
         $db = DB::getConnection();
+        $this->ensureClinicPaymentColumns($db);
         $clinic = $this->getClinic($db, $user['clinicId']);
         $clinicInput = $input['clinic'] ?? [];
         $config = $input['config'] ?? [];
-        $allowed = ['name', 'tagline', 'logo', 'address', 'phone', 'whatsapp', 'email', 'website', 'registrationNo', 'invoicePrefix', 'invoiceFooter', 'paymentTerms', 'mission', 'vision', 'servicesOverview', 'primaryColor', 'secondaryColor', 'font'];
+        $allowed = ['name', 'tagline', 'logo', 'address', 'phone', 'whatsapp', 'email', 'website', 'registrationNo', 'invoicePrefix', 'invoiceFooter', 'paymentTerms', 'mission', 'vision', 'servicesOverview', 'primaryColor', 'secondaryColor', 'font', 'bankName', 'accountTitle', 'accountNumber', 'iban', 'paymentNote'];
         $fields = [];
         $params = [];
         foreach ($allowed as $key) {

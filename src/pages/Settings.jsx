@@ -440,6 +440,11 @@ export default function Settings() {
   const [localInvoicePrefix, setLocalInvoicePrefix] = useState(clinicInfo.invoicePrefix || 'AC');
   const [localInvoiceFooter, setLocalInvoiceFooter] = useState(clinicInfo.invoiceFooter || '');
   const [localPaymentTerms, setLocalPaymentTerms] = useState(clinicInfo.paymentTerms || '');
+  const [localBankName, setLocalBankName] = useState(clinicInfo.bankName || '');
+  const [localAccountTitle, setLocalAccountTitle] = useState(clinicInfo.accountTitle || '');
+  const [localAccountNumber, setLocalAccountNumber] = useState(clinicInfo.accountNumber || '');
+  const [localIban, setLocalIban] = useState(clinicInfo.iban || '');
+  const [localPaymentNote, setLocalPaymentNote] = useState(clinicInfo.paymentNote || '');
   const [localMission, setLocalMission] = useState(clinicInfo.mission || '');
   const [localVision, setLocalVision] = useState(clinicInfo.vision || '');
   const [localServicesOverview, setLocalServicesOverview] = useState(clinicInfo.servicesOverview || '');
@@ -466,6 +471,11 @@ export default function Settings() {
         if (clinic.invoicePrefix) setLocalInvoicePrefix(clinic.invoicePrefix);
         setLocalInvoiceFooter(v(clinic.invoiceFooter));
         setLocalPaymentTerms(v(clinic.paymentTerms));
+        setLocalBankName(v(clinic.bankName));
+        setLocalAccountTitle(v(clinic.accountTitle));
+        setLocalAccountNumber(v(clinic.accountNumber));
+        setLocalIban(v(clinic.iban));
+        setLocalPaymentNote(v(clinic.paymentNote));
         setLocalMission(v(clinic.mission));
         setLocalVision(v(clinic.vision));
         setLocalServicesOverview(v(clinic.servicesOverview));
@@ -535,6 +545,11 @@ export default function Settings() {
       invoicePrefix: localInvoicePrefix,
       invoiceFooter: localInvoiceFooter,
       paymentTerms: localPaymentTerms,
+      bankName: localBankName,
+      accountTitle: localAccountTitle,
+      accountNumber: localAccountNumber,
+      iban: localIban,
+      paymentNote: localPaymentNote,
       mission: localMission,
       vision: localVision,
       servicesOverview: localServicesOverview,
@@ -551,7 +566,9 @@ export default function Settings() {
             name: localName, tagline: localTagline, logo: localLogo, address: localAddress,
             phone: localPhone, whatsapp: localWhatsapp, email: localEmail, website: localWebsite,
             registrationNo: localRegistrationNo, invoicePrefix: localInvoicePrefix,
-            invoiceFooter: localInvoiceFooter, paymentTerms: localPaymentTerms, mission: localMission,
+            invoiceFooter: localInvoiceFooter, paymentTerms: localPaymentTerms,
+            bankName: localBankName, accountTitle: localAccountTitle, accountNumber: localAccountNumber,
+            iban: localIban, paymentNote: localPaymentNote, mission: localMission,
             vision: localVision, servicesOverview: localServicesOverview, primaryColor: localPrimary,
             secondaryColor: localSecondary, font: localFont,
           },
@@ -702,6 +719,31 @@ export default function Settings() {
           <div className="lg:col-span-2">
             <label className="block text-xs font-semibold text-gray-600 mb-1">Invoice Footer Message</label>
             <input value={localInvoiceFooter} onChange={e => setLocalInvoiceFooter(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+          </div>
+
+          <div className="lg:col-span-2 mt-1">
+            <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Payment / Account Details</p>
+            <p className="text-[11px] text-gray-400">Shown on every invoice so patients know where to pay. Leave blank to hide.</p>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Bank Name</label>
+            <input value={localBankName} onChange={e => setLocalBankName(e.target.value)} placeholder="e.g. Meezan Bank" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Account Title</label>
+            <input value={localAccountTitle} onChange={e => setLocalAccountTitle(e.target.value)} placeholder="e.g. The Smile Xperts" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Account Number</label>
+            <input value={localAccountNumber} onChange={e => setLocalAccountNumber(e.target.value)} placeholder="e.g. 0123-4567890123" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">IBAN</label>
+            <input value={localIban} onChange={e => setLocalIban(e.target.value.toUpperCase())} placeholder="e.g. PK00MEZN0000000000000000" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+          </div>
+          <div className="lg:col-span-2">
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Payment Note (optional)</label>
+            <input value={localPaymentNote} onChange={e => setLocalPaymentNote(e.target.value)} placeholder="e.g. JazzCash/Easypaisa: 0300-1234567 — send receipt on WhatsApp" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
           </div>
         </div>
         <div className="mt-4 rounded-xl border border-gray-100 bg-gray-50 p-4">
