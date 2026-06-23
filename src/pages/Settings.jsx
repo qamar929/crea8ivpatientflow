@@ -11,10 +11,10 @@ import Badge from '../components/ui/Badge';
 import Modal from '../components/ui/Modal';
 import ColorPicker from '../components/ui/ColorPicker';
 import ClinicLogoMark from '../components/branding/ClinicLogoMark';
-import PublicWebsiteEditor from '../components/settings/PublicWebsiteEditor';
 import CustomDomain from '../components/settings/CustomDomain';
 import { fetchApi } from '../config/api';
 import { getLogoInitials, isImageLogo } from '../utils/branding';
+import { missingClinicFields, isFilled } from '../config/requiredSettings';
 
 const PORTAL_ROLES = [
   { value: 'owner', label: 'Owner' },
@@ -585,6 +585,15 @@ export default function Settings() {
     }
   };
 
+  const requiredValues = {
+    name: localName, address: localAddress, phone: localPhone, email: localEmail,
+    invoicePrefix: localInvoicePrefix, paymentTerms: localPaymentTerms, invoiceFooter: localInvoiceFooter,
+    bankName: localBankName, accountTitle: localAccountTitle, accountNumber: localAccountNumber, iban: localIban,
+  };
+  const missingRequired = missingClinicFields(requiredValues);
+  // Red border helper for required fields that are still empty.
+  const reqCls = (val) => (isFilled(val) ? 'border-gray-200' : 'border-red-400 ring-1 ring-red-200');
+
   return (
     <div className="max-w-5xl space-y-5">
       {/* Save bar */}
@@ -602,6 +611,19 @@ export default function Settings() {
         </Button>
       </div>
 
+      {/* Required-fields alert */}
+      {missingRequired.length > 0 && (
+        <div className="rounded-xl border border-red-200 bg-red-50 px-5 py-4">
+          <p className="text-sm font-bold text-red-800">
+            {missingRequired.length} required {missingRequired.length === 1 ? 'detail is' : 'details are'} missing
+          </p>
+          <p className="mt-0.5 text-xs text-red-700">
+            These appear on invoices and patient documents. Complete the fields highlighted in red, then Save.
+          </p>
+          <p className="mt-2 text-xs text-red-700"><span className="font-semibold">Missing:</span> {missingRequired.map((f) => f.label).join(', ')}</p>
+        </div>
+      )}
+
       {/* Clinic Info */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
         <SectionHeader icon={Building2} title="Clinic Information" description="Basic details shown across the platform" />
@@ -611,7 +633,7 @@ export default function Settings() {
             <input
               value={localName}
               onChange={e => setLocalName(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              className={`w-full border ${reqCls(localName)} rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300`}
             />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -639,7 +661,7 @@ export default function Settings() {
             <input
               value={localAddress}
               onChange={e => setLocalAddress(e.target.value)}
-              className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+              className={`w-full border ${reqCls(localAddress)} rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300`}
             />
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -648,7 +670,7 @@ export default function Settings() {
               <input
                 value={localPhone}
                 onChange={e => setLocalPhone(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                className={`w-full border ${reqCls(localPhone)} rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300`}
               />
             </div>
             <div>
@@ -656,7 +678,7 @@ export default function Settings() {
               <input
                 value={localEmail}
                 onChange={e => setLocalEmail(e.target.value)}
-                className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                className={`w-full border ${reqCls(localEmail)} rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300`}
               />
             </div>
           </div>
@@ -710,15 +732,15 @@ export default function Settings() {
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1">Invoice Prefix</label>
-            <input value={localInvoicePrefix} onChange={e => setLocalInvoicePrefix(e.target.value.toUpperCase())} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+            <input value={localInvoicePrefix} onChange={e => setLocalInvoicePrefix(e.target.value.toUpperCase())} className={`w-full border ${reqCls(localInvoicePrefix)} rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300`} />
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1">Payment Terms</label>
-            <input value={localPaymentTerms} onChange={e => setLocalPaymentTerms(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+            <input value={localPaymentTerms} onChange={e => setLocalPaymentTerms(e.target.value)} className={`w-full border ${reqCls(localPaymentTerms)} rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300`} />
           </div>
           <div className="lg:col-span-2">
             <label className="block text-xs font-semibold text-gray-600 mb-1">Invoice Footer Message</label>
-            <input value={localInvoiceFooter} onChange={e => setLocalInvoiceFooter(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+            <input value={localInvoiceFooter} onChange={e => setLocalInvoiceFooter(e.target.value)} className={`w-full border ${reqCls(localInvoiceFooter)} rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300`} />
           </div>
 
           <div className="lg:col-span-2 mt-1">
@@ -727,19 +749,19 @@ export default function Settings() {
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1">Bank Name</label>
-            <input value={localBankName} onChange={e => setLocalBankName(e.target.value)} placeholder="e.g. Meezan Bank" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+            <input value={localBankName} onChange={e => setLocalBankName(e.target.value)} placeholder="e.g. Meezan Bank" className={`w-full border ${reqCls(localBankName)} rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300`} />
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1">Account Title</label>
-            <input value={localAccountTitle} onChange={e => setLocalAccountTitle(e.target.value)} placeholder="e.g. The Smile Xperts" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+            <input value={localAccountTitle} onChange={e => setLocalAccountTitle(e.target.value)} placeholder="e.g. The Smile Xperts" className={`w-full border ${reqCls(localAccountTitle)} rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300`} />
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1">Account Number</label>
-            <input value={localAccountNumber} onChange={e => setLocalAccountNumber(e.target.value)} placeholder="e.g. 0123-4567890123" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+            <input value={localAccountNumber} onChange={e => setLocalAccountNumber(e.target.value)} placeholder="e.g. 0123-4567890123" className={`w-full border ${reqCls(localAccountNumber)} rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300`} />
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1">IBAN</label>
-            <input value={localIban} onChange={e => setLocalIban(e.target.value.toUpperCase())} placeholder="e.g. PK00MEZN0000000000000000" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+            <input value={localIban} onChange={e => setLocalIban(e.target.value.toUpperCase())} placeholder="e.g. PK00MEZN0000000000000000" className={`w-full border ${reqCls(localIban)} rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300`} />
           </div>
           <div className="lg:col-span-2">
             <label className="block text-xs font-semibold text-gray-600 mb-1">Payment Note (optional)</label>
@@ -836,9 +858,6 @@ export default function Settings() {
           </div>
         </div>
       </div>
-
-      {/* Notifications */}
-      {getCurrentUser()?.role === 'owner' && <PublicWebsiteEditor />}
 
       {/* Notifications */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">

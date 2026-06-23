@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Archive, Bot, Calendar, Database, Facebook, FileBarChart, Image, Loader2, Megaphone, Package, Receipt, Settings, Shield, Stethoscope, Users, UserCheck, WalletCards } from 'lucide-react';
 import { fetchApi } from '../config/api';
 import StatCard from '../components/ui/StatCard';
+import SetupAlert from '../components/dashboard/SetupAlert';
 import RevenueChart from '../components/charts/RevenueChart';
 import ServiceChart from '../components/charts/ServiceChart';
 import Badge from '../components/ui/Badge';
@@ -65,6 +66,7 @@ export default function Dashboard() {
 
   return (
     <div className="space-y-6">
+      <SetupAlert />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard title="Today's Appointments" value={String(todayAppts.length)} icon={Calendar} />
         <StatCard title="Collected This Month" value={money(data.financials?.totalRevenue)} icon={Receipt} />
