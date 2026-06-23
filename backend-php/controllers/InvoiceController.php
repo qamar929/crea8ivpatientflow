@@ -44,9 +44,16 @@ class InvoiceController {
         $parsedItems = is_array($items) ? $items : (json_decode($items, true) ?: []);
         $subtotal = 0;
 
+        if ($discountPercent < 0 || $discountPercent > 100 || $taxPercent < 0 || $taxPercent > 100) {
+            send_error('Discount and tax percentages must be between 0 and 100', 400);
+        }
+
         foreach ($parsedItems as &$item) {
             $qty = intval($item['qty'] ?? 1);
             $unitPrice = floatval($item['unitPrice'] ?? $item['price'] ?? 0);
+            if ($qty <= 0 || $unitPrice < 0) {
+                send_error('Invoice item quantity must be positive and unit price cannot be negative', 400);
+            }
             $item['qty'] = $qty;
             $item['unitPrice'] = $unitPrice;
             if (empty($item['description']) && !empty($item['name'])) {
@@ -60,6 +67,9 @@ class InvoiceController {
         $total = $subtotal - $discountAmt + $taxAmt;
         $grandTotal = $total + floatval($previousBalance);
         $paid = floatval($amountPaid);
+        if ($paid < 0 || $paid > $grandTotal) {
+            send_error('Amount paid cannot be negative or exceed the invoice total', 400);
+        }
         $balanceDue = max(0.0, $grandTotal - $paid);
         $status = 'pending';
         if ($balanceDue <= 0) {

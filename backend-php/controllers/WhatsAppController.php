@@ -81,6 +81,15 @@ class WhatsAppController {
     public function settingsSave($input,$user){$db=$this->db();$features=$this->features($db,$user['clinicId']);if(empty($features['whatsappEnabled']))send_error('WhatsApp is not enabled for this clinic plan.',403);$current=$this->settings($db,$user['clinicId']);$token=$current['accessToken']??null;$verifyToken=$current['webhookVerifyToken']??null;$sql=DB_DRIVER==='sqlite'?"INSERT INTO WhatsAppSetting(clinicId,phoneNumberId,businessAccountId,accessToken,webhookVerifyToken,apiVersion,simulationMode,quietHoursStart,quietHoursEnd) VALUES(?,?,?,?,?,?,?,?,?) ON CONFLICT(clinicId) DO UPDATE SET phoneNumberId=excluded.phoneNumberId,businessAccountId=excluded.businessAccountId,accessToken=excluded.accessToken,webhookVerifyToken=excluded.webhookVerifyToken,apiVersion=excluded.apiVersion,simulationMode=excluded.simulationMode,quietHoursStart=excluded.quietHoursStart,quietHoursEnd=excluded.quietHoursEnd,updatedAt=CURRENT_TIMESTAMP":"INSERT INTO WhatsAppSetting(clinicId,phoneNumberId,businessAccountId,accessToken,webhookVerifyToken,apiVersion,simulationMode,quietHoursStart,quietHoursEnd) VALUES(?,?,?,?,?,?,?,?,?) ON DUPLICATE KEY UPDATE phoneNumberId=VALUES(phoneNumberId),businessAccountId=VALUES(businessAccountId),accessToken=VALUES(accessToken),webhookVerifyToken=VALUES(webhookVerifyToken),apiVersion=VALUES(apiVersion),simulationMode=VALUES(simulationMode),quietHoursStart=VALUES(quietHoursStart),quietHoursEnd=VALUES(quietHoursEnd),updatedAt=CURRENT_TIMESTAMP";$db->prepare($sql)->execute([$user['clinicId'],$input['phoneNumberId']??null,$input['businessAccountId']??null,$token,$verifyToken,$input['apiVersion']??($current['apiVersion']??'v23.0'),!empty($input['simulationMode'])?1:0,$input['quietHoursStart']??'21:00',$input['quietHoursEnd']??'09:00']);send_json(['message'=>'WhatsApp number settings saved. Platform secrets remain superadmin-managed.','hasAccessToken'=>!empty($token)]);}
     public function webhookVerify(){ $db=$this->db();$token=$_GET['hub_verify_token']??'';$challenge=$_GET['hub_challenge']??'';$stmt=$db->prepare("SELECT COUNT(*) FROM WhatsAppSetting WHERE webhookVerifyToken=?");$stmt->execute([$token]);if($token&&$stmt->fetchColumn()){http_response_code(200);echo $challenge;exit;}send_error('Webhook verification failed',403); }
     public function webhook($input){
+        if (META_APP_SECRET === '') {
+            send_error('Meta webhook authentication is not configured', 503);
+        }
+        $signature=$_SERVER['HTTP_X_HUB_SIGNATURE_256']??'';
+        $raw=$GLOBALS['request_raw_input']??'';
+        $expected='sha256='.hash_hmac('sha256',$raw,META_APP_SECRET);
+        if ($signature==='' || !hash_equals($expected,$signature)) {
+            send_error('Invalid webhook signature',401);
+        }
         $db=$this->db();
         foreach(($input['entry']??[]) as $entry){
             foreach(($entry['changes']??[]) as $change){
@@ -119,8 +128,13 @@ class WhatsAppController {
                        ->execute([generate_uuid(),$clinicId,$conversation['id'],$client['id'],'inbound','support',$message['type']??'text',$body,$message['id']??null,'received']);
                     $db->prepare("UPDATE WhatsAppConversation SET freeReplyUntil=?,lastMessageAt=CURRENT_TIMESTAMP WHERE id=?")
                        ->execute([date('Y-m-d H:i:s',strtotime('+24 hours')),$conversation['id']]);
-                    if(in_array(strtoupper(trim($body)),['STOP','UNSUBSCRIBE','OPT OUT'],true))
+                    if(in_array(strtoupper(trim($body)),['STOP','UNSUBSCRIBE','OPT OUT'],true)){
                         $db->prepare("UPDATE Client SET whatsappMarketingOptIn=0,whatsappOptOutAt=CURRENT_TIMESTAMP WHERE id=?")->execute([$client['id']]);
+                    } else {
+                        // AI Receptionist auto-reply (opt-in per clinic; fully guarded, never throws).
+                        require_once __DIR__.'/../services/aiReceptionistService.php';
+                        air_webhook_autoreply($db,$clinicId,$client,$conversation,$this->settings($db,$clinicId),$this->features($db,$clinicId),$body);
+                    }
                 }
                 $db->prepare("UPDATE WhatsAppSetting SET lastWebhookAt=CURRENT_TIMESTAMP,lastWebhookError=NULL WHERE clinicId=?")->execute([$clinicId]);
                 $db->prepare("INSERT INTO WhatsAppWebhookLog(id,clinicId,eventType,status,details) VALUES(?,?,'message_event','received',?)")->execute([generate_uuid(),$clinicId,json_encode($value)]);

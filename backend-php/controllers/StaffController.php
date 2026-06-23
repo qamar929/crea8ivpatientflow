@@ -3,6 +3,13 @@ require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../helpers.php';
 
 class StaffController {
+    private function assertBranchInClinic($db, $branchId, $clinicId) {
+        if (empty($branchId)) return;
+        $stmt = $db->prepare("SELECT id FROM Branch WHERE id = ? AND clinicId = ? AND isActive = 1");
+        $stmt->execute([$branchId, $clinicId]);
+        if (!$stmt->fetch()) send_error('Branch not found for this clinic', 400);
+    }
+
     public function list($input, $user) {
         $specialty = $_GET['specialty'] ?? '';
         $status = $_GET['status'] ?? '';
@@ -101,6 +108,7 @@ class StaffController {
         }
 
         $branchId = $input['branchId'] ?? null;
+        $this->assertBranchInClinic($db, $branchId, $user['clinicId']);
 
         $stmt = $db->prepare("INSERT INTO Staff (id, clinicId, branchId, name, role, designation, specialty, phone, email, avatar, avatarColor, qualifications, experience, bio, workingDays, workingHours, status, rating, compensationType, fixedSalary, commissionRate, treatmentCommissionRates, portalRole, loginEmail, inviteStatus, lastInviteSent) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         
@@ -121,6 +129,9 @@ class StaffController {
         $stmt->execute([$id, $user['clinicId']]);
         if (!$stmt->fetch()) {
             send_error('Staff member not found', 404);
+        }
+        if (array_key_exists('branchId', $input)) {
+            $this->assertBranchInClinic($db, $input['branchId'], $user['clinicId']);
         }
 
         $fields = [];

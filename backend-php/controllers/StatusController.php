@@ -13,6 +13,9 @@ class StatusController {
     public function features($input, $user) {
         $db = DB::getConnection();
         $features = tenant_features_get($db, $user['clinicId']);
+        $stmt = $db->prepare("SELECT id, name, tagline, logo, primaryColor, secondaryColor, font, website FROM Clinic WHERE id = ?");
+        $stmt->execute([$user['clinicId']]);
+        $clinic = $stmt->fetch() ?: null;
         send_json([
             'marketingEnabled' => !empty($features['marketingEnabled']),
             'metaLeadsEnabled' => !empty($features['metaLeadsEnabled']),
@@ -25,6 +28,7 @@ class StatusController {
             'aiHumanApprovalRequired' => !empty($features['aiHumanApprovalRequired']),
             'monthlyAiTokenLimit' => intval($features['monthlyAiTokenLimit'] ?? 0),
             'monthlyWhatsAppLimit' => intval($features['monthlyWhatsAppLimit'] ?? 0),
+            'clinic' => $clinic,
         ]);
     }
 }

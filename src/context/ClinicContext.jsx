@@ -75,6 +75,7 @@ export function ClinicProvider({ children }) {
   // (e.g. the platform domain crea8ivmedia.com) the portal shows PatientFlow.
   const [clinicMatched, setClinicMatched] = useState(false);
   const [features, setFeatures] = useState(defaultFeatures);
+  const [featuresLoaded, setFeaturesLoaded] = useState(false);
   const [clinicInfo, setClinicInfo] = useState(() => {
     try {
       const saved = JSON.parse(localStorage.getItem('clinic_branding') || 'null');
@@ -123,10 +124,19 @@ export function ClinicProvider({ children }) {
   }, []);
 
   useEffect(() => {
-    if (!isClinicUserSession()) return;
+    // featuresLoaded gates FeatureRoute so a direct URL load to a plan-gated
+    // route doesn't flash/redirect before /features resolves.
+    if (!isClinicUserSession()) { setFeaturesLoaded(true); return; }
     fetchApi('/features')
-      .then((data) => setFeatures((current) => ({ ...current, ...data })))
-      .catch(() => {});
+      .then((data) => {
+        setFeatures((current) => ({ ...current, ...data }));
+        if (data?.clinic) {
+          setClinicMatched(true);
+          setClinicInfo((current) => ({ ...current, ...compact(data.clinic), _clinicId: data.clinic.id }));
+        }
+      })
+      .catch(() => {})
+      .finally(() => setFeaturesLoaded(true));
   }, []);
 
   useEffect(() => {
@@ -154,10 +164,11 @@ export function ClinicProvider({ children }) {
     setActiveSpecialty,
     clinicInfo,
     features,
+    featuresLoaded,
     updateClinicInfo,
     clinicMatched,
     isPlatform: !clinicMatched,
-  }), [activeSpecialty, clinicInfo, clinicMatched, features]);
+  }), [activeSpecialty, clinicInfo, clinicMatched, features, featuresLoaded]);
 
   return (
     <ClinicContext.Provider value={value}>

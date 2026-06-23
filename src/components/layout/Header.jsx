@@ -23,7 +23,7 @@ import {
 import { useClinic } from '../../context/ClinicContext';
 import { useTheme } from '../../context/ThemeContext';
 import { getCurrentRole, getCurrentUser, ROLE_LABELS } from '../../config/roles';
-import { fetchApi } from '../../config/api';
+import { appPath, fetchApi } from '../../config/api';
 
 const pageTitles = {
   '/dashboard': 'Dashboard',
@@ -143,7 +143,7 @@ export default function Header() {
     localStorage.removeItem('clinic_token');
     localStorage.removeItem('clinic_refresh');
     localStorage.removeItem('clinic_user');
-    navigate('/login');
+    window.location.assign(appPath('/login'));
   };
 
   return (

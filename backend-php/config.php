@@ -64,6 +64,10 @@ define('TWILIO_ACCOUNT_SID', getenv('TWILIO_ACCOUNT_SID') ?: '');
 define('TWILIO_AUTH_TOKEN', getenv('TWILIO_AUTH_TOKEN') ?: '');
 define('TWILIO_WHATSAPP_FROM', getenv('TWILIO_WHATSAPP_FROM') ?: 'whatsapp:+14155238886');
 
+// Meta webhooks must be authenticated with the app secret. The controller
+// reports a configuration error instead of accepting unsigned events.
+define('META_APP_SECRET', getenv('META_APP_SECRET') ?: '');
+
 // SMTP Email Config
 define('SMTP_HOST', getenv('SMTP_HOST') ?: '');
 define('SMTP_PORT', (int)(getenv('SMTP_PORT') ?: 587));

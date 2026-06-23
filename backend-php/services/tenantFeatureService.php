@@ -5,6 +5,8 @@ function tenant_features_ensure($db) {
         'marketingEnabled' => ['sqlite' => 'INTEGER DEFAULT 0', 'mysql' => 'TINYINT DEFAULT 0'],
         'metaLeadsEnabled' => ['sqlite' => 'INTEGER DEFAULT 0', 'mysql' => 'TINYINT DEFAULT 0'],
         'importsEnabled' => ['sqlite' => 'INTEGER DEFAULT 0', 'mysql' => 'TINYINT DEFAULT 0'],
+        // Phase 4: AI Receptionist may auto-create appointments from chat (opt-in, default off).
+        'aiAutoBookEnabled' => ['sqlite' => 'INTEGER DEFAULT 0', 'mysql' => 'TINYINT DEFAULT 0'],
     ];
     if (DB_DRIVER === 'sqlite') {
         $db->exec("CREATE TABLE IF NOT EXISTS ClinicFeatureSetting (
@@ -17,6 +19,7 @@ function tenant_features_ensure($db) {
             whatsappAutomationEnabled INTEGER DEFAULT 0,
             aiEnabled INTEGER DEFAULT 0,
             aiAutoReplyEnabled INTEGER DEFAULT 0,
+            aiAutoBookEnabled INTEGER DEFAULT 0,
             aiHumanApprovalRequired INTEGER DEFAULT 1,
             monthlyAiTokenLimit INTEGER DEFAULT 0,
             monthlyWhatsAppLimit INTEGER DEFAULT 0,
@@ -40,6 +43,7 @@ function tenant_features_ensure($db) {
             whatsappAutomationEnabled TINYINT DEFAULT 0,
             aiEnabled TINYINT DEFAULT 0,
             aiAutoReplyEnabled TINYINT DEFAULT 0,
+            aiAutoBookEnabled TINYINT DEFAULT 0,
             aiHumanApprovalRequired TINYINT DEFAULT 1,
             monthlyAiTokenLimit INT DEFAULT 0,
             monthlyWhatsAppLimit INT DEFAULT 0,
@@ -67,6 +71,7 @@ function tenant_features_defaults($clinicId) {
         'whatsappAutomationEnabled' => 0,
         'aiEnabled' => 0,
         'aiAutoReplyEnabled' => 0,
+        'aiAutoBookEnabled' => 0,
         'aiHumanApprovalRequired' => 1,
         'monthlyAiTokenLimit' => 0,
         'monthlyWhatsAppLimit' => 0,
@@ -98,19 +103,20 @@ function tenant_features_save($db, $clinicId, $input) {
         'whatsappAutomationEnabled' => $boolValue('whatsappAutomationEnabled'),
         'aiEnabled' => $boolValue('aiEnabled'),
         'aiAutoReplyEnabled' => $boolValue('aiAutoReplyEnabled'),
+        'aiAutoBookEnabled' => $boolValue('aiAutoBookEnabled'),
         'aiHumanApprovalRequired' => $boolValue('aiHumanApprovalRequired', 1),
         'monthlyAiTokenLimit' => max(0, intval($input['monthlyAiTokenLimit'] ?? $current['monthlyAiTokenLimit'] ?? 0)),
         'monthlyWhatsAppLimit' => max(0, intval($input['monthlyWhatsAppLimit'] ?? $current['monthlyWhatsAppLimit'] ?? 0)),
     ]);
 
     if (DB_DRIVER === 'sqlite') {
-        $sql = "INSERT INTO ClinicFeatureSetting (clinicId, marketingEnabled, metaLeadsEnabled, importsEnabled, whatsappEnabled, whatsappMarketingEnabled, whatsappAutomationEnabled, aiEnabled, aiAutoReplyEnabled, aiHumanApprovalRequired, monthlyAiTokenLimit, monthlyWhatsAppLimit)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(clinicId) DO UPDATE SET marketingEnabled=excluded.marketingEnabled, metaLeadsEnabled=excluded.metaLeadsEnabled, importsEnabled=excluded.importsEnabled, whatsappEnabled=excluded.whatsappEnabled, whatsappMarketingEnabled=excluded.whatsappMarketingEnabled, whatsappAutomationEnabled=excluded.whatsappAutomationEnabled, aiEnabled=excluded.aiEnabled, aiAutoReplyEnabled=excluded.aiAutoReplyEnabled, aiHumanApprovalRequired=excluded.aiHumanApprovalRequired, monthlyAiTokenLimit=excluded.monthlyAiTokenLimit, monthlyWhatsAppLimit=excluded.monthlyWhatsAppLimit, updatedAt=CURRENT_TIMESTAMP";
+        $sql = "INSERT INTO ClinicFeatureSetting (clinicId, marketingEnabled, metaLeadsEnabled, importsEnabled, whatsappEnabled, whatsappMarketingEnabled, whatsappAutomationEnabled, aiEnabled, aiAutoReplyEnabled, aiAutoBookEnabled, aiHumanApprovalRequired, monthlyAiTokenLimit, monthlyWhatsAppLimit)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(clinicId) DO UPDATE SET marketingEnabled=excluded.marketingEnabled, metaLeadsEnabled=excluded.metaLeadsEnabled, importsEnabled=excluded.importsEnabled, whatsappEnabled=excluded.whatsappEnabled, whatsappMarketingEnabled=excluded.whatsappMarketingEnabled, whatsappAutomationEnabled=excluded.whatsappAutomationEnabled, aiEnabled=excluded.aiEnabled, aiAutoReplyEnabled=excluded.aiAutoReplyEnabled, aiAutoBookEnabled=excluded.aiAutoBookEnabled, aiHumanApprovalRequired=excluded.aiHumanApprovalRequired, monthlyAiTokenLimit=excluded.monthlyAiTokenLimit, monthlyWhatsAppLimit=excluded.monthlyWhatsAppLimit, updatedAt=CURRENT_TIMESTAMP";
     } else {
-        $sql = "INSERT INTO ClinicFeatureSetting (clinicId, marketingEnabled, metaLeadsEnabled, importsEnabled, whatsappEnabled, whatsappMarketingEnabled, whatsappAutomationEnabled, aiEnabled, aiAutoReplyEnabled, aiHumanApprovalRequired, monthlyAiTokenLimit, monthlyWhatsAppLimit)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON DUPLICATE KEY UPDATE marketingEnabled=VALUES(marketingEnabled), metaLeadsEnabled=VALUES(metaLeadsEnabled), importsEnabled=VALUES(importsEnabled), whatsappEnabled=VALUES(whatsappEnabled), whatsappMarketingEnabled=VALUES(whatsappMarketingEnabled), whatsappAutomationEnabled=VALUES(whatsappAutomationEnabled), aiEnabled=VALUES(aiEnabled), aiAutoReplyEnabled=VALUES(aiAutoReplyEnabled), aiHumanApprovalRequired=VALUES(aiHumanApprovalRequired), monthlyAiTokenLimit=VALUES(monthlyAiTokenLimit), monthlyWhatsAppLimit=VALUES(monthlyWhatsAppLimit), updatedAt=CURRENT_TIMESTAMP";
+        $sql = "INSERT INTO ClinicFeatureSetting (clinicId, marketingEnabled, metaLeadsEnabled, importsEnabled, whatsappEnabled, whatsappMarketingEnabled, whatsappAutomationEnabled, aiEnabled, aiAutoReplyEnabled, aiAutoBookEnabled, aiHumanApprovalRequired, monthlyAiTokenLimit, monthlyWhatsAppLimit)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE marketingEnabled=VALUES(marketingEnabled), metaLeadsEnabled=VALUES(metaLeadsEnabled), importsEnabled=VALUES(importsEnabled), whatsappEnabled=VALUES(whatsappEnabled), whatsappMarketingEnabled=VALUES(whatsappMarketingEnabled), whatsappAutomationEnabled=VALUES(whatsappAutomationEnabled), aiEnabled=VALUES(aiEnabled), aiAutoReplyEnabled=VALUES(aiAutoReplyEnabled), aiAutoBookEnabled=VALUES(aiAutoBookEnabled), aiHumanApprovalRequired=VALUES(aiHumanApprovalRequired), monthlyAiTokenLimit=VALUES(monthlyAiTokenLimit), monthlyWhatsAppLimit=VALUES(monthlyWhatsAppLimit), updatedAt=CURRENT_TIMESTAMP";
     }
     $db->prepare($sql)->execute([
         $clinicId,
@@ -122,6 +128,7 @@ function tenant_features_save($db, $clinicId, $input) {
         $data['whatsappAutomationEnabled'],
         $data['aiEnabled'],
         $data['aiAutoReplyEnabled'],
+        $data['aiAutoBookEnabled'],
         $data['aiHumanApprovalRequired'],
         $data['monthlyAiTokenLimit'],
         $data['monthlyWhatsAppLimit'],

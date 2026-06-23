@@ -2,8 +2,19 @@ node_modules/
 dist/
 .env
 .env.*
+!.env.example
+!**/.env.example
 .DS_Store
 .claude/
 *.zip
 
+# Runtime data, logs, local databases, and patient uploads must never be added
+# to source control. Existing tracked artifacts still need a deliberate
+# history-cleanup step after production data is backed up.
+backend/prisma/*.db
+backend-php/error_log
+backend-php/logs/*
+backend-php/uploads/*
+!backend-php/uploads/.gitkeep
+backend-php/backups/
 

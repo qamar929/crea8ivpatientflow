@@ -547,7 +547,9 @@ function TenantAutomationControls({ tenantId }) {
           aiAutoReplyEnabled: !!Number(res.features?.aiAutoReplyEnabled),
         },
       }));
-      setNotice(`Package changed to ${key === 'ai' ? 'PatientFlow AI' : 'PatientFlow Core'}.`);
+      const changedName = (res.packages || data.packages || []).find((p) => p.key === key)?.name
+        || (key === 'ai' ? 'AppointmentFlow AI' : 'Starter');
+      setNotice(`Package changed to ${changedName}.`);
     } catch (e) { setErr(e.message); } finally { setSaving(false); }
   };
 
@@ -629,7 +631,8 @@ function TenantAutomationControls({ tenantId }) {
           <div className="grid gap-2 sm:grid-cols-2">
             {[
               ['aiEnabled', 'Enable AI hub'],
-              ['aiAutoReplyEnabled', 'Auto-reply draft engine'],
+              ['aiAutoReplyEnabled', 'AI receptionist auto-reply'],
+              ['aiAutoBookEnabled', 'Auto-book appointments'],
               ['aiHumanApprovalRequired', 'Require human approval'],
             ].map(([key, label]) => (
               <label key={key} className="flex items-center gap-2 rounded-lg border border-gray-200 bg-white px-3 py-2 text-xs font-bold dark:border-white/10 dark:bg-slate-900">

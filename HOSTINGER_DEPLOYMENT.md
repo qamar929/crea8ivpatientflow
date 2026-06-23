@@ -70,10 +70,8 @@ https://api.thesmilexperts.com/api/v1/health
 In Hostinger hPanel/phpMyAdmin:
 
 1. Create the MySQL database and user.
-2. Confirm `backend-php/config.php` matches the database credentials:
-   - DB name: `u700603111_thesmilexperts`
-   - DB user: `u700603111_thesmilexperts`
-   - DB password: `Thesmilexperts@2026`
+2. Set the database credentials in the server-side `.env` file. Never commit or
+   paste production database credentials into this guide.
 3. Import `schema.sql`.
 4. Import these MySQL migration files from `migrations/`:
    - `2026-06-02-logo-branding.sql`
@@ -85,15 +83,10 @@ In Hostinger hPanel/phpMyAdmin:
 
 Important: `hostinger-go-live.sql` clears demo/old operational data. Run it only when you want the live database reset for The Smile Xperts.
 
-## Default Logins
+## Initial Logins
 
-Change these passwords after first login:
-
-```text
-Owner:     owner@thesmilexperts.com / owner123
-Reception: reception@thesmilexperts.com / reception123
-Staff:     staff@thesmilexperts.com / staff123
-```
+Create accounts with unique generated passwords or single-use password-reset
+links. Do not deploy shared default credentials.
 
 ## Go-Live Checks
 

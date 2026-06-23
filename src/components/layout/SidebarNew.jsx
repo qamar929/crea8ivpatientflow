@@ -4,7 +4,7 @@ import {
   DollarSign, Settings, ChevronLeft, ChevronRight,
   Package, Receipt, Archive, Image, MessageSquare,
   Megaphone, Shield, Building2, ClipboardList, FileBarChart,
-  MessageCircle, Bot, Facebook, Database, LifeBuoy, FlaskConical,
+  MessageCircle, Bot, Facebook, Database, LifeBuoy, FlaskConical, Sparkles,
 } from 'lucide-react';
 import clsx from 'clsx';
 import { useClinic } from '../../context/ClinicContext';
@@ -48,6 +48,7 @@ const navGroups = [
       { to: '/marketing', icon: Megaphone, label: 'Marketing' },
       { to: '/whatsapp', icon: MessageCircle, label: 'WhatsApp Center' },
       { to: '/ai', icon: Bot, label: 'AI Hub' },
+      { to: '/ai-receptionist', icon: Sparkles, label: 'AI Receptionist' },
       { to: '/meta-leads', icon: Facebook, label: 'Meta Leads' },
       { to: '/imports', icon: Database, label: 'Import Center' },
       { to: '/reports', icon: FileBarChart, label: 'Reports' },
@@ -68,6 +69,7 @@ const FEATURE_LOCKS = {
   '/marketing': 'marketingEnabled',
   '/whatsapp': 'whatsappEnabled',
   '/ai': 'aiEnabled',
+  '/ai-receptionist': 'aiEnabled',
   '/meta-leads': 'metaLeadsEnabled',
   '/imports': 'importsEnabled',
 };
@@ -125,7 +127,18 @@ export default function SidebarNew() {
 
       {/* Navigation */}
       <nav className="relative z-10 flex-1 px-2 py-3 overflow-y-auto space-y-4">
-        {navGroups.map(group => (
+        {navGroups.map(group => {
+          // A module is visible only when the role can reach it AND, if it is a
+          // plan-gated feature, the clinic's plan includes it. Starter clinics
+          // never see AI / Marketing / WhatsApp / Meta Leads / Imports.
+          const visibleItems = group.items.filter((item) => {
+            if (!canAccessPath(item.to, role)) return false;
+            const featureKey = FEATURE_LOCKS[item.to];
+            if (featureKey && !features[featureKey]) return false;
+            return true;
+          });
+          if (visibleItems.length === 0) return null;
+          return (
           <div key={group.label}>
             {!collapsed && (
               <p className="text-white/40 text-[10px] uppercase tracking-widest px-2 mb-1.5 font-medium">
@@ -133,23 +146,7 @@ export default function SidebarNew() {
               </p>
             )}
             <div className="space-y-0.5">
-              {group.items.filter((item) => canAccessPath(item.to, role)).map(({ to, icon: Icon, label }) => {
-                const featureKey = FEATURE_LOCKS[to];
-                const disabled = featureKey && !features[featureKey];
-                if (disabled) {
-                  return (
-                    <button
-                      key={to}
-                      type="button"
-                      disabled
-                      className="flex w-full cursor-not-allowed items-center gap-3 rounded-lg border-l-2 border-transparent px-3 py-2.5 text-left text-sm font-medium text-white/30"
-                      title={`Contact Support to activate ${label}.`}
-                    >
-                      <Icon className="w-[18px] h-[18px] shrink-0" />
-                      {!collapsed && <span className="truncate">{label}</span>}
-                    </button>
-                  );
-                }
+              {visibleItems.map(({ to, icon: Icon, label }) => {
                 return (
                   <NavLink
                     key={to}
@@ -171,7 +168,8 @@ export default function SidebarNew() {
               })}
             </div>
           </div>
-        ))}
+          );
+        })}
       </nav>
 
       <div className="relative z-10 h-4 shrink-0 border-t border-white/10" />

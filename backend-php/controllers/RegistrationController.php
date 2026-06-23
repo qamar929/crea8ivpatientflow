@@ -17,7 +17,7 @@ class RegistrationController {
     public function register($input, $user) {
         $clinicName = trim($input['clinicName'] ?? '');
         $contactName = trim($input['contactName'] ?? '');
-        $email = trim($input['email'] ?? '');
+        $email = strtolower(trim($input['email'] ?? ''));
         $phone = trim($input['phone'] ?? '');
 
         if ($clinicName === '' || $contactName === '' || $email === '' || $phone === '') {

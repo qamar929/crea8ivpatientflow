@@ -4,6 +4,18 @@ require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../services/whatsappAutomationService.php';
 
 class AppointmentController {
+    private function validateDateTimeRange($date, $startTime, $endTime) {
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)
+            || !preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/', $startTime)
+            || !preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/', $endTime)) {
+            send_error('Invalid date, startTime, or endTime format', 400);
+        }
+        [$year, $month, $day] = array_map('intval', explode('-', $date));
+        if (!checkdate($month, $day, $year) || $endTime <= $startTime) {
+            send_error('Appointment end time must be after the start time', 400);
+        }
+    }
+
     private function assertClinicRecord($db, $table, $id, $clinicId, $extraWhere = '') {
         if ($id === null || $id === '') return;
         $sql = "SELECT id FROM $table WHERE id = ? AND clinicId = ?" . $extraWhere;
@@ -222,6 +234,11 @@ class AppointmentController {
         if (empty($clientId) || empty($staffId) || empty($date) || empty($startTime) || empty($endTime)) {
             send_error('clientId, staffId, date, startTime, and endTime are required', 400);
         }
+        $this->validateDateTimeRange($date, $startTime, $endTime);
+        if ($duration <= 0) {
+            $duration = (int)((strtotime("$date $endTime") - strtotime("$date $startTime")) / 60);
+        }
+        if ($price < 0) send_error('Appointment price cannot be negative', 400);
         if (!in_array($status, ['pending', 'confirmed', 'completed', 'cancelled', 'no-show'], true)) {
             send_error('Invalid appointment status', 400);
         }
@@ -275,6 +292,11 @@ class AppointmentController {
         $date = $input['date'] ?? $existing['date'];
         $startTime = $input['startTime'] ?? $existing['startTime'];
         $endTime = $input['endTime'] ?? $existing['endTime'];
+        $this->validateDateTimeRange($date, $startTime, $endTime);
+        if ((isset($input['duration']) && intval($input['duration']) <= 0)
+            || (isset($input['price']) && floatval($input['price']) < 0)) {
+            send_error('Duration must be positive and price cannot be negative', 400);
+        }
 
         $this->assertClinicRecord($db, 'Client', $clientId, $user['clinicId'], " AND status != 'inactive'");
         $this->assertClinicRecord($db, 'Staff', $staffId, $user['clinicId'], " AND status = 'active'");
@@ -343,6 +365,13 @@ class AppointmentController {
         $date = $input['date'] ?? '';
         $startTime = $input['startTime'] ?? '';
         if (empty($date) || empty($startTime)) send_error('New date and time are required', 400);
+
+        if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $date)
+            || !preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/', $startTime)) {
+            send_error('Invalid date or startTime format', 400);
+        }
+        [$year, $month, $day] = array_map('intval', explode('-', $date));
+        if (!checkdate($month, $day, $year)) send_error('Invalid appointment date', 400);
 
         $duration = intval($existing['duration'] ?: 30);
         $endTime = date('H:i', strtotime("$date $startTime") + $duration * 60);

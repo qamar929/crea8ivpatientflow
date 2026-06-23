@@ -3,6 +3,14 @@ require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../helpers.php';
 
 class FeedbackController {
+    private function validateRatings($staffRating, $serviceRating, $overallRating) {
+        foreach ([$staffRating, $serviceRating, $overallRating] as $rating) {
+            if ($rating < 1 || $rating > 5) {
+                send_error('Ratings must be between 1 and 5', 400);
+            }
+        }
+    }
+
     private function assertClientInClinic($db, $clientId, $clinicId) {
         $stmt = $db->prepare("SELECT id FROM Client WHERE id = ? AND clinicId = ? AND status != 'inactive'");
         $stmt->execute([$clientId, $clinicId]);
@@ -132,6 +140,7 @@ class FeedbackController {
         $comment = $input['comment'] ?? null;
         $wouldRecommend = !isset($input['wouldRecommend']) || !empty($input['wouldRecommend']) ? 1 : 0;
         $isPublic = !empty($input['isPublic']) ? 1 : 0;
+        $this->validateRatings($staffRating, $serviceRating, $overallRating);
         
         $staffId = $input['staffId'] ?? null;
 
@@ -189,6 +198,7 @@ class FeedbackController {
         $comment = array_key_exists('comment', $input) ? $input['comment'] : $existing['comment'];
         $wouldRecommend = array_key_exists('wouldRecommend', $input) ? (!empty($input['wouldRecommend']) ? 1 : 0) : intval($existing['wouldRecommend']);
         $isPublic = array_key_exists('isPublic', $input) ? (!empty($input['isPublic']) ? 1 : 0) : intval($existing['isPublic']);
+        $this->validateRatings($staffRating, $serviceRating, $overallRating);
 
         if (empty($clientId)) {
             send_error('clientId is required', 400);

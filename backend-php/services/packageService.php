@@ -32,9 +32,35 @@ function pf_packages() {
         'monthlyWhatsAppLimit' => 5000,
         'monthlyAiTokenLimit' => 1000000,
     ];
+    // Module manifests — drive plan-comparison UI, tooltips and onboarding.
+    // (Internal keys stay 'core'/'ai' for backward compatibility; only the
+    // display names changed to Starter / AppointmentFlow AI.)
+    $starterModules = [
+        'Dashboard', 'Reception Desk', 'Patients', 'Appointments', 'Clinical',
+        'Services', 'Billing', 'Packages', 'Reports', 'Inventory', 'Gallery',
+        'Feedback', 'Staff', 'Settings', 'Branding', 'Voice Notes', 'Customizations',
+    ];
+    $aiExtraModules = [
+        'AI Hub', 'WhatsApp Center', 'Meta Leads', 'Marketing', 'Growth',
+        'Campaign Builder', 'Broadcast Campaigns', 'AI Receptionist', 'AI Follow-ups',
+        'Review Automation', 'Patient Reactivation', 'Recall Campaigns', 'Referral Campaigns',
+    ];
+
     return [
-        'core' => ['key' => 'core', 'name' => 'PatientFlow Core', 'pricePKR' => 25000, 'flags' => $core],
-        'ai'   => ['key' => 'ai',   'name' => 'PatientFlow AI',   'pricePKR' => 40000, 'flags' => $ai],
+        'core' => [
+            'key' => 'core', 'name' => 'Starter', 'pricePKR' => 25000,
+            'tagline' => 'Everything to run the clinic day-to-day.',
+            'flags' => $core,
+            'modules' => $starterModules,
+            'lockedModules' => $aiExtraModules,
+        ],
+        'ai' => [
+            'key' => 'ai', 'name' => 'AppointmentFlow AI', 'pricePKR' => 40000,
+            'tagline' => 'Starter plus WhatsApp automation, Meta leads and the AI Receptionist.',
+            'flags' => $ai,
+            'modules' => array_merge($starterModules, $aiExtraModules),
+            'lockedModules' => [],
+        ],
     ];
 }
 

@@ -53,6 +53,9 @@ class ServiceController {
         $category = $input['category'] ?? '';
         $price = floatval($input['price'] ?? 0);
         $duration = intval($input['duration'] ?? 0);
+        if ($price < 0 || $duration <= 0) {
+            send_error('Price cannot be negative and duration must be positive', 400);
+        }
         $description = $input['description'] ?? null;
         $popular = !empty($input['popular']) ? 1 : 0;
         $isActive = 1;
@@ -75,6 +78,10 @@ class ServiceController {
         $stmt->execute([$id, $user['clinicId']]);
         if (!$stmt->fetch()) {
             send_error('Service not found', 404);
+        }
+        if ((isset($input['price']) && floatval($input['price']) < 0)
+            || (isset($input['duration']) && intval($input['duration']) <= 0)) {
+            send_error('Price cannot be negative and duration must be positive', 400);
         }
 
         $fields = [];

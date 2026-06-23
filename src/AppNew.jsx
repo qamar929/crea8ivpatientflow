@@ -42,6 +42,7 @@ import Reports from './pages/Reports';
 import AuditTrail from './pages/AuditTrail';
 import MultiBranch from './pages/MultiBranch';
 import AIHub from './pages/AIHub';
+import AIReceptionist from './pages/AIReceptionist';
 import MetaLeadCenter from './pages/MetaLeadCenter';
 import ImportCenter from './pages/ImportCenter';
 import Support from './pages/Support';
@@ -52,13 +53,20 @@ const FEATURE_ROUTES = {
   marketing: { key: 'marketingEnabled', label: 'Marketing' },
   whatsapp: { key: 'whatsappEnabled', label: 'WhatsApp Center' },
   ai: { key: 'aiEnabled', label: 'AI Hub' },
+  'ai-receptionist': { key: 'aiEnabled', label: 'AI Receptionist' },
   'meta-leads': { key: 'metaLeadsEnabled', label: 'Meta Leads' },
   imports: { key: 'importsEnabled', label: 'Import Center' },
 };
 
 function ProtectedRoute({ children }) {
   const isAuth = localStorage.getItem('clinic_auth') === 'true';
-  return isAuth ? children : <Navigate to="/login" replace />;
+  if (!isAuth) return <Navigate to="/login" replace />;
+  try {
+    if (JSON.parse(localStorage.getItem('clinic_user') || '{}').role === 'superadmin') {
+      return <Navigate to="/admin" replace />;
+    }
+  } catch (_) { /* the API remains the authorization boundary */ }
+  return children;
 }
 
 function SuperadminRoute({ children }) {
@@ -76,9 +84,17 @@ function RoleRoute({ path, children }) {
 }
 
 function FeatureRoute({ path, children }) {
-  const { features } = useClinic();
+  const { features, featuresLoaded } = useClinic();
   const feature = FEATURE_ROUTES[path];
   if (!canAccessPath(`/${path}`)) return <Navigate to="/dashboard" replace />;
+  // Wait for /features to resolve so a direct URL load doesn't wrongly lock/redirect.
+  if (feature && !featuresLoaded) {
+    return (
+      <div className="flex min-h-[55vh] items-center justify-center p-6 text-sm text-gray-400">
+        Loading…
+      </div>
+    );
+  }
   if (feature && !features[feature.key]) {
     return (
       <div className="flex min-h-[55vh] items-center justify-center p-6">
@@ -154,6 +170,7 @@ export default function AppNew() {
               <Route path="audit" element={<RoleRoute path="audit"><AuditTrail /></RoleRoute>} />
               <Route path="branches" element={<RoleRoute path="branches"><MultiBranch /></RoleRoute>} />
               <Route path="ai" element={<FeatureRoute path="ai"><AIHub /></FeatureRoute>} />
+              <Route path="ai-receptionist" element={<FeatureRoute path="ai-receptionist"><AIReceptionist /></FeatureRoute>} />
               <Route path="meta-leads" element={<FeatureRoute path="meta-leads"><MetaLeadCenter /></FeatureRoute>} />
               <Route path="imports" element={<FeatureRoute path="imports"><ImportCenter /></FeatureRoute>} />
               <Route path="support" element={<RoleRoute path="support"><Support /></RoleRoute>} />

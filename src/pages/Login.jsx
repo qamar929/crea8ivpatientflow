@@ -1,10 +1,10 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link } from 'react-router-dom';
 import {
   Eye, EyeOff, Sparkles, CalendarCheck2, Users, Receipt, ShieldCheck, Activity,
 } from 'lucide-react';
 import { useClinic } from '../context/ClinicContext';
-import { fetchApi } from '../config/api';
+import { appPath, fetchApi } from '../config/api';
 import ClinicLogoMark from '../components/branding/ClinicLogoMark';
 
 const FEATURES = [
@@ -36,7 +36,6 @@ const FEATURES = [
 ];
 
 export default function Login() {
-  const navigate = useNavigate();
   const { clinicInfo, isPlatform } = useClinic();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -61,7 +60,9 @@ export default function Login() {
       localStorage.setItem('clinic_token', data.accessToken);
       localStorage.setItem('clinic_refresh', data.refreshToken);
       localStorage.setItem('clinic_user', JSON.stringify(data.user));
-      navigate(data.user.role === 'superadmin' ? '/admin' : '/dashboard');
+      // Reload the app after establishing the session so ClinicProvider can
+      // hydrate tenant branding and plan features for the signed-in clinic.
+      window.location.assign(appPath(data.user.role === 'superadmin' ? '/admin' : '/dashboard'));
     } catch (err) {
       setError(err.message || 'Invalid email or password.');
     } finally {

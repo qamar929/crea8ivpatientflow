@@ -35,12 +35,12 @@ export default function Dashboard() {
 
   useEffect(() => {
     Promise.all([
-      fetchApi('/appointments'),
-      fetchApi('/clients'),
-      fetchApi('/staff'),
-      fetchApi('/services'),
-      fetchApi('/invoices'),
-      fetchApi('/financials/summary'),
+      fetchApi('/appointments').catch(() => []),
+      fetchApi('/clients').catch(() => ({ clients: [] })),
+      fetchApi('/staff').catch(() => []),
+      fetchApi('/services').catch(() => []),
+      fetchApi('/invoices').catch(() => []),
+      fetchApi('/financials/summary').catch(() => ({})),
     ]).then(([appointments, clients, staff, services, invoices, financials]) => {
       setData({
         appointments: Array.isArray(appointments) ? appointments : [],

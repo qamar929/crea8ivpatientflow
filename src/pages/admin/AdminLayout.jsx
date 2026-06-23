@@ -1,7 +1,8 @@
-import { NavLink, Outlet, useNavigate } from 'react-router-dom';
+import { NavLink, Outlet } from 'react-router-dom';
 import {
   LayoutDashboard, Users, Building2, Receipt, LogOut, Rocket, LifeBuoy, SlidersHorizontal,
 } from 'lucide-react';
+import { appPath } from '../../config/api';
 
 const NAV = [
   { to: '/admin', label: 'Dashboard', icon: LayoutDashboard, end: true },
@@ -13,7 +14,6 @@ const NAV = [
 ];
 
 export default function AdminLayout() {
-  const navigate = useNavigate();
   const user = JSON.parse(localStorage.getItem('clinic_user') || '{}');
 
   const handleLogout = () => {
@@ -21,7 +21,7 @@ export default function AdminLayout() {
     localStorage.removeItem('clinic_token');
     localStorage.removeItem('clinic_refresh');
     localStorage.removeItem('clinic_user');
-    navigate('/login');
+    window.location.assign(appPath('/login'));
   };
 
   return (

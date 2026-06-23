@@ -78,6 +78,9 @@ $method = $_SERVER['REQUEST_METHOD'];
 $input = [];
 if ($method === 'POST' || $method === 'PUT' || $method === 'PATCH') {
     $raw_input = file_get_contents('php://input');
+    // Preserve the exact bytes for providers (such as Meta) that sign webhook
+    // payloads. Re-encoding decoded JSON would produce a different signature.
+    $GLOBALS['request_raw_input'] = $raw_input;
     if (!empty($raw_input)) {
         $input = json_decode($raw_input, true) ?: [];
     }
@@ -366,6 +369,18 @@ $routes = [
     ['GET', '^api/v1/ai/overview$', 'AIHubController', 'overview', ['owner', 'manager']],
     ['PUT', '^api/v1/ai/providers/([^/]+)$', 'AIHubController', 'saveProvider', ['owner', 'manager']],
 
+    // AI Receptionist Routes (AppointmentFlow AI plan only — gated via api/v1/ai prefix)
+    ['GET', '^api/v1/ai-receptionist/persona$', 'AIReceptionistController', 'getPersona', ['owner', 'manager']],
+    ['PUT', '^api/v1/ai-receptionist/persona$', 'AIReceptionistController', 'savePersona', ['owner', 'manager']],
+    ['GET', '^api/v1/ai-receptionist/knowledge$', 'AIReceptionistController', 'listKnowledge', ['owner', 'manager']],
+    ['POST', '^api/v1/ai-receptionist/knowledge$', 'AIReceptionistController', 'createKnowledge', ['owner', 'manager']],
+    ['PUT', '^api/v1/ai-receptionist/knowledge/([^/]+)$', 'AIReceptionistController', 'updateKnowledge', ['owner', 'manager']],
+    ['DELETE', '^api/v1/ai-receptionist/knowledge/([^/]+)$', 'AIReceptionistController', 'deleteKnowledge', ['owner', 'manager']],
+    ['GET', '^api/v1/ai-receptionist/memory$', 'AIReceptionistController', 'listMemory', ['owner', 'manager']],
+    ['DELETE', '^api/v1/ai-receptionist/memory/([^/]+)$', 'AIReceptionistController', 'deleteMemory', ['owner', 'manager']],
+    ['POST', '^api/v1/ai-receptionist/preview$', 'AIReceptionistController', 'preview', ['owner', 'manager']],
+    ['POST', '^api/v1/ai-receptionist/simulate$', 'AIReceptionistController', 'simulate', ['owner', 'manager']],
+
     // Meta Lead Center Routes
     ['GET', '^api/v1/meta/settings$', 'MetaLeadController', 'settings', ['owner', 'manager']],
     ['PUT', '^api/v1/meta/settings$', 'MetaLeadController', 'saveSettings', ['owner', 'manager']],
@@ -493,8 +508,10 @@ foreach ($routes as $route) {
             
             try {
                 $controller->$actionName($input, $user, ...$matches);
-            } catch (Exception $e) {
-                send_error($e->getMessage(), 500);
+            } catch (Throwable $e) {
+                error_log("$controllerName::$actionName failed: " . $e->getMessage());
+                $message = APP_ENV === 'development' ? $e->getMessage() : 'Internal server error';
+                send_error($message, 500);
             }
         } else {
             send_error("Controller file $controllerName not found", 500);

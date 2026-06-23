@@ -48,7 +48,7 @@ class PortalController {
     }
 
     public function login($input, $user) {
-        $email = $input['email'] ?? '';
+        $email = strtolower(trim($input['email'] ?? ''));
         $password = $input['password'] ?? '';
 
         if (empty($email) || empty($password)) {
@@ -256,6 +256,9 @@ class PortalController {
         $comment = $input['comment'] ?? null;
         $wouldRecommend = !isset($input['wouldRecommend']) || !empty($input['wouldRecommend']) ? 1 : 0;
         $isPublic = !empty($input['isPublic']) ? 1 : 0;
+        foreach ([$staffRating, $serviceRating, $overallRating] as $rating) {
+            if ($rating < 1 || $rating > 5) send_error('Ratings must be between 1 and 5', 400);
+        }
 
         $staffId = null;
         if (!empty($appointmentId)) {

@@ -95,11 +95,14 @@ class AuthController {
     public function register($input, $user) {
         $clinicName = $input['clinicName'] ?? '';
         $name = $input['name'] ?? '';
-        $email = $input['email'] ?? '';
+        $email = strtolower(trim($input['email'] ?? ''));
         $password = $input['password'] ?? '';
 
         if (empty($clinicName) || empty($name) || empty($email) || empty($password)) {
             send_error('All fields are required', 400);
+        }
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            send_error('A valid email address is required', 400);
         }
         $this->validatePassword($password, $email);
 
@@ -148,7 +151,7 @@ class AuthController {
     }
 
     public function login($input, $user) {
-        $email = trim($input['email'] ?? '');
+        $email = strtolower(trim($input['email'] ?? ''));
         $password = $input['password'] ?? '';
 
         if (empty($email) || empty($password)) {
@@ -234,15 +237,17 @@ class AuthController {
     }
 
     public function forgotPassword($input, $user) {
-        $email = trim($input['email'] ?? '');
+        $email = strtolower(trim($input['email'] ?? ''));
         if (empty($email) || !filter_var($email, FILTER_VALIDATE_EMAIL)) {
             send_error('A valid email address is required', 400);
         }
 
         $db = DB::getConnection();
-        // Same rate limits as login — prevents abuse + email enumeration probing
-        $this->assertNotRateLimited($db, $email);
-        $this->recordAttempt($db, $email, false);
+        // Keep reset throttling separate from failed-login counters. Otherwise
+        // anyone could lock a known user out by requesting five reset emails.
+        $resetRateKey = 'reset:' . $email;
+        $this->assertNotRateLimited($db, $resetRateKey);
+        $this->recordAttempt($db, $resetRateKey, false);
 
         $stmt = $db->prepare("SELECT id, name, email FROM User WHERE email = ? AND isActive = 1");
         $stmt->execute([$email]);
