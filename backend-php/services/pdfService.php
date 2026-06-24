@@ -72,8 +72,8 @@ class InvoicePDF extends FPDF {
         $this->SetFont('Helvetica', '', 8);
         $this->SetY(-24);
         $this->Cell(0, 4, $this->clinic['invoiceFooter'] ?? 'Thank you for choosing The Smile Expert.', 0, 1, 'C');
-        $this->Cell(0, 4, $this->clinic['paymentTerms'] ?? 'This is a computer-generated invoice and does not require a signature.', 0, 1, 'C');
-        
+        $this->Cell(0, 4, 'This is a computer-generated invoice and does not require a signature.', 0, 1, 'C');
+
         $primaryColor = $this->clinic['primaryColor'] ?? '#0f766e';
         list($r, $g, $b) = $this->hex2rgb($primaryColor);
         $this->SetTextColor($r, $g, $b);
@@ -94,6 +94,17 @@ class InvoicePDF extends FPDF {
         }
         return [$r, $g, $b];
     }
+}
+
+// FPDF renders Windows-1252, not UTF-8 — convert so dashes/quotes/etc. in
+// owner-entered payment text don't turn into mojibake.
+function pdf_enc($s) {
+    $s = (string)$s;
+    if (function_exists('iconv')) {
+        $c = @iconv('UTF-8', 'Windows-1252//TRANSLIT//IGNORE', $s);
+        if ($c !== false) return $c;
+    }
+    return $s;
 }
 
 function generateInvoicePDF($invoice, $client, $clinic) {
@@ -250,26 +261,67 @@ function generateInvoicePDF($invoice, $client, $clinic) {
     $pdf->Cell(45, 6, 'Balance Due', 0, 0, 'R');
     $pdf->Cell(30, 6, 'PKR ' . number_format($invoice['balanceDue']) . '  ', 0, 1, 'R');
 
-    // Payment / account details (clinic-configured in Settings)
+    // ---- Payment details (left) + Payment terms as boxed bullets (right) ----
     $payLines = [];
-    if (!empty($clinic['bankName']))      $payLines[] = 'Bank: ' . $clinic['bankName'];
-    if (!empty($clinic['accountTitle']))  $payLines[] = 'Account Title: ' . $clinic['accountTitle'];
-    if (!empty($clinic['accountNumber'])) $payLines[] = 'Account Number: ' . $clinic['accountNumber'];
-    if (!empty($clinic['iban']))          $payLines[] = 'IBAN: ' . $clinic['iban'];
-    if (!empty($payLines) || !empty($clinic['paymentNote'])) {
-        $startY = $pdf->GetY() + 8;
-        if ($startY > 240) { $pdf->AddPage(); $startY = 55; }
-        $pdf->SetXY(15, $startY);
-        $pdf->SetTextColor($r, $g, $b);
-        $pdf->SetFont('Helvetica', 'B', 9);
-        $pdf->Cell(0, 5, 'PAYMENT DETAILS', 0, 1, 'L');
-        $pdf->SetTextColor(30, 41, 59);
-        $pdf->SetFont('Helvetica', '', 9);
-        foreach ($payLines as $line) { $pdf->SetX(15); $pdf->Cell(0, 5, $line, 0, 1, 'L'); }
-        if (!empty($clinic['paymentNote'])) {
-            $pdf->SetX(15);
-            $pdf->SetTextColor(100, 116, 139);
-            $pdf->MultiCell(150, 5, $clinic['paymentNote'], 0, 'L');
+    if (!empty($clinic['bankName']))      $payLines[] = ['Bank', pdf_enc($clinic['bankName'])];
+    if (!empty($clinic['accountTitle']))  $payLines[] = ['Account Title', pdf_enc($clinic['accountTitle'])];
+    if (!empty($clinic['accountNumber'])) $payLines[] = ['Account Number', pdf_enc($clinic['accountNumber'])];
+    if (!empty($clinic['iban']))          $payLines[] = ['IBAN', pdf_enc($clinic['iban'])];
+    $terms = array_values(array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', pdf_enc($clinic['paymentTerms'] ?? '')))));
+    $hasDetails = !empty($payLines) || !empty($clinic['paymentNote']);
+
+    if ($hasDetails || !empty($terms)) {
+        $top = $pdf->GetY() + 10;
+        if ($top > 232) { $pdf->AddPage(); $top = 55; }
+        $pdf->SetDrawColor(226, 232, 240);
+        $pdf->Line(15, $top, 195, $top);
+        $top += 6;
+
+        // LEFT column — Payment Details
+        if ($hasDetails) {
+            $y = $top;
+            $pdf->SetXY(15, $y);
+            $pdf->SetTextColor($r, $g, $b);
+            $pdf->SetFont('Helvetica', 'B', 9);
+            $pdf->Cell(90, 5, 'PAYMENT DETAILS', 0, 2, 'L');
+            $y += 7;
+            foreach ($payLines as $row) {
+                $pdf->SetXY(15, $y);
+                $pdf->SetTextColor(100, 116, 139);
+                $pdf->SetFont('Helvetica', '', 8);
+                $pdf->Cell(28, 5, $row[0], 0, 0, 'L');
+                $pdf->SetTextColor(30, 41, 59);
+                $pdf->SetFont('Helvetica', 'B', 9);
+                $pdf->Cell(60, 5, $row[1], 0, 0, 'L');
+                $y += 5.5;
+            }
+            if (!empty($clinic['paymentNote'])) {
+                $pdf->SetXY(15, $y + 1);
+                $pdf->SetTextColor(100, 116, 139);
+                $pdf->SetFont('Helvetica', '', 8);
+                $pdf->MultiCell(90, 4.5, pdf_enc($clinic['paymentNote']), 0, 'L');
+            }
+        }
+
+        // RIGHT column — Payment Terms as boxed bullets ("button" style)
+        if (!empty($terms)) {
+            $bx = $hasDetails ? 110 : 15;
+            $bw = $hasDetails ? 85 : 180;
+            $y = $top;
+            $pdf->SetXY($bx, $y);
+            $pdf->SetTextColor($r, $g, $b);
+            $pdf->SetFont('Helvetica', 'B', 9);
+            $pdf->Cell($bw, 5, 'PAYMENT TERMS', 0, 2, 'L');
+            $y += 7;
+            $pdf->SetFont('Helvetica', '', 8);
+            foreach ($terms as $term) {
+                $pdf->SetFillColor(241, 245, 249);
+                $pdf->SetDrawColor(226, 232, 240);
+                $pdf->SetTextColor(51, 65, 85);
+                $pdf->SetXY($bx, $y);
+                $pdf->MultiCell($bw, 5, $term, 1, 'L', true);
+                $y = $pdf->GetY() + 2;
+            }
         }
     }
 

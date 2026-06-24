@@ -736,7 +736,8 @@ export default function Settings() {
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1">Payment Terms</label>
-            <input value={localPaymentTerms} onChange={e => setLocalPaymentTerms(e.target.value)} className={`w-full border ${reqCls(localPaymentTerms)} rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300`} />
+            <textarea rows={4} value={localPaymentTerms} onChange={e => setLocalPaymentTerms(e.target.value)} placeholder={"One point per line — shown as bullets on the invoice:\nPayment due at time of treatment\nBalance to be cleared within 7 days\nReports collected after full payment"} className={`w-full border ${reqCls(localPaymentTerms)} rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-300`} />
+            <p className="text-[10px] text-gray-400 mt-1">Write each term on its own line. Each line becomes a bullet on the invoice.</p>
           </div>
           <div className="lg:col-span-2">
             <label className="block text-xs font-semibold text-gray-600 mb-1">Invoice Footer Message</label>
