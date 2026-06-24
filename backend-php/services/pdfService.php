@@ -261,7 +261,17 @@ function generateInvoicePDF($invoice, $client, $clinic) {
     $pdf->Cell(45, 6, 'Balance Due', 0, 0, 'R');
     $pdf->Cell(30, 6, 'PKR ' . number_format($invoice['balanceDue']) . '  ', 0, 1, 'R');
 
-    // ---- Payment details (left) + Payment terms as boxed bullets (right) ----
+    // ---- Stamp / signature: FPDF needs a real file path, so decode to temp ----
+    $stampFile = null;
+    if (!empty($clinic['stampImage']) && preg_match('#^data:image/(png|jpe?g);base64,(.+)$#s', $clinic['stampImage'], $sm)) {
+        $bin = base64_decode($sm[2]);
+        if ($bin !== false && strlen($bin) > 0) {
+            $stampFile = sys_get_temp_dir() . '/pfstamp_' . uniqid() . '.' . ($sm[1] === 'png' ? 'png' : 'jpg');
+            file_put_contents($stampFile, $bin);
+        }
+    }
+
+    // ---- Bottom: payment details + terms (left), signature/stamp (right) ----
     $payLines = [];
     if (!empty($clinic['bankName']))      $payLines[] = ['Bank', pdf_enc($clinic['bankName'])];
     if (!empty($clinic['accountTitle']))  $payLines[] = ['Account Title', pdf_enc($clinic['accountTitle'])];
@@ -270,60 +280,82 @@ function generateInvoicePDF($invoice, $client, $clinic) {
     $terms = array_values(array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', pdf_enc($clinic['paymentTerms'] ?? '')))));
     $hasDetails = !empty($payLines) || !empty($clinic['paymentNote']);
 
-    if ($hasDetails || !empty($terms)) {
-        $top = $pdf->GetY() + 10;
-        if ($top > 232) { $pdf->AddPage(); $top = 55; }
-        $pdf->SetDrawColor(226, 232, 240);
-        $pdf->Line(15, $top, 195, $top);
-        $top += 6;
+    $top = $pdf->GetY() + 12;
+    if ($top > 218) { $pdf->AddPage(); $top = 55; }
+    $pdf->SetDrawColor(226, 232, 240);
+    $pdf->Line(15, $top, 195, $top);
+    $top += 8;
 
-        // LEFT column — Payment Details
-        if ($hasDetails) {
-            $y = $top;
-            $pdf->SetXY(15, $y);
-            $pdf->SetTextColor($r, $g, $b);
-            $pdf->SetFont('Helvetica', 'B', 9);
-            $pdf->Cell(90, 5, 'PAYMENT DETAILS', 0, 2, 'L');
-            $y += 7;
-            foreach ($payLines as $row) {
-                $pdf->SetXY(15, $y);
-                $pdf->SetTextColor(100, 116, 139);
-                $pdf->SetFont('Helvetica', '', 8);
-                $pdf->Cell(28, 5, $row[0], 0, 0, 'L');
-                $pdf->SetTextColor(30, 41, 59);
-                $pdf->SetFont('Helvetica', 'B', 9);
-                $pdf->Cell(60, 5, $row[1], 0, 0, 'L');
-                $y += 5.5;
-            }
-            if (!empty($clinic['paymentNote'])) {
-                $pdf->SetXY(15, $y + 1);
-                $pdf->SetTextColor(100, 116, 139);
-                $pdf->SetFont('Helvetica', '', 8);
-                $pdf->MultiCell(90, 4.5, pdf_enc($clinic['paymentNote']), 0, 'L');
-            }
-        }
-
-        // RIGHT column — Payment Terms as boxed bullets ("button" style)
-        if (!empty($terms)) {
-            $bx = $hasDetails ? 110 : 15;
-            $bw = $hasDetails ? 85 : 180;
-            $y = $top;
-            $pdf->SetXY($bx, $y);
-            $pdf->SetTextColor($r, $g, $b);
-            $pdf->SetFont('Helvetica', 'B', 9);
-            $pdf->Cell($bw, 5, 'PAYMENT TERMS', 0, 2, 'L');
-            $y += 7;
+    // LEFT column (x=15, w=108): Payment Details, then Payment Terms below
+    $ly = $top;
+    if ($hasDetails) {
+        $pdf->SetXY(15, $ly);
+        $pdf->SetTextColor($r, $g, $b);
+        $pdf->SetFont('Helvetica', 'B', 9);
+        $pdf->Cell(108, 5, 'PAYMENT DETAILS', 0, 2, 'L');
+        $ly += 7;
+        foreach ($payLines as $row) {
+            $pdf->SetXY(15, $ly);
+            $pdf->SetTextColor(120, 130, 145);
             $pdf->SetFont('Helvetica', '', 8);
-            foreach ($terms as $term) {
-                $pdf->SetFillColor(241, 245, 249);
-                $pdf->SetDrawColor(226, 232, 240);
-                $pdf->SetTextColor(51, 65, 85);
-                $pdf->SetXY($bx, $y);
-                $pdf->MultiCell($bw, 5, $term, 1, 'L', true);
-                $y = $pdf->GetY() + 2;
-            }
+            $pdf->Cell(30, 5, $row[0], 0, 0, 'L');
+            $pdf->SetTextColor(30, 41, 59);
+            $pdf->SetFont('Helvetica', 'B', 9);
+            $pdf->Cell(78, 5, $row[1], 0, 0, 'L');
+            $ly += 5.5;
+        }
+        if (!empty($clinic['paymentNote'])) {
+            $pdf->SetXY(15, $ly + 1);
+            $pdf->SetTextColor(120, 130, 145);
+            $pdf->SetFont('Helvetica', '', 8);
+            $pdf->MultiCell(108, 4.5, pdf_enc($clinic['paymentNote']), 0, 'L');
+            $ly = $pdf->GetY();
+        }
+    }
+    if (!empty($terms)) {
+        if ($hasDetails) $ly += 5;
+        $pdf->SetXY(15, $ly);
+        $pdf->SetTextColor($r, $g, $b);
+        $pdf->SetFont('Helvetica', 'B', 9);
+        $pdf->Cell(108, 5, 'PAYMENT TERMS', 0, 2, 'L');
+        $ly += 7;
+        $pdf->SetFont('Helvetica', '', 8);
+        foreach ($terms as $term) {
+            $pdf->SetFillColor(247, 249, 251);
+            $pdf->SetDrawColor(226, 232, 240);
+            $pdf->SetTextColor(51, 65, 85);
+            $pdf->SetXY(15, $ly);
+            $pdf->MultiCell(108, 6, $term, 1, 'L', true);
+            $ly = $pdf->GetY() + 2;
         }
     }
 
-    return $pdf->Output('S');
+    // RIGHT column (x=130, w=65): Signature / stamp area
+    $rx = 130; $rw = 65;
+    $ry = $top;
+    if ($stampFile) {
+        $dim = @getimagesize($stampFile);
+        if ($dim && $dim[0] > 0 && $dim[1] > 0) {
+            $maxW = 55; $maxH = 24;
+            $scale = min($maxW / $dim[0], $maxH / $dim[1]);
+            $iw = $dim[0] * $scale; $ih = $dim[1] * $scale;
+            $pdf->Image($stampFile, $rx + ($rw - $iw) / 2, $ry, $iw, $ih);
+            $ry += $ih + 2;
+        } else { $ry += 18; }
+    } else {
+        $ry += 18; // blank space for a handwritten signature
+    }
+    $pdf->SetDrawColor(160, 170, 180);
+    $pdf->Line($rx + 6, $ry, $rx + $rw - 6, $ry);
+    $pdf->SetXY($rx, $ry + 1.5);
+    $pdf->SetTextColor(120, 130, 145);
+    $pdf->SetFont('Helvetica', '', 8);
+    $pdf->Cell($rw, 4, 'Authorized Signature', 0, 2, 'C');
+    $pdf->SetTextColor(30, 41, 59);
+    $pdf->SetFont('Helvetica', 'B', 8.5);
+    $pdf->Cell($rw, 4, pdf_enc($clinic['name'] ?? ''), 0, 1, 'C');
+
+    $output = $pdf->Output('S');
+    if ($stampFile && file_exists($stampFile)) { @unlink($stampFile); }
+    return $output;
 }

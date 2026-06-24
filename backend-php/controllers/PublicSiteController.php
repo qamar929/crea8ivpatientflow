@@ -5,7 +5,8 @@ require_once __DIR__ . '/../helpers.php';
 class PublicSiteController {
     // Additive, idempotent: clinic bank/account details shown on invoices.
     private function ensureClinicPaymentColumns($db) {
-        $cols = ['bankName', 'accountTitle', 'accountNumber', 'iban', 'paymentNote'];
+        // stampImage holds a base64 data URL (like logo) → needs a large text type.
+        $cols = ['bankName', 'accountTitle', 'accountNumber', 'iban', 'paymentNote', 'stampImage'];
         if (DB_DRIVER === 'sqlite') {
             $existing = array_column($db->query("PRAGMA table_info(Clinic)")->fetchAll(), 'name');
             foreach ($cols as $c) {
@@ -16,7 +17,7 @@ class PublicSiteController {
                 $stmt = $db->prepare("SELECT COUNT(*) FROM information_schema.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'Clinic' AND COLUMN_NAME = ?");
                 $stmt->execute([$c]);
                 if (!(int)$stmt->fetchColumn()) {
-                    $type = $c === 'paymentNote' ? 'TEXT' : 'VARCHAR(191)';
+                    $type = $c === 'stampImage' ? 'MEDIUMTEXT' : ($c === 'paymentNote' ? 'TEXT' : 'VARCHAR(191)');
                     $db->exec("ALTER TABLE Clinic ADD COLUMN $c $type NULL");
                 }
             }
@@ -199,7 +200,7 @@ class PublicSiteController {
         $clinic = $this->getClinic($db, $user['clinicId']);
         $clinicInput = $input['clinic'] ?? [];
         $config = $input['config'] ?? [];
-        $allowed = ['name', 'tagline', 'logo', 'address', 'phone', 'whatsapp', 'email', 'website', 'registrationNo', 'invoicePrefix', 'invoiceFooter', 'paymentTerms', 'mission', 'vision', 'servicesOverview', 'primaryColor', 'secondaryColor', 'font', 'bankName', 'accountTitle', 'accountNumber', 'iban', 'paymentNote'];
+        $allowed = ['name', 'tagline', 'logo', 'address', 'phone', 'whatsapp', 'email', 'website', 'registrationNo', 'invoicePrefix', 'invoiceFooter', 'paymentTerms', 'mission', 'vision', 'servicesOverview', 'primaryColor', 'secondaryColor', 'font', 'bankName', 'accountTitle', 'accountNumber', 'iban', 'paymentNote', 'stampImage'];
         $fields = [];
         $params = [];
         foreach ($allowed as $key) {

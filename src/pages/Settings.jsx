@@ -445,6 +445,8 @@ export default function Settings() {
   const [localAccountNumber, setLocalAccountNumber] = useState(clinicInfo.accountNumber || '');
   const [localIban, setLocalIban] = useState(clinicInfo.iban || '');
   const [localPaymentNote, setLocalPaymentNote] = useState(clinicInfo.paymentNote || '');
+  const [localStamp, setLocalStamp] = useState(clinicInfo.stampImage || '');
+  const [stampError, setStampError] = useState('');
   const [localMission, setLocalMission] = useState(clinicInfo.mission || '');
   const [localVision, setLocalVision] = useState(clinicInfo.vision || '');
   const [localServicesOverview, setLocalServicesOverview] = useState(clinicInfo.servicesOverview || '');
@@ -476,6 +478,7 @@ export default function Settings() {
         setLocalAccountNumber(v(clinic.accountNumber));
         setLocalIban(v(clinic.iban));
         setLocalPaymentNote(v(clinic.paymentNote));
+        setLocalStamp(v(clinic.stampImage));
         setLocalMission(v(clinic.mission));
         setLocalVision(v(clinic.vision));
         setLocalServicesOverview(v(clinic.servicesOverview));
@@ -500,6 +503,18 @@ export default function Settings() {
   });
 
   const toggleNotif = (key) => setNotifications(n => ({ ...n, [key]: !n[key] }));
+
+  const handleStampUpload = (event) => {
+    const [file] = Array.from(event.target.files || []);
+    event.target.value = '';
+    if (!file) return;
+    if (!file.type.startsWith('image/')) { setStampError('Please choose a valid image file.'); return; }
+    if (file.size > 1.5 * 1024 * 1024) { setStampError('Stamp/signature must be 1.5MB or smaller.'); return; }
+    const reader = new FileReader();
+    reader.onload = () => { setLocalStamp(typeof reader.result === 'string' ? reader.result : localStamp); setStampError(''); };
+    reader.onerror = () => setStampError('Could not read the selected file. Please try again.');
+    reader.readAsDataURL(file);
+  };
 
   const handleLogoUpload = (event) => {
     const [file] = Array.from(event.target.files || []);
@@ -550,6 +565,7 @@ export default function Settings() {
       accountNumber: localAccountNumber,
       iban: localIban,
       paymentNote: localPaymentNote,
+      stampImage: localStamp,
       mission: localMission,
       vision: localVision,
       servicesOverview: localServicesOverview,
@@ -568,7 +584,7 @@ export default function Settings() {
             registrationNo: localRegistrationNo, invoicePrefix: localInvoicePrefix,
             invoiceFooter: localInvoiceFooter, paymentTerms: localPaymentTerms,
             bankName: localBankName, accountTitle: localAccountTitle, accountNumber: localAccountNumber,
-            iban: localIban, paymentNote: localPaymentNote, mission: localMission,
+            iban: localIban, paymentNote: localPaymentNote, stampImage: localStamp, mission: localMission,
             vision: localVision, servicesOverview: localServicesOverview, primaryColor: localPrimary,
             secondaryColor: localSecondary, font: localFont,
           },
@@ -767,6 +783,31 @@ export default function Settings() {
           <div className="lg:col-span-2">
             <label className="block text-xs font-semibold text-gray-600 mb-1">Payment Note (optional)</label>
             <input value={localPaymentNote} onChange={e => setLocalPaymentNote(e.target.value)} placeholder="e.g. JazzCash/Easypaisa: 0300-1234567 — send receipt on WhatsApp" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
+          </div>
+
+          <div className="lg:col-span-2">
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Stamp / Signature (optional)</label>
+            <p className="text-[11px] text-gray-400 mb-2">Shown in the signature area of every invoice. Use a transparent PNG of your clinic stamp or an authorized signature.</p>
+            <div className="flex items-center gap-3 flex-wrap">
+              <div className="h-16 w-32 rounded-lg border border-gray-200 bg-white flex items-center justify-center overflow-hidden">
+                {localStamp
+                  ? <img src={localStamp} alt="Stamp / signature preview" className="max-h-14 max-w-[120px] object-contain" />
+                  : <span className="text-[10px] text-gray-300">No stamp</span>}
+              </div>
+              <div className="space-y-1.5">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <label className="cursor-pointer bg-white border border-gray-200 rounded-lg px-4 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors">
+                    {localStamp ? 'Replace' : 'Upload'} Stamp / Signature
+                    <input type="file" accept="image/*" className="hidden" onChange={handleStampUpload} />
+                  </label>
+                  {localStamp && (
+                    <button type="button" onClick={() => { setLocalStamp(''); setStampError(''); }} className="bg-white border border-gray-200 rounded-lg px-4 py-2 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors">Remove</button>
+                  )}
+                </div>
+                <p className="text-[10px] text-gray-400">PNG (transparent recommended), max 1.5MB.</p>
+                {stampError && <p className="text-[10px] text-red-500">{stampError}</p>}
+              </div>
+            </div>
           </div>
         </div>
         <div className="mt-4 rounded-xl border border-gray-100 bg-gray-50 p-4">
