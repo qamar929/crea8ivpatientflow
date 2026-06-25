@@ -273,8 +273,9 @@ function generateInvoicePDF($invoice, $client, $clinic) {
 
     // ---- Bottom: payment details + terms (left), signature/stamp (right) ----
     $payLines = [];
-    if (!empty($clinic['bankName']))      $payLines[] = ['Bank', pdf_enc($clinic['bankName'])];
     if (!empty($clinic['accountTitle']))  $payLines[] = ['Account Title', pdf_enc($clinic['accountTitle'])];
+    if (!empty($clinic['bankName']))      $payLines[] = ['Bank', pdf_enc($clinic['bankName'])];
+    if (!empty($clinic['bankBranch']))    $payLines[] = ['Branch', pdf_enc($clinic['bankBranch'])];
     if (!empty($clinic['accountNumber'])) $payLines[] = ['Account Number', pdf_enc($clinic['accountNumber'])];
     if (!empty($clinic['iban']))          $payLines[] = ['IBAN', pdf_enc($clinic['iban'])];
     $terms = array_values(array_filter(array_map('trim', preg_split('/\r\n|\r|\n/', pdf_enc($clinic['paymentTerms'] ?? '')))));

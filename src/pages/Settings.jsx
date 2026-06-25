@@ -441,6 +441,7 @@ export default function Settings() {
   const [localInvoiceFooter, setLocalInvoiceFooter] = useState(clinicInfo.invoiceFooter || '');
   const [localPaymentTerms, setLocalPaymentTerms] = useState(clinicInfo.paymentTerms || '');
   const [localBankName, setLocalBankName] = useState(clinicInfo.bankName || '');
+  const [localBankBranch, setLocalBankBranch] = useState(clinicInfo.bankBranch || '');
   const [localAccountTitle, setLocalAccountTitle] = useState(clinicInfo.accountTitle || '');
   const [localAccountNumber, setLocalAccountNumber] = useState(clinicInfo.accountNumber || '');
   const [localIban, setLocalIban] = useState(clinicInfo.iban || '');
@@ -474,6 +475,7 @@ export default function Settings() {
         setLocalInvoiceFooter(v(clinic.invoiceFooter));
         setLocalPaymentTerms(v(clinic.paymentTerms));
         setLocalBankName(v(clinic.bankName));
+        setLocalBankBranch(v(clinic.bankBranch));
         setLocalAccountTitle(v(clinic.accountTitle));
         setLocalAccountNumber(v(clinic.accountNumber));
         setLocalIban(v(clinic.iban));
@@ -561,6 +563,7 @@ export default function Settings() {
       invoiceFooter: localInvoiceFooter,
       paymentTerms: localPaymentTerms,
       bankName: localBankName,
+      bankBranch: localBankBranch,
       accountTitle: localAccountTitle,
       accountNumber: localAccountNumber,
       iban: localIban,
@@ -583,7 +586,7 @@ export default function Settings() {
             phone: localPhone, whatsapp: localWhatsapp, email: localEmail, website: localWebsite,
             registrationNo: localRegistrationNo, invoicePrefix: localInvoicePrefix,
             invoiceFooter: localInvoiceFooter, paymentTerms: localPaymentTerms,
-            bankName: localBankName, accountTitle: localAccountTitle, accountNumber: localAccountNumber,
+            bankName: localBankName, bankBranch: localBankBranch, accountTitle: localAccountTitle, accountNumber: localAccountNumber,
             iban: localIban, paymentNote: localPaymentNote, stampImage: localStamp, mission: localMission,
             vision: localVision, servicesOverview: localServicesOverview, primaryColor: localPrimary,
             secondaryColor: localSecondary, font: localFont,
@@ -766,7 +769,11 @@ export default function Settings() {
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1">Bank Name</label>
-            <input value={localBankName} onChange={e => setLocalBankName(e.target.value)} placeholder="e.g. Meezan Bank" className={`w-full border ${reqCls(localBankName)} rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300`} />
+            <input value={localBankName} onChange={e => setLocalBankName(e.target.value)} placeholder="e.g. Faysal Bank" className={`w-full border ${reqCls(localBankName)} rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300`} />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Branch Name</label>
+            <input value={localBankBranch} onChange={e => setLocalBankBranch(e.target.value)} placeholder="e.g. IBB F-8 Markaz, Islamabad" className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1">Account Title</label>

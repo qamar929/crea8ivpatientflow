@@ -6,7 +6,7 @@ class PublicSiteController {
     // Additive, idempotent: clinic bank/account details shown on invoices.
     private function ensureClinicPaymentColumns($db) {
         // stampImage holds a base64 data URL (like logo) → needs a large text type.
-        $cols = ['bankName', 'accountTitle', 'accountNumber', 'iban', 'paymentNote', 'stampImage'];
+        $cols = ['bankName', 'bankBranch', 'accountTitle', 'accountNumber', 'iban', 'paymentNote', 'stampImage'];
         if (DB_DRIVER === 'sqlite') {
             $existing = array_column($db->query("PRAGMA table_info(Clinic)")->fetchAll(), 'name');
             foreach ($cols as $c) {
@@ -200,7 +200,7 @@ class PublicSiteController {
         $clinic = $this->getClinic($db, $user['clinicId']);
         $clinicInput = $input['clinic'] ?? [];
         $config = $input['config'] ?? [];
-        $allowed = ['name', 'tagline', 'logo', 'address', 'phone', 'whatsapp', 'email', 'website', 'registrationNo', 'invoicePrefix', 'invoiceFooter', 'paymentTerms', 'mission', 'vision', 'servicesOverview', 'primaryColor', 'secondaryColor', 'font', 'bankName', 'accountTitle', 'accountNumber', 'iban', 'paymentNote', 'stampImage'];
+        $allowed = ['name', 'tagline', 'logo', 'address', 'phone', 'whatsapp', 'email', 'website', 'registrationNo', 'invoicePrefix', 'invoiceFooter', 'paymentTerms', 'mission', 'vision', 'servicesOverview', 'primaryColor', 'secondaryColor', 'font', 'bankName', 'bankBranch', 'accountTitle', 'accountNumber', 'iban', 'paymentNote', 'stampImage'];
         $fields = [];
         $params = [];
         foreach ($allowed as $key) {
