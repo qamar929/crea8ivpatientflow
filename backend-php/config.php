@@ -60,9 +60,13 @@ define('JWT_REFRESH_EXPIRES_IN', (int)(getenv('JWT_REFRESH_EXPIRES_IN') ?: 60480
 define('CLIENT_URL', getenv('CLIENT_URL') ?: 'https://portal.thesmilexperts.com');
 
 // Wildcard subdomain every new clinic gets a default URL on:
-//   <slug>.clinic.crea8ivmedia.com → "smile-xperts.clinic.crea8ivmedia.com"
+//   <slug>.crea8ivmedia.com → "smile-xperts.crea8ivmedia.com"
 // Override via env if rebranded. Needs wildcard DNS + SSL to actually resolve.
-define('TENANT_DOMAIN_SUFFIX', getenv('TENANT_DOMAIN_SUFFIX') ?: 'clinic.crea8ivmedia.com');
+define('TENANT_DOMAIN_SUFFIX', getenv('TENANT_DOMAIN_SUFFIX') ?: 'crea8ivmedia.com');
+
+// Subdomains reserved for the platform itself — clinics can never claim these
+// (the slugify also blocks them, and normalizeDomain rejects them).
+define('PLATFORM_RESERVED_SUBDOMAINS', 'www,app,api,clinic,portal,patientflow,admin,mail,webmail,smtp,imap,pop,ftp,cpanel,hpanel,cdn,static,assets,blog,docs,support,help,status,billing');
 
 // Twilio Config
 define('TWILIO_ACCOUNT_SID', getenv('TWILIO_ACCOUNT_SID') ?: '');

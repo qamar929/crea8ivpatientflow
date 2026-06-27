@@ -155,6 +155,9 @@ class AdminController {
     private function slugify($db, $name) {
         $base = strtolower(trim(preg_replace('/[^a-z0-9]+/i', '-', $name), '-'));
         $base = substr($base ?: 'clinic', 0, 50);
+        // Don't let a clinic claim a reserved platform subdomain via its slug.
+        $reserved = array_filter(array_map('trim', explode(',', PLATFORM_RESERVED_SUBDOMAINS)));
+        if (in_array($base, $reserved, true)) $base = $base . '-clinic';
         $slug = $base;
         $i = 2;
         while (true) {
@@ -603,13 +606,17 @@ class AdminController {
         if (!preg_match('/^(?=.{1,253}$)([a-z0-9](-?[a-z0-9])*\.)+[a-z]{2,}$/', $domain)) {
             send_error('Enter a valid domain like portal.yourclinic.com', 400);
         }
-        // Allow the platform wildcard tenant subdomain (e.g. *.clinic.crea8ivmedia.com)
-        // — that's the auto-assigned default; reject the bare platform host(s).
-        if ($domain === 'crea8ivmedia.com' || $domain === 'clinic.crea8ivmedia.com' || $domain === TENANT_DOMAIN_SUFFIX) {
-            send_error('Platform domains cannot be used as a clinic custom domain', 400);
+        // Reject the bare platform host + reserved infra subdomains.
+        // Any other "<slug>.crea8ivmedia.com" is fair game (that's the auto-assigned default).
+        if ($domain === TENANT_DOMAIN_SUFFIX) {
+            send_error('The platform domain cannot be used as a clinic custom domain', 400);
         }
-        if (str_ends_with($domain, '.crea8ivmedia.com') && !str_ends_with($domain, '.' . TENANT_DOMAIN_SUFFIX)) {
-            send_error('Platform domains cannot be used as a clinic custom domain', 400);
+        if (str_ends_with($domain, '.' . TENANT_DOMAIN_SUFFIX)) {
+            $sub = substr($domain, 0, -1 * (strlen(TENANT_DOMAIN_SUFFIX) + 1));
+            $reserved = array_filter(array_map('trim', explode(',', PLATFORM_RESERVED_SUBDOMAINS)));
+            if ($sub === '' || in_array(strtolower($sub), $reserved, true)) {
+                send_error('That subdomain is reserved for the platform', 400);
+            }
         }
         $sql = "SELECT id FROM Clinic WHERE LOWER(customDomain) = ?" . ($excludeClinicId ? " AND id != ?" : "");
         $stmt = $db->prepare($sql);
