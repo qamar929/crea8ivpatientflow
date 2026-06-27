@@ -127,6 +127,11 @@ export function ClinicProvider({ children }) {
     // featuresLoaded gates FeatureRoute so a direct URL load to a plan-gated
     // route doesn't flash/redirect before /features resolves.
     if (!isClinicUserSession()) { setFeaturesLoaded(true); return; }
+    // Terminal screens (subscription-inactive, login) must not hit tenant APIs
+    // — those would 402 and bounce the page back to itself in a loop.
+    if (typeof window !== 'undefined' && /\/(subscription-inactive|login|forgot-password|reset-password)$/.test(window.location.pathname)) {
+      setFeaturesLoaded(true); return;
+    }
     fetchApi('/features')
       .then((data) => {
         setFeatures((current) => ({ ...current, ...data }));
@@ -145,6 +150,7 @@ export function ClinicProvider({ children }) {
     // including the shared platform domain where /public/branding matches
     // nothing. Roles without access to this endpoint just keep domain branding.
     if (!isClinicUserSession()) return;
+    if (typeof window !== 'undefined' && /\/(subscription-inactive|login|forgot-password|reset-password)$/.test(window.location.pathname)) return;
     fetchApi('/settings/public-site')
       .then((data) => {
         if (data?.clinic) {

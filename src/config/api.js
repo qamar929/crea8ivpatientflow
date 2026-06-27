@@ -81,12 +81,17 @@ export async function fetchApi(endpoint, options = {}) {
   const data = isJson ? await response.json() : await response.text();
 
   if (!response.ok) {
+    // Don't redirect AWAY from a page TO itself — that turns a single 401/402
+    // background fetch into a navigation loop that blocks clicks.
+    const here = typeof window !== 'undefined' ? window.location.pathname : '';
     if (response.status === 401) {
       clearSession();
-      window.location.href = appPath('/login');
+      const target = appPath('/login');
+      if (here !== target && !here.endsWith('/login')) window.location.href = target;
     }
     if (response.status === 402 && data.code === 'subscription_inactive') {
-      window.location.href = appPath('/subscription-inactive');
+      const target = appPath('/subscription-inactive');
+      if (here !== target && !here.endsWith('/subscription-inactive')) window.location.href = target;
     }
     throw new Error(data.message || data.error || 'API request failed');
   }

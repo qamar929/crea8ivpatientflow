@@ -37,3 +37,133 @@ SUBJECT: Your clinic portal is ready — set your password
   <p style="color:#64748b;font-size:13px;">If you didn't request this, you can safely ignore this email — your password will not change.</p>
 </div>
 ------------------------------------------------------------
+[2026-06-22 23:03:34] TO: qa-manager@example.invalid
+SUBJECT: Reset your portal password
+<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;">
+  <h2 style="color:#0f766e;">Password Reset Request</h2>
+  <p>Hi QA Manager,</p>
+  <p>We received a request to reset your portal password. Click the button below to choose a new one. This link expires in 30 minutes and can be used once.</p>
+  <p style="margin:28px 0;">
+    <a href="http://127.0.0.1:4173/reset-password?token=dd7b4181e1a3ea2ee3555545147c9134df90addafdf5f801e2188250f5cba6fd" style="background:#0f766e;color:#ffffff;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;">Reset Password</a>
+  </p>
+  <p style="color:#64748b;font-size:13px;">If the button doesn't work, copy this link into your browser:<br>http://127.0.0.1:4173/reset-password?token=dd7b4181e1a3ea2ee3555545147c9134df90addafdf5f801e2188250f5cba6fd</p>
+  <p style="color:#64748b;font-size:13px;">If you didn't request this, you can safely ignore this email — your password will not change.</p>
+</div>
+------------------------------------------------------------
+[2026-06-22 23:03:34] TO: qa-manager@example.invalid
+SUBJECT: Reset your portal password
+<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;">
+  <h2 style="color:#0f766e;">Password Reset Request</h2>
+  <p>Hi QA Manager,</p>
+  <p>We received a request to reset your portal password. Click the button below to choose a new one. This link expires in 30 minutes and can be used once.</p>
+  <p style="margin:28px 0;">
+    <a href="http://127.0.0.1:4173/reset-password?token=023b01bcdec4ccb3b52955f6cbaf778d5bce8a947b714ba60c8d6ddae21bdeb6" style="background:#0f766e;color:#ffffff;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;">Reset Password</a>
+  </p>
+  <p style="color:#64748b;font-size:13px;">If the button doesn't work, copy this link into your browser:<br>http://127.0.0.1:4173/reset-password?token=023b01bcdec4ccb3b52955f6cbaf778d5bce8a947b714ba60c8d6ddae21bdeb6</p>
+  <p style="color:#64748b;font-size:13px;">If you didn't request this, you can safely ignore this email — your password will not change.</p>
+</div>
+------------------------------------------------------------
+[2026-06-22 23:03:34] TO: qa-manager@example.invalid
+SUBJECT: Reset your portal password
+<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;">
+  <h2 style="color:#0f766e;">Password Reset Request</h2>
+  <p>Hi QA Manager,</p>
+  <p>We received a request to reset your portal password. Click the button below to choose a new one. This link expires in 30 minutes and can be used once.</p>
+  <p style="margin:28px 0;">
+    <a href="http://127.0.0.1:4173/reset-password?token=741a983e7aead790d1105d14724b9de987358fad708af30963c397dfa5ec3a4b" style="background:#0f766e;color:#ffffff;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;">Reset Password</a>
+  </p>
+  <p style="color:#64748b;font-size:13px;">If the button doesn't work, copy this link into your browser:<br>http://127.0.0.1:4173/reset-password?token=741a983e7aead790d1105d14724b9de987358fad708af30963c397dfa5ec3a4b</p>
+  <p style="color:#64748b;font-size:13px;">If you didn't request this, you can safely ignore this email — your password will not change.</p>
+</div>
+------------------------------------------------------------
+[2026-06-22 23:03:34] TO: qa-manager@example.invalid
+SUBJECT: Reset your portal password
+<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;">
+  <h2 style="color:#0f766e;">Password Reset Request</h2>
+  <p>Hi QA Manager,</p>
+  <p>We received a request to reset your portal password. Click the button below to choose a new one. This link expires in 30 minutes and can be used once.</p>
+  <p style="margin:28px 0;">
+    <a href="http://127.0.0.1:4173/reset-password?token=fed100ddfddbdacf62c40d14f2b2d18570e220e38b88155d42ad74fe6d78cf72" style="background:#0f766e;color:#ffffff;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;">Reset Password</a>
+  </p>
+  <p style="color:#64748b;font-size:13px;">If the button doesn't work, copy this link into your browser:<br>http://127.0.0.1:4173/reset-password?token=fed100ddfddbdacf62c40d14f2b2d18570e220e38b88155d42ad74fe6d78cf72</p>
+  <p style="color:#64748b;font-size:13px;">If you didn't request this, you can safely ignore this email — your password will not change.</p>
+</div>
+------------------------------------------------------------
+[2026-06-22 23:03:34] TO: qa-manager@example.invalid
+SUBJECT: Reset your portal password
+<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;">
+  <h2 style="color:#0f766e;">Password Reset Request</h2>
+  <p>Hi QA Manager,</p>
+  <p>We received a request to reset your portal password. Click the button below to choose a new one. This link expires in 30 minutes and can be used once.</p>
+  <p style="margin:28px 0;">
+    <a href="http://127.0.0.1:4173/reset-password?token=8325a395a0428ce0e6d603dcfee6b59d1241d39ec31a82c42c40ddfc11c9397d" style="background:#0f766e;color:#ffffff;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;">Reset Password</a>
+  </p>
+  <p style="color:#64748b;font-size:13px;">If the button doesn't work, copy this link into your browser:<br>http://127.0.0.1:4173/reset-password?token=8325a395a0428ce0e6d603dcfee6b59d1241d39ec31a82c42c40ddfc11c9397d</p>
+  <p style="color:#64748b;font-size:13px;">If you didn't request this, you can safely ignore this email — your password will not change.</p>
+</div>
+------------------------------------------------------------
+[2026-06-22 23:09:04] TO: qa-manager@example.invalid
+SUBJECT: Reset your portal password
+<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;">
+  <h2 style="color:#0f766e;">Password Reset Request</h2>
+  <p>Hi QA Manager,</p>
+  <p>We received a request to reset your portal password. Click the button below to choose a new one. This link expires in 30 minutes and can be used once.</p>
+  <p style="margin:28px 0;">
+    <a href="http://127.0.0.1:4173/reset-password?token=35699bda1d06d5053903df217ca4b682615aee8435550ec21071a03032a6016c" style="background:#0f766e;color:#ffffff;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;">Reset Password</a>
+  </p>
+  <p style="color:#64748b;font-size:13px;">If the button doesn't work, copy this link into your browser:<br>http://127.0.0.1:4173/reset-password?token=35699bda1d06d5053903df217ca4b682615aee8435550ec21071a03032a6016c</p>
+  <p style="color:#64748b;font-size:13px;">If you didn't request this, you can safely ignore this email — your password will not change.</p>
+</div>
+------------------------------------------------------------
+[2026-06-22 23:09:04] TO: qa-manager@example.invalid
+SUBJECT: Reset your portal password
+<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;">
+  <h2 style="color:#0f766e;">Password Reset Request</h2>
+  <p>Hi QA Manager,</p>
+  <p>We received a request to reset your portal password. Click the button below to choose a new one. This link expires in 30 minutes and can be used once.</p>
+  <p style="margin:28px 0;">
+    <a href="http://127.0.0.1:4173/reset-password?token=43aab182473539e36cc4a3c9db6aa7326d8bca0377749c44108c67969e7f0c9c" style="background:#0f766e;color:#ffffff;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;">Reset Password</a>
+  </p>
+  <p style="color:#64748b;font-size:13px;">If the button doesn't work, copy this link into your browser:<br>http://127.0.0.1:4173/reset-password?token=43aab182473539e36cc4a3c9db6aa7326d8bca0377749c44108c67969e7f0c9c</p>
+  <p style="color:#64748b;font-size:13px;">If you didn't request this, you can safely ignore this email — your password will not change.</p>
+</div>
+------------------------------------------------------------
+[2026-06-22 23:09:04] TO: qa-manager@example.invalid
+SUBJECT: Reset your portal password
+<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;">
+  <h2 style="color:#0f766e;">Password Reset Request</h2>
+  <p>Hi QA Manager,</p>
+  <p>We received a request to reset your portal password. Click the button below to choose a new one. This link expires in 30 minutes and can be used once.</p>
+  <p style="margin:28px 0;">
+    <a href="http://127.0.0.1:4173/reset-password?token=5c49385af69139a64b1c13fa50e989eb544dfde5846d28c4af807886c4d8b671" style="background:#0f766e;color:#ffffff;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;">Reset Password</a>
+  </p>
+  <p style="color:#64748b;font-size:13px;">If the button doesn't work, copy this link into your browser:<br>http://127.0.0.1:4173/reset-password?token=5c49385af69139a64b1c13fa50e989eb544dfde5846d28c4af807886c4d8b671</p>
+  <p style="color:#64748b;font-size:13px;">If you didn't request this, you can safely ignore this email — your password will not change.</p>
+</div>
+------------------------------------------------------------
+[2026-06-22 23:09:04] TO: qa-manager@example.invalid
+SUBJECT: Reset your portal password
+<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;">
+  <h2 style="color:#0f766e;">Password Reset Request</h2>
+  <p>Hi QA Manager,</p>
+  <p>We received a request to reset your portal password. Click the button below to choose a new one. This link expires in 30 minutes and can be used once.</p>
+  <p style="margin:28px 0;">
+    <a href="http://127.0.0.1:4173/reset-password?token=83123be55737b14459d7617e79f3f05c682df6348b0239c0b4f9b9cf4696cfea" style="background:#0f766e;color:#ffffff;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;">Reset Password</a>
+  </p>
+  <p style="color:#64748b;font-size:13px;">If the button doesn't work, copy this link into your browser:<br>http://127.0.0.1:4173/reset-password?token=83123be55737b14459d7617e79f3f05c682df6348b0239c0b4f9b9cf4696cfea</p>
+  <p style="color:#64748b;font-size:13px;">If you didn't request this, you can safely ignore this email — your password will not change.</p>
+</div>
+------------------------------------------------------------
+[2026-06-22 23:09:04] TO: qa-manager@example.invalid
+SUBJECT: Reset your portal password
+<div style="font-family:Arial,sans-serif;max-width:520px;margin:0 auto;padding:24px;">
+  <h2 style="color:#0f766e;">Password Reset Request</h2>
+  <p>Hi QA Manager,</p>
+  <p>We received a request to reset your portal password. Click the button below to choose a new one. This link expires in 30 minutes and can be used once.</p>
+  <p style="margin:28px 0;">
+    <a href="http://127.0.0.1:4173/reset-password?token=22e9e7507f7c948ca9d88bb75e244c7ba9192cd7e24f2c10bfb7f026e758f8c2" style="background:#0f766e;color:#ffffff;padding:12px 24px;border-radius:8px;text-decoration:none;display:inline-block;">Reset Password</a>
+  </p>
+  <p style="color:#64748b;font-size:13px;">If the button doesn't work, copy this link into your browser:<br>http://127.0.0.1:4173/reset-password?token=22e9e7507f7c948ca9d88bb75e244c7ba9192cd7e24f2c10bfb7f026e758f8c2</p>
+  <p style="color:#64748b;font-size:13px;">If you didn't request this, you can safely ignore this email — your password will not change.</p>
+</div>
+------------------------------------------------------------
