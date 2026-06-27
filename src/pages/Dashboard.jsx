@@ -74,13 +74,6 @@ export default function Dashboard() {
         <StatCard title="Active Staff" value={String(activeStaff.length)} icon={UserCheck} />
       </div>
 
-      <div className="rounded-xl border border-teal-100 bg-teal-50/80 p-5">
-        <h2 className="text-sm font-bold text-teal-950">The Smile Xperts Live Portal</h2>
-        <p className="mt-1 text-xs leading-relaxed text-teal-700">
-          Demo collections have been removed. Revenue, dues, invoices, appointments and patient counts now come from the database only.
-        </p>
-      </div>
-
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="luxury-card h-72 p-5 lg:col-span-2"><RevenueChart /></div>
         <div className="luxury-card p-5">
