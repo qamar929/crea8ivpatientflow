@@ -1,6 +1,7 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from './context/ThemeContext';
 import { ClinicProvider } from './context/ClinicContext';
+import { PORTAL_BASENAME } from './config/portalPath';
 import LayoutNew from './components/layout/LayoutNew';
 
 // Existing pages
@@ -113,7 +114,7 @@ export default function AppNew() {
   return (
     <ThemeProvider>
       <ClinicProvider>
-        <BrowserRouter basename={import.meta.env.BASE_URL}>
+        <BrowserRouter basename={PORTAL_BASENAME}>
           <Routes>
             <Route path="/public" element={<PublicSite />} />
             <Route path="/login" element={<Login />} />

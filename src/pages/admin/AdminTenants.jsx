@@ -425,7 +425,8 @@ function TenantDrawer({ id, onClose, onManage, onEdit }) {
               <Row label="Email">{data.email || '—'}</Row>
               <Row label="Phone">{data.phone || '—'}</Row>
               <Row label="Owner">{owner ? <>{owner.name}<span className="block text-xs text-gray-400">{owner.email}</span></> : 'No owner'}</Row>
-              <Row label="Domain">{data.customDomain ? <>{data.customDomain}<span className="block text-xs text-gray-400">{data.domainStatus} · SSL {data.sslStatus || 'n/a'}</span></> : 'Platform subdomain'}</Row>
+              <Row label="Portal link">{data.slug ? <a href={`https://crea8ivmedia.com/clinic/${data.slug}`} target="_blank" rel="noopener noreferrer" className="text-orange-600 hover:underline break-all">crea8ivmedia.com/clinic/{data.slug}</a> : '—'}</Row>
+              <Row label="Custom domain">{data.customDomain ? <>{data.customDomain}<span className="block text-xs text-gray-400">{data.domainStatus} · SSL {data.sslStatus || 'n/a'}</span></> : 'None (uses portal link)'}</Row>
               <Row label="Subscription">{expiry ? <span className="inline-flex items-center gap-1"><Clock className="w-3.5 h-3.5 text-gray-400" /><ExpiryBadge date={expiry} status={data.status} /></span> : '—'}</Row>
               <Row label="Created">{data.createdAt ? String(data.createdAt).slice(0, 10) : '—'}</Row>
             </section>

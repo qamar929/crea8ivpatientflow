@@ -668,20 +668,13 @@ class AdminController {
                 ? date('Y-m-d H:i:s', strtotime('+' . max(1, (int)($input['trialDays'] ?? 14)) . ' days'))
                 : null;
 
-            // Auto-assign the branded platform subdomain when the operator did
-            // not provide a custom domain. Marked 'connected' since it's the
-            // wildcard the platform itself serves.
-            $autoAssigned = false;
-            if (empty($customDomain)) {
-                $customDomain = default_clinic_subdomain($db, $slug);
-                $autoAssigned = true;
-            }
-            $domainStatus = $autoAssigned ? 'connected' : ($customDomain ? 'pending' : 'none');
-
+            // Every clinic is reachable at crea8ivmedia.com/clinic/<slug> (path-based,
+            // valid SSL, zero setup). customDomain stays empty unless the operator
+            // assigns a real domain the clinic owns.
             $db->prepare("INSERT INTO Clinic (id, name, email, phone, address, status, clinicType, slug, primaryColor, secondaryColor, trialEndsAt, customDomain, domainStatus) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
                ->execute([$clinicId, $name, $email, $phone, $address, $status, $clinicType, $slug,
                           $primaryColor, $secondaryColor, $trialEndsAt,
-                          $customDomain, $domainStatus]);
+                          $customDomain, $customDomain ? 'pending' : 'none']);
 
             $ownerId = generate_uuid();
             $hash = $sendInvite
@@ -871,11 +864,11 @@ class AdminController {
 
             $clinicId = generate_uuid();
             $slug = $this->slugify($db, $lead['clinicName']);
-            $autoDomain = default_clinic_subdomain($db, $slug);
-            // Created as 'pending' — activate (after payment) flips it on
-            $db->prepare("INSERT INTO Clinic (id, name, phone, email, status, clinicType, slug, customDomain, domainStatus) VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, 'connected')")
+            // Created as 'pending' — activate (after payment) flips it on. Reachable
+            // at crea8ivmedia.com/clinic/<slug>; no custom domain unless assigned later.
+            $db->prepare("INSERT INTO Clinic (id, name, phone, email, status, clinicType, slug) VALUES (?, ?, ?, ?, 'pending', ?, ?)")
                ->execute([$clinicId, $lead['clinicName'], $lead['phone'], $lead['email'],
-                          $lead['clinicType'] ?: 'dental', $slug, $autoDomain]);
+                          $lead['clinicType'] ?: 'dental', $slug]);
 
             $ownerId = generate_uuid();
             // Unusable random password; the owner sets their own via the invite link

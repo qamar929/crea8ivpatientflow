@@ -110,8 +110,19 @@ class PublicSiteController {
     // neutral default (e.g. on clinic.crea8ivmedia.com or localhost).
     public function branding($input, $user = null) {
         $db = DB::getConnection();
-        $host = $_GET['domain'] ?? ($_SERVER['HTTP_ORIGIN'] ?? '');
-        $clinic = find_clinic_by_domain($db, $host);
+        // Path-based portal links (crea8ivmedia.com/clinic/<slug>) pass ?slug=.
+        // Fall back to domain matching for custom-domain / subdomain portals.
+        $slug = trim($_GET['slug'] ?? '');
+        $clinic = null;
+        if ($slug !== '') {
+            $stmt = $db->prepare("SELECT * FROM Clinic WHERE LOWER(slug) = LOWER(?) AND id != 'platform' LIMIT 1");
+            $stmt->execute([$slug]);
+            $clinic = $stmt->fetch() ?: null;
+        }
+        if (!$clinic) {
+            $host = $_GET['domain'] ?? ($_SERVER['HTTP_ORIGIN'] ?? '');
+            $clinic = find_clinic_by_domain($db, $host);
+        }
         if (!$clinic) {
             send_json(['matched' => false]);
         }

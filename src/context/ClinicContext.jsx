@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { fetchApi, fetchPublicApi } from '../config/api';
 import { syncBrandingMetadata } from '../utils/branding';
+import { PORTAL_CLINIC_SLUG } from '../config/portalPath';
 
 // A signed-in clinic user (not the platform superadmin) should always see
 // their own clinic's saved branding, regardless of which domain they use.
@@ -108,8 +109,13 @@ export function ClinicProvider({ children }) {
     // portal (incl. the login screen) accordingly. The domain is sent
     // explicitly so it works even when the API lives on a different host
     // (e.g. portal.thesmilexperts.com talking to app.crea8ivmedia.com).
+    // Path-based portal link (/clinic/<slug>/…) brands by slug; otherwise the
+    // clinic is identified by the domain (custom domain / subdomain portals).
     const domain = window.location.hostname;
-    fetchPublicApi(`/public/branding?domain=${encodeURIComponent(domain)}`)
+    const q = PORTAL_CLINIC_SLUG
+      ? `slug=${encodeURIComponent(PORTAL_CLINIC_SLUG)}`
+      : `domain=${encodeURIComponent(domain)}`;
+    fetchPublicApi(`/public/branding?${q}`)
       .then((data) => {
         if (data?.matched && data.clinic) {
           setClinicMatched(true);
