@@ -544,6 +544,48 @@ class AdminController {
         send_json(['message' => "Subscription extended by $months month(s)", 'expiresAt' => $newExpiry]);
     }
 
+    // Detailed subscription control: set an EXACT end date (and optionally the
+    // billing cycle / amount). Creates a subscription if none exists, else updates
+    // the active one. Clinic status follows the date (future = active, past = expired).
+    public function setSubscription($input, $user, $id) {
+        $db = DB::getConnection();
+        $stmt = $db->prepare("SELECT id, status FROM Clinic WHERE id = ? AND id != 'platform'");
+        $stmt->execute([$id]);
+        if (!$stmt->fetch()) send_error('Tenant not found', 404);
+
+        $raw = trim((string)($input['expiresAt'] ?? ''));
+        $ts = $raw !== '' ? strtotime($raw) : false;
+        if ($ts === false) send_error('A valid end date is required (YYYY-MM-DD).', 400);
+        // Normalise to end-of-day so the clinic stays active through the chosen date.
+        $expiresAt = date('Y-m-d 23:59:59', $ts);
+
+        $billingCycle = in_array($input['billingCycle'] ?? '', ['monthly', 'annual'], true) ? $input['billingCycle'] : null;
+        $amount = isset($input['amountPKR']) && $input['amountPKR'] !== '' ? (float)$input['amountPKR'] : null;
+
+        $existing = $db->prepare("SELECT * FROM Subscription WHERE clinicId = ? AND status = 'active' ORDER BY expiresAt DESC LIMIT 1");
+        $existing->execute([$id]);
+        $sub = $existing->fetch();
+
+        if ($sub) {
+            $db->prepare("UPDATE Subscription SET expiresAt = ?, billingCycle = COALESCE(?, billingCycle), amountPKR = COALESCE(?, amountPKR) WHERE id = ?")
+               ->execute([$expiresAt, $billingCycle, $amount, $sub['id']]);
+            $subId = $sub['id'];
+        } else {
+            $subId = generate_uuid();
+            $db->prepare("INSERT INTO Subscription (id, clinicId, billingCycle, amountPKR, startsAt, expiresAt, status) VALUES (?, ?, ?, ?, ?, ?, 'active')")
+               ->execute([$subId, $id, $billingCycle ?: 'monthly', $amount ?? (float)PLAN_MONTHLY_PKR, date('Y-m-d H:i:s'), $expiresAt]);
+        }
+
+        // Status follows the date: future end = active, past = expired (keep suspended as-is otherwise).
+        $newStatus = strtotime($expiresAt) >= time() ? 'active' : 'expired';
+        $db->prepare("UPDATE Clinic SET status = ?, suspendedAt = NULL, suspensionReason = NULL WHERE id = ?")
+           ->execute([$newStatus, $id]);
+
+        log_audit($id, $user['id'], 'tenant_subscription_set', 'Clinic', $id, null,
+                  ['expiresAt' => $expiresAt, 'billingCycle' => $billingCycle, 'amountPKR' => $amount, 'status' => $newStatus]);
+        send_json(['message' => 'Subscription updated', 'subscriptionId' => $subId, 'expiresAt' => $expiresAt, 'status' => $newStatus]);
+    }
+
     // Superadmin "manage clinic": mint a real owner session for the clinic so
     // the platform admin can step in and configure everything (staff, services,
     // branding, appointments) exactly as the owner would, then return to /admin.

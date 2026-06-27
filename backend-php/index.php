@@ -241,6 +241,7 @@ $routes = [
     ['POST', '^api/v1/admin/tenants/([^/]+)/activate$', 'AdminController', 'activateTenant', 'admin'],
     ['POST', '^api/v1/admin/tenants/([^/]+)/suspend$', 'AdminController', 'suspendTenant', 'admin'],
     ['POST', '^api/v1/admin/tenants/([^/]+)/extend$', 'AdminController', 'extendTenant', 'admin'],
+    ['POST', '^api/v1/admin/tenants/([^/]+)/subscription$', 'AdminController', 'setSubscription', 'admin'],
     ['POST', '^api/v1/admin/tenants/([^/]+)/impersonate$', 'AdminController', 'impersonateTenant', 'admin'],
     ['PUT', '^api/v1/admin/tenants/([^/]+)/package$', 'AdminController', 'setPackage', 'admin'],
     ['PUT', '^api/v1/admin/tenants/([^/]+)/domain$', 'AdminController', 'setDomain', 'admin'],

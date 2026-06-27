@@ -365,6 +365,7 @@ export default function AdminTenants() {
           onClose={() => setDrawerId(null)}
           onManage={(t) => { setDrawerId(null); manage(t); }}
           onEdit={(t) => { setDrawerId(null); setEditTenant(t); }}
+          onChanged={load}
         />
       )}
     </div>
@@ -373,13 +374,100 @@ export default function AdminTenants() {
 
 // ----------------------------------------------------------------------
 // Slide-over detail panel: owner(s), domain/SSL, subscription, usage counts.
-function TenantDrawer({ id, onClose, onManage, onEdit }) {
+function SubscriptionControls({ tenantId, status, currentExpiry, onChanged }) {
+  const toDateInput = (v) => {
+    if (!v) return '';
+    const d = new Date(String(v).replace(' ', 'T'));
+    return isNaN(d) ? '' : d.toISOString().slice(0, 10);
+  };
+  const [date, setDate] = useState(toDateInput(currentExpiry));
+  const [cycle, setCycle] = useState('');
+  const [amount, setAmount] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [msg, setMsg] = useState('');
+  const [err, setErr] = useState('');
+
+  useEffect(() => { setDate(toDateInput(currentExpiry)); }, [currentExpiry]);
+
+  const daysLeft = currentExpiry ? Math.ceil((new Date(String(currentExpiry).replace(' ', 'T')) - new Date()) / 86400000) : null;
+
+  const save = async (overrideDate) => {
+    const expiresAt = overrideDate || date;
+    if (!expiresAt) { setErr('Pick an end date first.'); return; }
+    setBusy(true); setErr(''); setMsg('');
+    try {
+      const body = { expiresAt };
+      if (cycle) body.billingCycle = cycle;
+      if (amount !== '') body.amountPKR = Number(amount);
+      const res = await fetchApi(`/admin/tenants/${tenantId}/subscription`, { method: 'POST', body: JSON.stringify(body) });
+      setMsg(`Saved — ends ${String(res.expiresAt).slice(0, 10)} · ${res.status}`);
+      onChanged?.();
+    } catch (e) { setErr(e.message); } finally { setBusy(false); }
+  };
+
+  const quick = (months) => {
+    const base = currentExpiry && new Date(String(currentExpiry).replace(' ', 'T')) > new Date()
+      ? new Date(String(currentExpiry).replace(' ', 'T')) : new Date();
+    base.setMonth(base.getMonth() + months);
+    const d = base.toISOString().slice(0, 10);
+    setDate(d);
+    save(d);
+  };
+
+  return (
+    <section className="rounded-xl border border-gray-200/70 dark:border-white/10 p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <h3 className="text-xs font-bold uppercase tracking-wider text-gray-400 flex items-center gap-1.5"><Clock className="w-3.5 h-3.5" /> Subscription</h3>
+        {currentExpiry
+          ? <span className={`text-[11px] font-bold ${daysLeft < 0 ? 'text-rose-600' : daysLeft <= 30 ? 'text-amber-600' : 'text-emerald-600'}`}>{daysLeft < 0 ? `expired ${Math.abs(daysLeft)}d ago` : `${daysLeft}d left`}</span>
+          : <span className="text-[11px] text-gray-400">no active subscription</span>}
+      </div>
+
+      <div>
+        <label className="block text-[11px] font-semibold text-gray-500 mb-1">Subscription end date</label>
+        <div className="flex gap-2">
+          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="flex-1 border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm" />
+          <button onClick={() => save()} disabled={busy} className="px-4 py-2 rounded-lg bg-orange-600 hover:bg-orange-700 text-white text-xs font-bold disabled:opacity-60">{busy ? 'Saving…' : 'Save'}</button>
+        </div>
+        <p className="text-[10px] text-gray-400 mt-1">Sets the exact end date. Future date keeps the clinic active; a past date marks it expired.</p>
+      </div>
+
+      <div>
+        <p className="text-[11px] font-semibold text-gray-500 mb-1">Quick extend from current end</p>
+        <div className="flex flex-wrap gap-1.5">
+          {[1, 3, 6, 12].map((m) => (
+            <button key={m} onClick={() => quick(m)} disabled={busy} className="px-2.5 py-1.5 rounded-lg border border-gray-200 dark:border-white/10 text-xs font-bold text-gray-600 dark:text-gray-300 hover:border-orange-300 hover:text-orange-600 disabled:opacity-60">+{m} mo</button>
+          ))}
+        </div>
+      </div>
+
+      <details className="text-xs">
+        <summary className="cursor-pointer text-gray-400 font-semibold select-none">Billing cycle & amount (optional)</summary>
+        <div className="mt-2 grid grid-cols-2 gap-2">
+          <select value={cycle} onChange={(e) => setCycle(e.target.value)} className="border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-900 dark:text-white rounded-lg px-2 py-1.5 text-xs">
+            <option value="">Keep current cycle</option>
+            <option value="monthly">Monthly</option>
+            <option value="annual">Annual</option>
+          </select>
+          <input type="number" min="0" value={amount} onChange={(e) => setAmount(e.target.value)} placeholder="Amount PKR" className="border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 text-gray-900 dark:text-white rounded-lg px-2 py-1.5 text-xs" />
+        </div>
+      </details>
+
+      {msg && <p className="text-[11px] text-emerald-600 font-semibold">{msg}</p>}
+      {err && <p className="text-[11px] text-rose-600 font-semibold">{err}</p>}
+    </section>
+  );
+}
+
+function TenantDrawer({ id, onClose, onManage, onEdit, onChanged }) {
   const [data, setData] = useState(null);
   const [err, setErr] = useState('');
 
+  const loadDrawer = () => fetchApi(`/admin/tenants/${id}`).then(setData).catch((e) => setErr(e.message));
   useEffect(() => {
     setData(null); setErr('');
-    fetchApi(`/admin/tenants/${id}`).then(setData).catch((e) => setErr(e.message));
+    loadDrawer();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   const owner = data?.users?.find((u) => u.role === 'owner') || data?.users?.[0];
@@ -430,6 +518,13 @@ function TenantDrawer({ id, onClose, onManage, onEdit }) {
               <Row label="Subscription">{expiry ? <span className="inline-flex items-center gap-1"><Clock className="w-3.5 h-3.5 text-gray-400" /><ExpiryBadge date={expiry} status={data.status} /></span> : '—'}</Row>
               <Row label="Created">{data.createdAt ? String(data.createdAt).slice(0, 10) : '—'}</Row>
             </section>
+
+            <SubscriptionControls
+              tenantId={data.id}
+              status={data.status}
+              currentExpiry={expiry}
+              onChanged={() => { loadDrawer(); onChanged?.(); }}
+            />
 
             <TenantAutomationControls tenantId={data.id} />
 
