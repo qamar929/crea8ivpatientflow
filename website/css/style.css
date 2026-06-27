@@ -50,7 +50,7 @@
   --radius-lg: 26px;
   --radius-sm: 12px;
 
-  --container: 1160px;
+  --container: 1300px;
   --ease: cubic-bezier(0.22, 1, 0.36, 1);
 }
 
@@ -114,6 +114,9 @@ ul { list-style: none; }
 .nav { display: flex; align-items: center; justify-content: space-between; gap: 18px; height: 82px; }
 
 .brand { display: flex; align-items: center; gap: 12px; font-weight: 800; font-size: 18px; letter-spacing: -0.02em; }
+.brand-logo { height: 42px; width: auto; display: block; }
+.site-footer .brand-logo { height: 46px; }
+@media (max-width: 720px) { .brand-logo { height: 36px; } }
 .brand-mark {
   display: inline-block; width: 42px; height: 34px; flex-shrink: 0;
   background: var(--grad);
