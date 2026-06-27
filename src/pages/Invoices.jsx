@@ -237,6 +237,30 @@ function InvoiceDetailModal({ invoice, isOpen, onClose, onMarkPaid, onRefund, on
           <div className="flex justify-between text-sm font-bold text-red-600"><span>Balance due</span><span>{money(invoice.balanceDue)}</span></div>
         </div>
         {invoice.notes && <div className="rounded-xl border border-amber-100 bg-amber-50 p-3 text-xs text-amber-700">{invoice.notes}</div>}
+        {(() => {
+          const payRows = [
+            ['Account Title', invoiceClinic.accountTitle],
+            ['Bank', invoiceClinic.bankName],
+            ['Branch', invoiceClinic.bankBranch],
+            ['Account Number', invoiceClinic.accountNumber],
+            ['IBAN', invoiceClinic.iban],
+          ].filter(([, v]) => v);
+          if (!payRows.length && !invoiceClinic.paymentNote) return null;
+          return (
+            <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-white/10 dark:bg-white/5">
+              <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-[var(--primary)]">Payment Details</p>
+              <div className="grid grid-cols-1 gap-x-6 gap-y-1 sm:grid-cols-2">
+                {payRows.map(([label, value]) => (
+                  <div key={label} className="flex justify-between gap-3 text-xs">
+                    <span className="text-gray-500">{label}</span>
+                    <span className="font-semibold text-gray-900 dark:text-white text-right break-all">{value}</span>
+                  </div>
+                ))}
+              </div>
+              {invoiceClinic.paymentNote && <p className="mt-2 text-xs text-gray-500">{invoiceClinic.paymentNote}</p>}
+            </div>
+          );
+        })()}
         <div className="flex flex-wrap gap-2 no-print">
           <Button variant="secondary" onClick={() => onPrint(invoice)}>Print</Button>
           <Button variant="secondary" onClick={() => onDownload(invoice)}><Download className="h-4 w-4" /> PDF</Button>

@@ -601,9 +601,15 @@ class InvoiceController {
 
         try {
             $pdfContent = generateInvoicePDF($invoice, $client, $clinic);
-            
+
             header('Content-Type: application/pdf');
             header('Content-Disposition: attachment; filename="' . $invoice['invoiceNo'] . '.pdf"');
+            // Never cache invoice PDFs — they must always reflect the latest clinic
+            // payment details / branding, so a freshly-added bank account shows up
+            // on EVERY invoice (paid or pending), not a stale browser copy.
+            header('Cache-Control: no-store, no-cache, must-revalidate, max-age=0');
+            header('Pragma: no-cache');
+            header('Expires: 0');
             echo $pdfContent;
             exit;
         } catch (Exception $e) {
