@@ -140,6 +140,23 @@ function generate_qr_data_url($appointmentId, $clientName, $date, $time) {
 // Priority: exact custom domain (e.g. portal.thesmilexperts.com)
 //           then slug subdomain ({slug}.crea8ivmedia.com).
 // Returns the Clinic row or null (caller decides the fallback).
+
+// Default branded URL every new clinic gets: <slug>.clinic.crea8ivmedia.com.
+// Picks the longest available -<n> suffix only if needed for uniqueness.
+function default_clinic_subdomain($db, $slug, $excludeClinicId = null) {
+    $suffix = '.' . TENANT_DOMAIN_SUFFIX;
+    $base = $slug ?: 'clinic';
+    $candidate = $base . $suffix;
+    $sql = "SELECT id FROM Clinic WHERE LOWER(customDomain) = ?" . ($excludeClinicId ? " AND id != ?" : "");
+    for ($i = 2; $i < 20; $i++) {
+        $stmt = $db->prepare($sql);
+        $stmt->execute($excludeClinicId ? [$candidate, $excludeClinicId] : [$candidate]);
+        if (!$stmt->fetch()) return $candidate;
+        $candidate = $base . '-' . $i . $suffix;
+    }
+    return $candidate;
+}
+
 function find_clinic_by_domain($db, $host) {
     $host = strtolower(trim((string)$host));
     if ($host === '') return null;

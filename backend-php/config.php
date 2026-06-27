@@ -59,6 +59,11 @@ define('JWT_REFRESH_EXPIRES_IN', (int)(getenv('JWT_REFRESH_EXPIRES_IN') ?: 60480
 // CORS / Allowed Client origin
 define('CLIENT_URL', getenv('CLIENT_URL') ?: 'https://portal.thesmilexperts.com');
 
+// Wildcard subdomain every new clinic gets a default URL on:
+//   <slug>.clinic.crea8ivmedia.com → "smile-xperts.clinic.crea8ivmedia.com"
+// Override via env if rebranded. Needs wildcard DNS + SSL to actually resolve.
+define('TENANT_DOMAIN_SUFFIX', getenv('TENANT_DOMAIN_SUFFIX') ?: 'clinic.crea8ivmedia.com');
+
 // Twilio Config
 define('TWILIO_ACCOUNT_SID', getenv('TWILIO_ACCOUNT_SID') ?: '');
 define('TWILIO_AUTH_TOKEN', getenv('TWILIO_AUTH_TOKEN') ?: '');

@@ -603,7 +603,12 @@ class AdminController {
         if (!preg_match('/^(?=.{1,253}$)([a-z0-9](-?[a-z0-9])*\.)+[a-z]{2,}$/', $domain)) {
             send_error('Enter a valid domain like portal.yourclinic.com', 400);
         }
-        if ($domain === 'crea8ivmedia.com' || str_ends_with($domain, '.crea8ivmedia.com')) {
+        // Allow the platform wildcard tenant subdomain (e.g. *.clinic.crea8ivmedia.com)
+        // — that's the auto-assigned default; reject the bare platform host(s).
+        if ($domain === 'crea8ivmedia.com' || $domain === 'clinic.crea8ivmedia.com' || $domain === TENANT_DOMAIN_SUFFIX) {
+            send_error('Platform domains cannot be used as a clinic custom domain', 400);
+        }
+        if (str_ends_with($domain, '.crea8ivmedia.com') && !str_ends_with($domain, '.' . TENANT_DOMAIN_SUFFIX)) {
             send_error('Platform domains cannot be used as a clinic custom domain', 400);
         }
         $sql = "SELECT id FROM Clinic WHERE LOWER(customDomain) = ?" . ($excludeClinicId ? " AND id != ?" : "");
@@ -656,10 +661,20 @@ class AdminController {
                 ? date('Y-m-d H:i:s', strtotime('+' . max(1, (int)($input['trialDays'] ?? 14)) . ' days'))
                 : null;
 
+            // Auto-assign the branded platform subdomain when the operator did
+            // not provide a custom domain. Marked 'connected' since it's the
+            // wildcard the platform itself serves.
+            $autoAssigned = false;
+            if (empty($customDomain)) {
+                $customDomain = default_clinic_subdomain($db, $slug);
+                $autoAssigned = true;
+            }
+            $domainStatus = $autoAssigned ? 'connected' : ($customDomain ? 'pending' : 'none');
+
             $db->prepare("INSERT INTO Clinic (id, name, email, phone, address, status, clinicType, slug, primaryColor, secondaryColor, trialEndsAt, customDomain, domainStatus) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
                ->execute([$clinicId, $name, $email, $phone, $address, $status, $clinicType, $slug,
                           $primaryColor, $secondaryColor, $trialEndsAt,
-                          $customDomain, $customDomain ? 'pending' : 'none']);
+                          $customDomain, $domainStatus]);
 
             $ownerId = generate_uuid();
             $hash = $sendInvite
@@ -849,10 +864,11 @@ class AdminController {
 
             $clinicId = generate_uuid();
             $slug = $this->slugify($db, $lead['clinicName']);
+            $autoDomain = default_clinic_subdomain($db, $slug);
             // Created as 'pending' — activate (after payment) flips it on
-            $db->prepare("INSERT INTO Clinic (id, name, phone, email, status, clinicType, slug) VALUES (?, ?, ?, ?, 'pending', ?, ?)")
+            $db->prepare("INSERT INTO Clinic (id, name, phone, email, status, clinicType, slug, customDomain, domainStatus) VALUES (?, ?, ?, ?, 'pending', ?, ?, ?, 'connected')")
                ->execute([$clinicId, $lead['clinicName'], $lead['phone'], $lead['email'],
-                          $lead['clinicType'] ?: 'dental', $slug]);
+                          $lead['clinicType'] ?: 'dental', $slug, $autoDomain]);
 
             $ownerId = generate_uuid();
             // Unusable random password; the owner sets their own via the invite link
