@@ -413,7 +413,12 @@ export default function Invoices() {
 
   const fetchPdfBlobUrl = async (invoice) => {
     const token = localStorage.getItem('clinic_token');
-    const response = await fetch(`${API_URL}/invoices/${invoice.id}/pdf`, { headers: { Authorization: `Bearer ${token}` } });
+    // Cache-buster + no-store so the browser never reuses an old cached PDF
+    // (e.g. one rendered before the clinic's payment details were added).
+    const response = await fetch(`${API_URL}/invoices/${invoice.id}/pdf?t=${Date.now()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+      cache: 'no-store',
+    });
     if (!response.ok) {
       let msg = 'PDF could not be generated.';
       try { const j = await response.json(); if (j.error) msg = j.error; } catch (_) { /* non-JSON */ }
