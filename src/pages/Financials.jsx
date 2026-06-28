@@ -1,153 +1,366 @@
 import { useEffect, useMemo, useState } from 'react';
-import { AlertCircle, DollarSign, Download, Loader2, TrendingDown, TrendingUp } from 'lucide-react';
-import { fetchApi } from '../config/api';
-import { useClinic } from '../context/ClinicContext';
+import {
+  AlertCircle, BarChart3, DollarSign, Download, FileText, Loader2, Plus,
+  Receipt, Save, TrendingDown, TrendingUp, Upload
+} from 'lucide-react';
+import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import Badge from '../components/ui/Badge';
-import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import Button from '../components/ui/Button';
+import { fetchApi, API_URL } from '../config/api';
+import { useClinic } from '../context/ClinicContext';
 
 const money = (value = 0) => `PKR ${Number(value || 0).toLocaleString()}`;
-const statusBadge = { paid: 'paid', pending: 'pending', partial: 'pending', refunded: 'refunded' };
+const today = () => new Date().toISOString().slice(0, 10);
+const monthStart = () => new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10);
+const monthEnd = () => new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).toISOString().slice(0, 10);
+const fileBase = API_URL.replace(/\/api\/v1\/?$/, '');
 
-function SummaryCard({ label, value, icon: Icon, iconBg, iconColor }) {
+function SummaryCard({ label, value, helper, icon: Icon, tone }) {
   return (
-    <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-slate-900">
-      <div className="mb-3 flex items-center justify-between">
+    <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-slate-900" title={helper}>
+      <div className="mb-3 flex items-center justify-between gap-3">
         <p className="text-xs font-semibold uppercase tracking-wider text-gray-500">{label}</p>
-        <div className={`rounded-lg p-2 ${iconBg}`}><Icon className={`h-4 w-4 ${iconColor}`} /></div>
+        <div className={`rounded-lg p-2 ${tone}`}><Icon className="h-4 w-4" /></div>
       </div>
-      <p className="text-2xl font-bold text-gray-900 dark:text-white">{value}</p>
-      <p className="mt-1 text-xs text-gray-400">Live data only</p>
+      <p className="text-2xl font-black text-gray-950 dark:text-white">{value}</p>
+      <p className="mt-1 text-xs text-gray-400">{helper}</p>
+    </div>
+  );
+}
+
+function EmptyState({ icon: Icon = FileText, title, body }) {
+  return (
+    <div className="py-12 text-center">
+      <Icon className="mx-auto h-10 w-10 text-gray-300" />
+      <p className="mt-3 text-sm font-bold text-gray-700 dark:text-gray-200">{title}</p>
+      <p className="mt-1 text-xs text-gray-400">{body}</p>
     </div>
   );
 }
 
 export default function Financials() {
   const { term } = useClinic();
-  const patientLabel = term('patient', 'Patient');
   const serviceLabel = term('service', 'Service');
-  const servicesLabel = term('services', 'services');
-  const [summary, setSummary] = useState({ totalRevenue: 0, totalExpenses: 0, netProfit: 0, outstandingPayments: 0 });
+  const patientLabel = term('patient', 'Patient');
+  const [summary, setSummary] = useState(null);
   const [monthly, setMonthly] = useState([]);
   const [transactions, setTransactions] = useState([]);
+  const [expenses, setExpenses] = useState([]);
+  const [categories, setCategories] = useState([]);
+  const [branches, setBranches] = useState([]);
+  const [profitability, setProfitability] = useState([]);
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState('');
+  const [procedureRows, setProcedureRows] = useState([]);
+  const [range, setRange] = useState({ from: monthStart(), to: monthEnd() });
+  const [expenseForm, setExpenseForm] = useState({
+    categoryId: '', branchId: '', description: '', amount: '', expenseDate: today(), paymentMethod: 'Cash', receipt: null,
+  });
+  const [newCategory, setNewCategory] = useState('');
+  const [saving, setSaving] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  useEffect(() => {
-    Promise.all([
-      fetchApi('/financials/summary'),
-      fetchApi('/financials/monthly'),
-      fetchApi('/financials/transactions'),
-    ]).then(([sum, months, txns]) => {
+  const load = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const [sum, months, txns, expensePayload, cats, branchRows, profitRows] = await Promise.all([
+        fetchApi('/financials/summary'),
+        fetchApi('/financials/monthly'),
+        fetchApi('/financials/transactions?limit=50'),
+        fetchApi(`/expenses?from=${range.from}&to=${range.to}`),
+        fetchApi('/expenses/categories'),
+        fetchApi('/branches').catch(() => []),
+        fetchApi('/financials/profitability').catch(() => []),
+      ]);
       setSummary(sum || {});
       setMonthly(Array.isArray(months) ? months : []);
       setTransactions(Array.isArray(txns) ? txns : []);
-    }).catch(err => {
-      alert(err.message || 'Financial data could not be loaded.');
-    }).finally(() => setLoading(false));
-  }, []);
+      setExpenses(Array.isArray(expensePayload?.expenses) ? expensePayload.expenses : []);
+      setCategories(Array.isArray(cats) ? cats : []);
+      setBranches(Array.isArray(branchRows) ? branchRows : []);
+      setProfitability(Array.isArray(profitRows) ? profitRows : []);
+      setExpenseForm(current => ({ ...current, categoryId: current.categoryId || cats?.[0]?.id || '' }));
+      if (!selectedInvoiceId && Array.isArray(txns) && txns[0]?.id) setSelectedInvoiceId(txns[0].id);
+    } catch (err) {
+      setError(err.message || 'Financial data could not be loaded.');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  const chartData = monthly.length ? monthly : [{ month: 'No revenue', total: 0 }];
-  const categoryData = useMemo(() => {
+  useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [range.from, range.to]);
+
+  useEffect(() => {
+    if (!selectedInvoiceId) { setProcedureRows([]); return; }
+    fetchApi(`/invoices/${selectedInvoiceId}/procedure-costs`)
+      .then(data => setProcedureRows(Array.isArray(data.items) ? data.items : []))
+      .catch(() => setProcedureRows([]));
+  }, [selectedInvoiceId]);
+
+  const expenseTotal = expenses.reduce((sum, row) => sum + Number(row.amount || 0), 0);
+  const topRevenue = useMemo(() => {
     const grouped = {};
-    transactions.forEach(txn => {
-      const name = txn.appointment?.service?.name || normalizeItems(txn.items)[0]?.description || 'Manual invoice';
-      grouped[name] = (grouped[name] || 0) + Number(txn.total || 0);
-    });
-    return Object.entries(grouped).map(([name, revenue]) => ({ name, revenue }));
+    transactions.forEach(txn => (txn.items || []).forEach(item => {
+      const name = item.description || item.name || 'Manual item';
+      grouped[name] = (grouped[name] || 0) + Number(item.qty || 1) * Number(item.unitPrice || item.price || 0);
+    }));
+    return Object.entries(grouped).map(([name, revenue]) => ({ name, revenue })).sort((a, b) => b.revenue - a.revenue).slice(0, 8);
   }, [transactions]);
-  const serviceData = categoryData.length ? categoryData : [{ name: `No paid ${servicesLabel} yet`, revenue: 0 }];
-  const paidCount = transactions.filter(txn => txn.status === 'paid').length;
-  const pendingCount = transactions.filter(txn => txn.status === 'pending' || txn.status === 'partial').length;
 
-  if (loading) {
+  const saveExpense = async () => {
+    if (!expenseForm.description.trim()) return setError('Expense description is required.');
+    if (Number(expenseForm.amount) <= 0) return setError('Expense amount must be greater than zero.');
+    if (!expenseForm.expenseDate) return setError('Expense date is required.');
+    setSaving(true);
+    setError('');
+    try {
+      const fd = new FormData();
+      Object.entries(expenseForm).forEach(([key, value]) => {
+        if (key === 'receipt') {
+          if (value) fd.append('receipt', value);
+        } else {
+          fd.append(key, value || '');
+        }
+      });
+      await fetchApi('/expenses', { method: 'POST', body: fd });
+      setExpenseForm({ categoryId: categories[0]?.id || '', branchId: '', description: '', amount: '', expenseDate: today(), paymentMethod: 'Cash', receipt: null });
+      await load();
+    } catch (err) {
+      setError(err.message || 'Expense could not be saved.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const addCategory = async () => {
+    if (!newCategory.trim()) return;
+    setSaving(true);
+    setError('');
+    try {
+      const created = await fetchApi('/expenses/categories', { method: 'POST', body: JSON.stringify({ name: newCategory.trim() }) });
+      setCategories(current => [...current, created].sort((a, b) => a.name.localeCompare(b.name)));
+      setExpenseForm(current => ({ ...current, categoryId: created.id }));
+      setNewCategory('');
+    } catch (err) {
+      setError(err.message || 'Category could not be created.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const archiveExpense = async (expense) => {
+    if (!window.confirm(`Archive expense "${expense.description}"?`)) return;
+    await fetchApi(`/expenses/${expense.id}`, { method: 'DELETE' });
+    await load();
+  };
+
+  const saveProcedureCost = async (row) => {
+    setSaving(true);
+    setError('');
+    try {
+      await fetchApi(`/invoices/${selectedInvoiceId}/procedure-costs`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          invoiceItemIndex: row.invoiceItemIndex,
+          patientCharge: Number(row.patientCharge || 0),
+          procedureCost: Number(row.procedureCost || 0),
+          serviceId: row.serviceId || null,
+          notes: row.notes || '',
+        }),
+      });
+      const refreshed = await fetchApi(`/invoices/${selectedInvoiceId}/procedure-costs`);
+      setProcedureRows(Array.isArray(refreshed.items) ? refreshed.items : []);
+      await load();
+    } catch (err) {
+      setError(err.message || 'Procedure cost could not be saved.');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  if (loading && !summary) {
     return <div className="flex items-center justify-center gap-2 py-16 text-sm text-gray-500"><Loader2 className="h-4 w-4 animate-spin" /> Loading financials...</div>;
   }
 
+  const chartData = monthly.length ? monthly.slice(-8) : [{ month: 'No data', revenue: 0, expenses: 0, grossProfit: 0, netProfit: 0 }];
+  const profitableRows = profitability.length ? profitability : [{ procedureName: 'No procedure costs yet', revenue: 0, procedureCost: 0, grossProfit: 0, cases: 0 }];
+
   return (
     <div className="space-y-5">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <SummaryCard label="Total Collected" value={money(summary.totalRevenue)} icon={DollarSign} iconBg="bg-emerald-50" iconColor="text-emerald-600" />
-        <SummaryCard label="Total Expenses" value={money(summary.totalExpenses)} icon={TrendingDown} iconBg="bg-red-50" iconColor="text-red-500" />
-        <SummaryCard label="Net Profit" value={money(summary.netProfit)} icon={TrendingUp} iconBg="bg-[var(--primary)]/10" iconColor="text-[var(--primary)]" />
-        <SummaryCard label="Outstanding" value={money(summary.outstandingPayments)} icon={AlertCircle} iconBg="bg-amber-50" iconColor="text-amber-500" />
+      <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+        <div>
+          <h1 className="text-xl font-bold text-gray-950 dark:text-white">Financials</h1>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Revenue, expenses, procedure costs, and profit reporting for authorized roles.</p>
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <input type="date" value={range.from} onChange={e => setRange({ ...range, from: e.target.value })} className="rounded-lg border border-gray-200 px-3 py-2 text-xs dark:border-white/10 dark:bg-slate-900" title="Report start date" />
+          <input type="date" value={range.to} onChange={e => setRange({ ...range, to: e.target.value })} className="rounded-lg border border-gray-200 px-3 py-2 text-xs dark:border-white/10 dark:bg-slate-900" title="Report end date" />
+          <Button variant="secondary" size="sm" onClick={load}><Download className="h-4 w-4" /> Refresh</Button>
+        </div>
       </div>
 
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-slate-900 lg:col-span-2">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Revenue Trends</h3>
-          <p className="mb-4 mt-0.5 text-xs text-gray-400">Only paid invoices are counted.</p>
-          <div className="h-56">
+      {error && <div className="rounded-lg border border-rose-100 bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700">{error}</div>}
+
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
+        <SummaryCard label="Revenue" value={money(summary?.totalRevenue)} helper="Paid invoice amount" icon={DollarSign} tone="bg-emerald-50 text-emerald-700" />
+        <SummaryCard label="Expenses" value={money(summary?.totalExpenses)} helper="General clinic expenses" icon={TrendingDown} tone="bg-rose-50 text-rose-600" />
+        <SummaryCard label="Gross Profit" value={money(summary?.grossProfit)} helper="Revenue minus procedure costs" icon={TrendingUp} tone="bg-blue-50 text-blue-700" />
+        <SummaryCard label="Net Profit" value={money(summary?.netProfit)} helper="Gross profit minus expenses" icon={BarChart3} tone="bg-indigo-50 text-indigo-700" />
+        <SummaryCard label="Outstanding" value={money(summary?.outstandingPayments)} helper="Pending and partial invoice balance" icon={AlertCircle} tone="bg-amber-50 text-amber-700" />
+      </div>
+
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+        <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-slate-900 xl:col-span-2">
+          <h2 className="text-sm font-bold text-gray-950 dark:text-white">Revenue, Expense, and Profit Trend</h2>
+          <p className="mt-1 text-xs text-gray-400">Monthly view from invoices, expense entries, and procedure costs.</p>
+          <div className="mt-4 h-64">
             <ResponsiveContainer width="100%" height="100%">
               <AreaChart data={chartData}>
                 <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" />
                 <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
                 <YAxis tickFormatter={(v) => `${Number(v || 0) / 1000}k`} tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-                <Tooltip formatter={(v) => [money(v), 'Revenue']} />
-                <Area type="monotone" dataKey="total" stroke="#0f766e" strokeWidth={2.5} fill="#0f766e22" />
+                <Tooltip formatter={(v, name) => [money(v), name]} />
+                <Legend wrapperStyle={{ fontSize: 11 }} />
+                <Area type="monotone" dataKey="revenue" stroke="#0f766e" fill="#0f766e20" strokeWidth={2} />
+                <Area type="monotone" dataKey="expenses" stroke="#dc2626" fill="#dc262620" strokeWidth={2} />
+                <Area type="monotone" dataKey="netProfit" stroke="#4f46e5" fill="#4f46e520" strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
           </div>
         </div>
+
         <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-slate-900">
-          <h3 className="mb-1 text-sm font-semibold text-gray-900 dark:text-white">Current Month</h3>
-          <p className="mb-4 text-xs text-gray-400">Zero until real invoices are paid.</p>
-          <div className="space-y-2">
-            <div className="rounded-lg bg-teal-50 p-4"><p className="text-[10px] font-bold uppercase tracking-wider text-teal-700">Collected</p><p className="mt-1 text-2xl font-black text-teal-950">{money(summary.totalRevenue)}</p></div>
-            <div className="rounded-lg bg-gray-50 p-4"><p className="text-[10px] font-bold uppercase tracking-wider text-gray-500">Pending</p><p className="mt-1 text-xl font-black text-gray-950">{money(summary.outstandingPayments)}</p></div>
+          <h2 className="text-sm font-bold text-gray-950 dark:text-white">Monthly Expense Report</h2>
+          <p className="mt-1 text-xs text-gray-400">Selected range total: {money(expenseTotal)}</p>
+          <div className="mt-4 h-56">
+            <ResponsiveContainer width="100%" height="100%">
+              <BarChart data={chartData}>
+                <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+                <XAxis dataKey="month" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                <YAxis tickFormatter={(v) => `${Number(v || 0) / 1000}k`} tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+                <Tooltip formatter={(v) => [money(v), 'Expenses']} />
+                <Bar dataKey="expenses" fill="#dc2626" radius={[6, 6, 0, 0]} maxBarSize={38} />
+              </BarChart>
+            </ResponsiveContainer>
           </div>
         </div>
       </div>
 
-      <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-slate-900">
-        <h3 className="mb-1 text-sm font-semibold text-gray-900 dark:text-white">{serviceLabel} Revenue</h3>
-        <p className="mb-4 text-xs text-gray-400">Live invoice items. Empty means no collected amount yet.</p>
-        <div className="h-44">
-          <ResponsiveContainer width="100%" height="100%">
-            <BarChart data={serviceData}>
-              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
-              <XAxis dataKey="name" tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-              <YAxis tickFormatter={(v) => `${Number(v || 0) / 1000}k`} tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-              <Tooltip formatter={(v) => [money(v), 'Revenue']} />
-              <Bar dataKey="revenue" fill="#0f766e" radius={[6, 6, 0, 0]} maxBarSize={42} />
-            </BarChart>
-          </ResponsiveContainer>
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+        <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-slate-900">
+          <h2 className="text-sm font-bold text-gray-950 dark:text-white">Add Expense</h2>
+          <p className="mt-1 text-xs text-gray-400">Rent, utility bills, salaries, supplies, and miscellaneous costs.</p>
+          <div className="mt-4 space-y-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              <select value={expenseForm.categoryId} onChange={e => setExpenseForm({ ...expenseForm, categoryId: e.target.value })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" title="Expense category">
+                {categories.map(cat => <option key={cat.id} value={cat.id}>{cat.name}</option>)}
+              </select>
+              <select value={expenseForm.branchId} onChange={e => setExpenseForm({ ...expenseForm, branchId: e.target.value })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" title="Branch">
+                <option value="">All branches</option>
+                {branches.map(branch => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
+              </select>
+            </div>
+            <div className="flex gap-2">
+              <input value={newCategory} onChange={e => setNewCategory(e.target.value)} className="min-w-0 flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" placeholder="New category" />
+              <Button variant="secondary" size="sm" onClick={addCategory} disabled={saving || !newCategory.trim()}><Plus className="h-4 w-4" /> Add</Button>
+            </div>
+            <input value={expenseForm.description} onChange={e => setExpenseForm({ ...expenseForm, description: e.target.value })} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" placeholder="Description, e.g. electricity bill" />
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+              <input type="number" min="0" value={expenseForm.amount} onChange={e => setExpenseForm({ ...expenseForm, amount: e.target.value })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" placeholder="Amount" />
+              <input type="date" value={expenseForm.expenseDate} onChange={e => setExpenseForm({ ...expenseForm, expenseDate: e.target.value })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" />
+              <select value={expenseForm.paymentMethod} onChange={e => setExpenseForm({ ...expenseForm, paymentMethod: e.target.value })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900">
+                {['Cash', 'Card', 'Bank Transfer', 'JazzCash', 'EasyPaisa', 'Other'].map(method => <option key={method}>{method}</option>)}
+              </select>
+            </div>
+            <label className="flex cursor-pointer items-center justify-center gap-2 rounded-lg border border-dashed border-gray-300 px-3 py-3 text-sm font-semibold text-gray-500 hover:border-[var(--primary)] hover:text-[var(--primary)]">
+              <Upload className="h-4 w-4" /> {expenseForm.receipt ? expenseForm.receipt.name : 'Attach receipt'}
+              <input type="file" accept=".pdf,image/*" className="hidden" onChange={e => setExpenseForm({ ...expenseForm, receipt: e.target.files?.[0] || null })} />
+            </label>
+            <Button onClick={saveExpense} disabled={saving}><Receipt className="h-4 w-4" /> Save Expense</Button>
+          </div>
+        </div>
+
+        <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-slate-900 xl:col-span-2">
+          <h2 className="text-sm font-bold text-gray-950 dark:text-white">Expenses</h2>
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full min-w-[760px] text-sm">
+              <thead><tr className="border-b border-gray-100 text-left text-[10px] uppercase tracking-wider text-gray-400">{['Date', 'Category', 'Description', 'Branch', 'Amount', 'Receipt', ''].map(h => <th key={h} className="py-3 font-semibold">{h}</th>)}</tr></thead>
+              <tbody className="divide-y divide-gray-50 dark:divide-white/5">
+                {expenses.map(expense => (
+                  <tr key={expense.id}>
+                    <td className="py-3 text-xs text-gray-500">{expense.expenseDate}</td>
+                    <td className="py-3"><Badge label={expense.categoryName || 'General'} variant="active" /></td>
+                    <td className="py-3 font-semibold text-gray-900 dark:text-white">{expense.description}</td>
+                    <td className="py-3 text-xs text-gray-500">{expense.branchName || 'All'}</td>
+                    <td className="py-3 font-bold text-rose-600">{money(expense.amount)}</td>
+                    <td className="py-3">{expense.receiptUrl ? <a href={`${fileBase}${expense.receiptUrl}`} target="_blank" rel="noreferrer" className="text-xs font-bold text-[var(--primary)]">Open</a> : <span className="text-xs text-gray-300">None</span>}</td>
+                    <td className="py-3 text-right"><button onClick={() => archiveExpense(expense)} className="text-xs font-bold text-gray-400 hover:text-rose-600">Archive</button></td>
+                  </tr>
+                ))}
+                {expenses.length === 0 && <tr><td colSpan={7}><EmptyState icon={Receipt} title="No expenses in this range" body="Add rent, bills, salaries, or supplies to start net profit reporting." /></td></tr>}
+              </tbody>
+            </table>
+          </div>
         </div>
       </div>
 
-      <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm dark:border-white/10 dark:bg-slate-900">
-        <div className="flex items-center justify-between border-b border-gray-50 px-5 py-4">
-          <div>
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Recent Transactions</h3>
-            <p className="mt-0.5 text-xs text-gray-400">{paidCount} paid · {pendingCount} pending</p>
+      <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-slate-900">
+          <h2 className="text-sm font-bold text-gray-950 dark:text-white">Procedure Cost Tracking</h2>
+          <p className="mt-1 text-xs text-gray-400">Record internal costs per invoice item. Only authorized roles can view this section.</p>
+          <select value={selectedInvoiceId} onChange={e => setSelectedInvoiceId(e.target.value)} className="mt-4 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900">
+            {transactions.map(txn => <option key={txn.id} value={txn.id}>{txn.invoiceNo} - {txn.client?.name || patientLabel}</option>)}
+          </select>
+          <div className="mt-4 space-y-3">
+            {procedureRows.map((row, index) => (
+              <div key={row.invoiceItemIndex} className="rounded-lg border border-gray-100 p-3 dark:border-white/10">
+                <div className="mb-3 flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-bold text-gray-950 dark:text-white">{row.description}</p>
+                    <p className="text-xs text-gray-400">Net profit: {money(Number(row.patientCharge || 0) - Number(row.procedureCost || 0))}</p>
+                  </div>
+                  <Button size="sm" variant="secondary" onClick={() => saveProcedureCost(row)} disabled={saving}><Save className="h-4 w-4" /> Save</Button>
+                </div>
+                <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
+                  <input type="number" min="0" value={row.patientCharge} onChange={e => setProcedureRows(rows => rows.map((r, i) => i === index ? { ...r, patientCharge: e.target.value } : r))} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" title="Patient charge" />
+                  <input type="number" min="0" value={row.procedureCost} onChange={e => setProcedureRows(rows => rows.map((r, i) => i === index ? { ...r, procedureCost: e.target.value } : r))} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" title="Internal procedure cost" />
+                  <input value={row.notes || ''} onChange={e => setProcedureRows(rows => rows.map((r, i) => i === index ? { ...r, notes: e.target.value } : r))} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" placeholder="Cost notes" />
+                </div>
+              </div>
+            ))}
+            {procedureRows.length === 0 && <EmptyState icon={Receipt} title="No invoice selected" body="Create invoices first, then record internal costs here." />}
           </div>
-          <button onClick={() => alert('Export will be connected to live CSV in the next reporting phase.')} className="flex items-center gap-1.5 rounded-lg border border-gray-200 px-3 py-1.5 text-xs font-medium text-gray-600">
-            <Download className="h-3.5 w-3.5" /> Export
-          </button>
         </div>
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50">
-              <tr>{['Invoice', 'Date', patientLabel, serviceLabel, 'Amount', 'Status'].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">{h}</th>)}</tr>
-            </thead>
-            <tbody className="divide-y divide-gray-50 dark:divide-white/5">
-              {transactions.map(txn => (
-                <tr key={txn.id}>
-                  <td className="px-4 py-3.5 font-mono text-xs font-bold text-[var(--primary)]">{txn.invoiceNo}</td>
-                  <td className="px-4 py-3.5 text-xs text-gray-500">{String(txn.createdAt || '').slice(0, 10)}</td>
-                  <td className="px-4 py-3.5 text-xs font-semibold text-gray-900">{txn.client?.name || 'Unknown'}</td>
-                  <td className="px-4 py-3.5 max-w-[180px] truncate text-xs text-gray-600">{txn.appointment?.service?.name || normalizeItems(txn.items)[0]?.description || 'Manual invoice'}</td>
-                  <td className="px-4 py-3.5 text-xs font-bold text-gray-900">{money(txn.total)}</td>
-                  <td className="px-4 py-3.5"><Badge label={txn.status} variant={statusBadge[txn.status] || txn.status} /></td>
-                </tr>
-              ))}
-              {transactions.length === 0 && <tr><td colSpan={6} className="px-4 py-12 text-center text-sm text-gray-400">No live transactions yet.</td></tr>}
-            </tbody>
-          </table>
+
+        <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-slate-900">
+          <h2 className="text-sm font-bold text-gray-950 dark:text-white">Most Profitable Procedures</h2>
+          <p className="mt-1 text-xs text-gray-400">Based on recorded procedure costs.</p>
+          <div className="mt-4 space-y-3">
+            {profitableRows.map(row => (
+              <div key={row.procedureName} className="rounded-lg bg-gray-50 p-3 dark:bg-white/5">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-bold text-gray-950 dark:text-white">{row.procedureName}</p>
+                    <p className="text-xs text-gray-500">{row.cases} cases - {Number(row.margin || 0)}% margin</p>
+                  </div>
+                  <p className="text-sm font-black text-teal-700">{money(row.grossProfit)}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+
+          <h2 className="mt-6 text-sm font-bold text-gray-950 dark:text-white">Top Revenue {serviceLabel}s</h2>
+          <div className="mt-4 space-y-3">
+            {(topRevenue.length ? topRevenue : [{ name: `No paid ${serviceLabel.toLowerCase()}s yet`, revenue: 0 }]).map(row => (
+              <div key={row.name} className="flex items-center justify-between rounded-lg bg-gray-50 p-3 dark:bg-white/5">
+                <span className="text-xs font-bold text-gray-700 dark:text-gray-200">{row.name}</span>
+                <span className="text-xs font-black text-gray-950 dark:text-white">{money(row.revenue)}</span>
+              </div>
+            ))}
+          </div>
         </div>
       </div>
     </div>
   );
-}
-
-function normalizeItems(items = []) {
-  return Array.isArray(items) ? items : [];
 }

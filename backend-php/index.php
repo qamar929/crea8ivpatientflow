@@ -303,6 +303,11 @@ $routes = [
     ['POST', '^api/v1/clients/([^/]+)/treatment-plan$', 'TreatmentController', 'create', ['owner', 'manager', 'doctor', 'therapist']],
     ['PUT', '^api/v1/treatment-plan/([^/]+)$', 'TreatmentController', 'update', ['owner', 'manager', 'doctor', 'therapist']],
     ['DELETE', '^api/v1/treatment-plan/([^/]+)$', 'TreatmentController', 'remove', ['owner', 'manager', 'doctor', 'therapist']],
+    ['GET', '^api/v1/clients/([^/]+)/treatment-details$', 'TreatmentController', 'details', ['owner', 'manager', 'doctor', 'therapist', 'receptionist', 'staff']],
+    ['POST', '^api/v1/clients/([^/]+)/treatment-details$', 'TreatmentController', 'createDetail', ['owner', 'manager', 'doctor', 'therapist']],
+    ['PUT', '^api/v1/treatment-details/([^/]+)$', 'TreatmentController', 'updateDetail', ['owner', 'manager', 'doctor', 'therapist']],
+    ['DELETE', '^api/v1/treatment-details/([^/]+)$', 'TreatmentController', 'removeDetail', ['owner', 'manager', 'doctor', 'therapist']],
+    ['GET', '^api/v1/clients/([^/]+)/treatment-timeline$', 'TreatmentController', 'timeline', ['owner', 'manager', 'doctor', 'therapist', 'receptionist', 'staff']],
     ['GET', '^api/v1/lab$', 'LabController', 'list', ['owner', 'manager', 'doctor', 'therapist', 'receptionist']],
     ['POST', '^api/v1/lab$', 'LabController', 'create', ['owner', 'manager', 'doctor', 'therapist', 'receptionist']],
     ['PUT', '^api/v1/lab/([^/]+)$', 'LabController', 'update', ['owner', 'manager', 'doctor', 'therapist', 'receptionist']],
@@ -347,11 +352,11 @@ $routes = [
     ['GET', '^api/v1/invoices$', 'InvoiceController', 'list', ['owner', 'manager', 'accountant', 'receptionist']],
     ['POST', '^api/v1/invoices$', 'InvoiceController', 'create', ['owner', 'manager', 'accountant', 'receptionist']],
     ['PUT', '^api/v1/invoices/([^/]+)/paid$', 'InvoiceController', 'markPaid', ['owner', 'manager', 'accountant', 'receptionist']],
-    ['PUT', '^api/v1/invoices/([^/]+)/refund$', 'InvoiceController', 'refund', ['owner', 'manager', 'accountant', 'receptionist']],
+    ['PUT', '^api/v1/invoices/([^/]+)/refund$', 'InvoiceController', 'refund', ['owner', 'manager', 'accountant']],
     ['GET', '^api/v1/invoices/([^/]+)/pdf$', 'InvoiceController', 'getPDF', ['owner', 'manager', 'accountant', 'receptionist']],
     ['GET', '^api/v1/invoices/([^/]+)$', 'InvoiceController', 'getById', ['owner', 'manager', 'accountant', 'receptionist']],
     ['PUT', '^api/v1/invoices/([^/]+)$', 'InvoiceController', 'update', ['owner', 'manager', 'accountant', 'receptionist']],
-    ['DELETE', '^api/v1/invoices/([^/]+)$', 'InvoiceController', 'remove', ['owner', 'manager', 'receptionist']],
+    ['DELETE', '^api/v1/invoices/([^/]+)$', 'InvoiceController', 'remove', ['owner', 'manager', 'accountant']],
 
     // Inventory Routes
     ['GET', '^api/v1/inventory/alerts/low-stock$', 'InventoryController', 'getLowStock', ['owner', 'manager', 'doctor', 'therapist', 'receptionist', 'staff']],
@@ -365,6 +370,18 @@ $routes = [
     ['GET', '^api/v1/financials/summary$', 'FinancialController', 'getSummary', ['owner', 'manager', 'accountant']],
     ['GET', '^api/v1/financials/monthly$', 'FinancialController', 'getMonthly', ['owner', 'manager', 'accountant']],
     ['GET', '^api/v1/financials/transactions$', 'FinancialController', 'getTransactions', ['owner', 'manager', 'accountant']],
+    ['GET', '^api/v1/financials/profitability$', 'FinancialController', 'getProfitability', ['owner', 'manager', 'accountant']],
+    ['GET', '^api/v1/invoices/([^/]+)/procedure-costs$', 'FinancialController', 'getProcedureCosts', ['owner', 'manager', 'accountant']],
+    ['PUT', '^api/v1/invoices/([^/]+)/procedure-costs$', 'FinancialController', 'saveProcedureCost', ['owner', 'manager', 'accountant']],
+
+    // Expenses Routes
+    ['GET', '^api/v1/expenses/categories$', 'ExpenseController', 'categories', ['owner', 'manager', 'accountant']],
+    ['POST', '^api/v1/expenses/categories$', 'ExpenseController', 'createCategory', ['owner', 'manager', 'accountant']],
+    ['GET', '^api/v1/expenses$', 'ExpenseController', 'list', ['owner', 'manager', 'accountant']],
+    ['POST', '^api/v1/expenses$', 'ExpenseController', 'create', ['owner', 'manager', 'accountant']],
+    ['GET', '^api/v1/expenses/([^/]+)$', 'ExpenseController', 'get', ['owner', 'manager', 'accountant']],
+    ['PUT', '^api/v1/expenses/([^/]+)$', 'ExpenseController', 'update', ['owner', 'manager', 'accountant']],
+    ['DELETE', '^api/v1/expenses/([^/]+)$', 'ExpenseController', 'remove', ['owner', 'manager', 'accountant']],
 
     // AI Hub Routes
     ['GET', '^api/v1/ai/overview$', 'AIHubController', 'overview', ['owner', 'manager']],

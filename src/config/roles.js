@@ -76,7 +76,7 @@ export const ROLE_ACCESS = {
   doctor: ['dashboard', 'clinical', 'lab', 'appointments', 'clients', 'gallery', 'feedback', 'inventory'],
   therapist: ['dashboard', 'clinical', 'lab', 'appointments', 'clients', 'gallery', 'feedback', 'inventory'],
   accountant: ['dashboard', 'clients', 'financials', 'packages', 'invoices', 'reports'],
-  receptionist: ['dashboard', 'reception', 'appointments', 'clients', 'lab', 'invoices', 'packages', 'whatsapp', 'reports', 'support'],
+  receptionist: ['dashboard', 'reception', 'appointments', 'clients', 'lab', 'invoices', 'packages', 'whatsapp', 'support'],
   staff: ['dashboard', 'clinical', 'appointments', 'clients', 'gallery', 'feedback', 'inventory'],
 };
 
@@ -126,6 +126,14 @@ export function isOwner(role = getCurrentRole()) {
 
 export function isReceptionist(role = getCurrentRole()) {
   return normalizeRole(role) === ROLES.receptionist;
+}
+
+export function canViewBusinessFinancials(role = getCurrentRole()) {
+  return [ROLES.owner, ROLES.manager, ROLES.accountant].includes(normalizeRole(role));
+}
+
+export function canManageInvoiceAdmin(role = getCurrentRole()) {
+  return [ROLES.owner, ROLES.manager, ROLES.accountant].includes(normalizeRole(role));
 }
 
 export function isStaff(role = getCurrentRole()) {

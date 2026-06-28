@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Calendar, CreditCard, Loader2, Mail, MessageCircle, Phone, UserRound, FileText, Upload, Trash2, Image as ImageIcon } from 'lucide-react';
+import { ArrowLeft, Calendar, Clock, CreditCard, FileText, Image as ImageIcon, Loader2, Mail, MessageCircle, Phone, Save, Trash2, Upload, UserRound } from 'lucide-react';
 import { fetchApi, API_URL } from '../config/api';
 import { useClinic } from '../context/ClinicContext';
 
@@ -156,6 +156,174 @@ function TreatmentPlan({ clientId }) {
   );
 }
 
+const procedurePresets = {
+  Implant: ['toothNumber', 'jaw', 'side', 'notes'],
+  'Root Canal': ['toothNumber', 'canalType', 'notes'],
+  Extraction: ['toothNumber', 'extractionType', 'notes'],
+  Crown: ['toothNumber', 'crownMaterial', 'notes'],
+  Filling: ['toothNumber', 'notes'],
+};
+
+const emptyProcedure = {
+  procedureType: 'Implant',
+  toothNumber: '',
+  jaw: '',
+  side: '',
+  canalType: '',
+  extractionType: '',
+  crownMaterial: '',
+  notes: '',
+  followUpDate: '',
+  performedAt: todayDate(),
+};
+
+function todayDate() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+function DentalProcedureDetails({ clientId, appointments }) {
+  const { term } = useClinic();
+  const treatmentLabel = term('treatment', 'Treatment');
+  const doctorLabel = term('doctor', 'Doctor');
+  const [items, setItems] = useState(null);
+  const [form, setForm] = useState(emptyProcedure);
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+
+  const load = () => fetchApi(`/clients/${clientId}/treatment-details`).then(setItems).catch(e => setErr(e.message));
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [clientId]);
+
+  const visibleFields = procedurePresets[form.procedureType] || ['toothNumber', 'notes'];
+  const set = (key, value) => setForm(current => ({ ...current, [key]: value }));
+
+  const submit = async () => {
+    if (!form.procedureType.trim()) return setErr(`${treatmentLabel} type is required.`);
+    if (visibleFields.includes('toothNumber') && !form.toothNumber.trim()) return setErr('Tooth number is required for this procedure.');
+    setBusy(true); setErr('');
+    try {
+      await fetchApi(`/clients/${clientId}/treatment-details`, { method: 'POST', body: JSON.stringify(form) });
+      setForm({ ...emptyProcedure, procedureType: form.procedureType, performedAt: todayDate() });
+      load();
+    } catch (e) {
+      setErr(e.message || 'Procedure detail could not be saved.');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const remove = async (item) => {
+    if (!window.confirm(`Archive ${item.procedureType}?`)) return;
+    try {
+      await fetchApi(`/treatment-details/${item.id}`, { method: 'DELETE' });
+      load();
+    } catch (e) {
+      setErr(e.message);
+    }
+  };
+
+  return (
+    <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/5">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div>
+          <h3 className="text-sm font-black text-gray-950 dark:text-white">Dental Procedure Details</h3>
+          <p className="mt-1 text-xs text-gray-400">Structured tooth, jaw, material, canal, extraction, and follow-up details.</p>
+        </div>
+        <div className="flex flex-wrap gap-1">
+          {Object.keys(procedurePresets).map(name => (
+            <button key={name} onClick={() => setForm({ ...emptyProcedure, procedureType: name, performedAt: form.performedAt || todayDate() })} className={`rounded-lg border px-2.5 py-1.5 text-xs font-bold ${form.procedureType === name ? 'border-transparent bg-[var(--primary)] text-white' : 'border-gray-200 text-gray-500'}`}>
+              {name}
+            </button>
+          ))}
+        </div>
+      </div>
+      {err && <p className="mt-3 rounded-lg bg-rose-50 px-3 py-2 text-xs font-semibold text-rose-700">{err}</p>}
+
+      <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-4">
+        <input value={form.procedureType} onChange={e => set('procedureType', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" placeholder={`${treatmentLabel} type`} />
+        <input type="date" value={String(form.performedAt || '').slice(0, 10)} onChange={e => set('performedAt', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" title="Treatment date" />
+        <select value={form.appointmentId || ''} onChange={e => set('appointmentId', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" title="Related appointment">
+          <option value="">No linked appointment</option>
+          {appointments.map(appt => <option key={appt.id} value={appt.id}>{appt.date} - {appt.service?.name || appt.serviceName || treatmentLabel}</option>)}
+        </select>
+        <input type="date" value={form.followUpDate} onChange={e => set('followUpDate', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" title="Follow-up date" />
+      </div>
+
+      <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-4">
+        {visibleFields.includes('toothNumber') && <input value={form.toothNumber} onChange={e => set('toothNumber', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" placeholder="Tooth number" />}
+        {visibleFields.includes('jaw') && <select value={form.jaw} onChange={e => set('jaw', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900"><option value="">Jaw</option><option>Upper</option><option>Lower</option></select>}
+        {visibleFields.includes('side') && <select value={form.side} onChange={e => set('side', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900"><option value="">Side</option><option>Left</option><option>Right</option></select>}
+        {visibleFields.includes('canalType') && <input value={form.canalType} onChange={e => set('canalType', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" placeholder="Canal type" />}
+        {visibleFields.includes('extractionType') && <input value={form.extractionType} onChange={e => set('extractionType', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" placeholder="Extraction type" />}
+        {visibleFields.includes('crownMaterial') && <input value={form.crownMaterial} onChange={e => set('crownMaterial', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" placeholder="Crown material" />}
+        <input value={form.notes} onChange={e => set('notes', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900 md:col-span-2" placeholder="Clinical notes" />
+      </div>
+
+      <div className="mt-3 flex justify-end">
+        <Button onClick={submit} disabled={busy}><Save className="h-4 w-4" /> Save Procedure</Button>
+      </div>
+
+      <div className="mt-4 space-y-2 border-t border-gray-100 pt-4 dark:border-white/10">
+        {!items ? (
+          <div className="py-6 text-center"><Loader2 className="mx-auto h-4 w-4 animate-spin text-gray-400" /></div>
+        ) : items.length === 0 ? (
+          <p className="py-6 text-center text-sm text-gray-400">No detailed procedures recorded yet.</p>
+        ) : items.map(item => (
+          <div key={item.id} className="flex flex-col gap-2 rounded-lg bg-gray-50 p-3 dark:bg-white/5 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="text-sm font-bold text-gray-950 dark:text-white">{item.procedureType}{item.toothNumber ? <span className="font-normal text-gray-400"> - tooth {item.toothNumber}</span> : null}</p>
+              <p className="text-xs text-gray-500">{String(item.performedAt || '').slice(0, 10)} - {item.staffName || doctorLabel}{item.followUpDate ? ` - follow-up ${item.followUpDate}` : ''}</p>
+            </div>
+            <button onClick={() => remove(item)} className="self-start rounded p-1 text-gray-400 hover:bg-rose-50 hover:text-rose-600 sm:self-center"><Trash2 className="h-3.5 w-3.5" /></button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function TreatmentTimeline({ clientId }) {
+  const [items, setItems] = useState(null);
+  const [err, setErr] = useState('');
+  useEffect(() => {
+    fetchApi(`/clients/${clientId}/treatment-timeline`).then(setItems).catch(e => setErr(e.message));
+  }, [clientId]);
+
+  return (
+    <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/5">
+      <div className="flex items-center gap-2">
+        <Clock className="h-4 w-4 text-[var(--primary)]" />
+        <h3 className="text-sm font-black text-gray-950 dark:text-white">Treatment Timeline</h3>
+      </div>
+      <p className="mt-1 text-xs text-gray-400">Treatment date, procedure, tooth, clinician, invoice, notes, and follow-up history.</p>
+      {err && <p className="mt-3 text-xs text-rose-600">{err}</p>}
+      {!items ? (
+        <div className="py-8 text-center"><Loader2 className="mx-auto h-4 w-4 animate-spin text-gray-400" /></div>
+      ) : items.length === 0 ? (
+        <p className="py-8 text-center text-sm text-gray-400">No treatment timeline yet.</p>
+      ) : (
+        <div className="mt-4 space-y-3">
+          {items.map(item => (
+            <div key={item.id} className="relative rounded-lg border border-gray-100 p-3 dark:border-white/10">
+              <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                <div>
+                  <p className="text-sm font-bold text-gray-950 dark:text-white">{item.procedure}{item.toothNumber ? <span className="font-normal text-gray-400"> - tooth {item.toothNumber}</span> : null}</p>
+                  <p className="text-xs text-gray-500">{item.date || 'No date'}{item.dentist ? ` - ${item.dentist}` : ''}</p>
+                  {item.notes && <p className="mt-1 text-xs text-gray-500">{item.notes}</p>}
+                </div>
+                <div className="text-left text-xs sm:text-right">
+                  {item.invoice && <p className="font-bold text-[var(--primary)]">{item.invoice}</p>}
+                  {item.followUp && <p className="mt-1 text-amber-700">Follow-up {item.followUp}</p>}
+                  {item.balanceDue !== undefined && <p className="mt-1 text-gray-500">Balance {money(item.balanceDue)}</p>}
+                </div>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ClientProfile() {
   const { term } = useClinic();
   const patientLabel = term('patient', 'Patient');
@@ -269,6 +437,10 @@ export default function ClientProfile() {
           </div>
 
           <TreatmentPlan clientId={client.id} />
+
+          <DentalProcedureDetails clientId={client.id} appointments={appointments} />
+
+          <TreatmentTimeline clientId={client.id} />
 
           <PatientDocuments clientId={client.id} />
         </main>

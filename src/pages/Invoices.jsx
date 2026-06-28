@@ -7,11 +7,11 @@ import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import ClinicLogoMark from '../components/branding/ClinicLogoMark';
 import PatientSearchSelect from '../components/ui/PatientSearchSelect';
-import { isReceptionist } from '../config/roles';
+import { canManageInvoiceAdmin, isReceptionist } from '../config/roles';
 
 const statusVariant = { paid: 'paid', pending: 'pending', partial: 'pending', refunded: 'refunded' };
 const money = (value = 0) => `PKR ${Math.round(Number(value || 0)).toLocaleString()}`;
-const emptyItem = { description: '', qty: 1, unitPrice: 0 };
+const emptyItem = { description: '', qty: 1, unitPrice: 0, serviceId: '' };
 const emptyInvoice = {
   clientId: '',
   appointmentId: '',
@@ -28,6 +28,7 @@ const normalizeItems = (items = []) => items.length ? items.map(item => ({
   description: item.description || item.name || '',
   qty: Number(item.qty || 1),
   unitPrice: Number(item.unitPrice || item.price || 0),
+  serviceId: item.serviceId || '',
 })) : [emptyItem];
 
 const totalsFromForm = (form, selectedClient, editing = false) => {
@@ -84,7 +85,7 @@ function InvoiceFormModal({ isOpen, onClose, onSave, invoice, clients, services,
     if (!service) return updateItem(idx, 'description', '');
     setForm(current => ({
       ...current,
-      items: current.items.map((item, i) => i === idx ? { ...item, description: service.name, unitPrice: Number(service.price || 0) } : item),
+      items: current.items.map((item, i) => i === idx ? { ...item, serviceId: service.id, description: service.name, unitPrice: Number(service.price || 0) } : item),
     }));
   };
 
@@ -193,7 +194,7 @@ function InvoiceFormModal({ isOpen, onClose, onSave, invoice, clients, services,
   );
 }
 
-function InvoiceDetailModal({ invoice, isOpen, onClose, onMarkPaid, onRefund, onDownload, onPrint }) {
+function InvoiceDetailModal({ invoice, isOpen, onClose, onMarkPaid, onRefund, onDownload, onPrint, canAdminInvoice }) {
   const { clinicInfo, term } = useClinic();
   const patientLabel = term('patient', 'Patient');
   if (!invoice) return null;
@@ -271,7 +272,7 @@ function InvoiceDetailModal({ invoice, isOpen, onClose, onMarkPaid, onRefund, on
           <Button variant="secondary" onClick={() => onPrint(invoice)}>Print</Button>
           <Button variant="secondary" onClick={() => onDownload(invoice)}><Download className="h-4 w-4" /> PDF</Button>
           {invoice.status !== 'paid' && invoice.status !== 'refunded' && <Button onClick={() => onMarkPaid(invoice)}><CheckCircle className="h-4 w-4" /> Mark Paid</Button>}
-          {invoice.status === 'paid' && <Button variant="secondary" onClick={() => onRefund(invoice)}><Undo2 className="h-4 w-4" /> Refund</Button>}
+          {canAdminInvoice && invoice.status === 'paid' && <Button variant="secondary" onClick={() => onRefund(invoice)}><Undo2 className="h-4 w-4" /> Refund</Button>}
           <Button variant="secondary" onClick={sendWhatsapp}><MessageCircle className="h-4 w-4" /> WhatsApp</Button>
         </div>
       </div>
@@ -281,6 +282,7 @@ function InvoiceDetailModal({ invoice, isOpen, onClose, onMarkPaid, onRefund, on
 
 export default function Invoices() {
   const receptionist = isReceptionist();
+  const canAdminInvoice = canManageInvoiceAdmin();
   const { term } = useClinic();
   const patientLabel = term('patient', 'Patient');
   const [invoices, setInvoices] = useState([]);
@@ -541,7 +543,7 @@ export default function Invoices() {
                         <button onClick={() => { setEditInvoice(inv); setShowForm(true); }} className="rounded-lg p-1.5 text-gray-400 hover:bg-blue-50 hover:text-blue-600" title="Edit"><Edit2 className="h-3.5 w-3.5" /></button>
                         {inv.status !== 'paid' && inv.status !== 'refunded' && <button onClick={() => markPaid(inv)} className="rounded-lg p-1.5 text-gray-400 hover:bg-green-50 hover:text-green-600" title="Mark paid"><CheckCircle className="h-3.5 w-3.5" /></button>}
                         <button onClick={() => downloadPdf(inv)} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600" title="PDF"><Download className="h-3.5 w-3.5" /></button>
-                        <button onClick={() => deleteInvoice(inv)} className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600" title="Delete"><Trash2 className="h-3.5 w-3.5" /></button>
+                        {canAdminInvoice && <button onClick={() => deleteInvoice(inv)} className="rounded-lg p-1.5 text-gray-400 hover:bg-red-50 hover:text-red-600" title="Archive"><Trash2 className="h-3.5 w-3.5" /></button>}
                       </div>
                     </td>
                   </tr>
@@ -565,7 +567,7 @@ export default function Invoices() {
       )}
 
       <InvoiceFormModal isOpen={showForm} onClose={() => { setShowForm(false); setEditInvoice(null); }} onSave={saveInvoice} invoice={editInvoice} clients={clients} services={services} appointments={appointments} saving={saving} onPatientSelected={rememberPatient} />
-      <InvoiceDetailModal invoice={selectedInvoice} isOpen={!!selectedInvoice} onClose={() => setSelectedInvoice(null)} onMarkPaid={markPaid} onRefund={refundInvoice} onDownload={downloadPdf} onPrint={printPdf} />
+      <InvoiceDetailModal invoice={selectedInvoice} isOpen={!!selectedInvoice} onClose={() => setSelectedInvoice(null)} onMarkPaid={markPaid} onRefund={refundInvoice} onDownload={downloadPdf} onPrint={printPdf} canAdminInvoice={canAdminInvoice} />
     </div>
   );
 }

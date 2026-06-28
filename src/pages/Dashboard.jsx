@@ -8,6 +8,7 @@ import SetupAlert from '../components/dashboard/SetupAlert';
 import RevenueChart from '../components/charts/RevenueChart';
 import ServiceChart from '../components/charts/ServiceChart';
 import Badge from '../components/ui/Badge';
+import { canAccessPath, canViewBusinessFinancials, getCurrentRole } from '../config/roles';
 
 const money = (value = 0) => `PKR ${Number(value || 0).toLocaleString()}`;
 
@@ -35,6 +36,8 @@ const portalModules = [
 
 export default function Dashboard() {
   const { industryTemplate, term } = useClinic();
+  const canSeeFinancials = canViewBusinessFinancials();
+  const role = getCurrentRole();
   const [data, setData] = useState({ appointments: [], clients: [], staff: [], services: [], invoices: [], financials: null });
   const [loading, setLoading] = useState(true);
 
@@ -45,7 +48,7 @@ export default function Dashboard() {
       fetchApi('/staff').catch(() => []),
       fetchApi('/services').catch(() => []),
       fetchApi('/invoices').catch(() => []),
-      fetchApi('/financials/summary').catch(() => ({})),
+      canSeeFinancials ? fetchApi('/financials/summary').catch(() => ({})) : Promise.resolve({}),
     ]).then(([appointments, clients, staff, services, invoices, financials]) => {
       setData({
         appointments: Array.isArray(appointments) ? appointments : [],
@@ -56,7 +59,7 @@ export default function Dashboard() {
         financials: financials || {},
       });
     }).finally(() => setLoading(false));
-  }, []);
+  }, [canSeeFinancials]);
 
   const today = new Date().toISOString().slice(0, 10);
   const todayAppts = data.appointments.filter(appt => appt.date === today);
@@ -73,13 +76,25 @@ export default function Dashboard() {
       <SetupAlert />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
         <StatCard title={industryTemplate.config.dashboard.todayAppointments} value={String(todayAppts.length)} icon={Calendar} />
-        <StatCard title="Collected This Month" value={money(data.financials?.totalRevenue)} icon={Receipt} />
+        {canSeeFinancials
+          ? <StatCard title="Collected This Month" value={money(data.financials?.totalRevenue)} icon={Receipt} />
+          : <StatCard title="Pending Invoices" value={String(pendingInvoices.length)} icon={Receipt} />}
         <StatCard title={industryTemplate.config.dashboard.activePatients} value={String(data.clients.filter(c => c.status !== 'inactive').length)} icon={Users} />
         <StatCard title={industryTemplate.config.dashboard.activeStaff} value={String(activeStaff.length)} icon={UserCheck} />
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <div className="luxury-card h-72 p-5 lg:col-span-2"><RevenueChart /></div>
+        <div className="luxury-card h-72 p-5 lg:col-span-2">
+          {canSeeFinancials ? (
+            <RevenueChart />
+          ) : (
+            <div className="flex h-full flex-col justify-center text-center">
+              <Receipt className="mx-auto h-9 w-9 text-gray-300" />
+              <h3 className="mt-3 text-sm font-bold text-gray-900 dark:text-white">Reception Work Queue</h3>
+              <p className="mt-1 text-xs text-gray-500">Financial analytics are restricted. Use invoices for billing and payment collection.</p>
+            </div>
+          )}
+        </div>
         <div className="luxury-card p-5">
           <div className="mb-4 flex items-center justify-between">
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{industryTemplate.config.dashboard.scheduleTitle}</h3>
@@ -122,7 +137,9 @@ export default function Dashboard() {
           <h3 className="mb-4 text-sm font-semibold text-gray-900 dark:text-white">Billing Snapshot</h3>
           <div className="space-y-3 text-sm">
             <div className="flex justify-between"><span className="text-gray-500">Pending invoices</span><b>{pendingInvoices.length}</b></div>
-            <div className="flex justify-between"><span className="text-gray-500">Outstanding</span><b>{money(data.financials?.outstandingPayments)}</b></div>
+            {canSeeFinancials
+              ? <div className="flex justify-between"><span className="text-gray-500">Outstanding</span><b>{money(data.financials?.outstandingPayments)}</b></div>
+              : <div className="flex justify-between"><span className="text-gray-500">Invoices needing payment</span><b>{pendingInvoices.length}</b></div>}
             <div className="flex justify-between"><span className="text-gray-500">{industryTemplate.config.dashboard.servicesConfigured}</span><b>{data.services.length}</b></div>
           </div>
         </div>
@@ -132,7 +149,7 @@ export default function Dashboard() {
         <h2 className="text-sm font-bold text-gray-950 dark:text-white">{industryTemplate.config.dashboard.portalFeatures}</h2>
         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">All modules below are live entry points. CRUD-enabled modules update the database directly.</p>
         <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {portalModules.map(({ key, to }) => {
+          {portalModules.filter(({ to }) => canAccessPath(to, role)).map(({ key, to }) => {
             const mod = industryTemplate.templateKey === 'healthcare'
               ? (industryTemplate.config.dashboardModules?.[key] || industryTemplate.config.modules?.[key] || {})
               : (industryTemplate.config.modules?.[key] || industryTemplate.config.dashboardModules?.[key] || {});
