@@ -42,7 +42,12 @@ const totalsFromForm = (form, selectedClient, editing = false) => {
 };
 
 function InvoiceFormModal({ isOpen, onClose, onSave, invoice, clients, services, appointments, saving, onPatientSelected }) {
+  const { term } = useClinic();
   const [form, setForm] = useState(emptyInvoice);
+  const patientLabel = term('patient', 'Patient');
+  const appointmentLabel = term('appointment', 'Appointment');
+  const serviceLabel = term('service', 'Service');
+  const visitLabel = term('visit', 'Visit');
 
   useEffect(() => {
     if (!invoice) {
@@ -84,7 +89,7 @@ function InvoiceFormModal({ isOpen, onClose, onSave, invoice, clients, services,
   };
 
   const submit = () => {
-    if (!form.clientId) return alert('Patient is required.');
+    if (!form.clientId) return alert(`${patientLabel} is required.`);
     const items = normalizeItems(form.items).filter(item => item.description && item.unitPrice >= 0);
     if (!items.length) return alert('At least one invoice item is required.');
     onSave({
@@ -106,7 +111,7 @@ function InvoiceFormModal({ isOpen, onClose, onSave, invoice, clients, services,
       <div className="space-y-5">
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="text-xs font-semibold text-gray-700 dark:text-gray-200">
-            Patient
+            {patientLabel}
             <div className="mt-1">
               <PatientSearchSelect
                 value={form.clientId}
@@ -121,20 +126,20 @@ function InvoiceFormModal({ isOpen, onClose, onSave, invoice, clients, services,
             </div>
           </label>
           <label className="text-xs font-semibold text-gray-700 dark:text-gray-200">
-            Appointment
+            {appointmentLabel}
             <select className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" value={form.appointmentId} onChange={e => set('appointmentId', e.target.value)}>
-              <option value="">No appointment link</option>
-              {appointments.map(appt => <option key={appt.id} value={appt.id}>{appt.date} · {appt.client?.name || appt.clientName || 'Patient'} · {appt.service?.name || appt.serviceName || 'Service'}</option>)}
+              <option value="">No {appointmentLabel.toLowerCase()} link</option>
+              {appointments.map(appt => <option key={appt.id} value={appt.id}>{appt.date} · {appt.client?.name || appt.clientName || patientLabel} · {appt.service?.name || appt.serviceName || serviceLabel}</option>)}
             </select>
           </label>
         </div>
 
         {selectedClient && (
           <div className="grid gap-3 rounded-xl border border-amber-100 bg-amber-50 p-4 text-xs sm:grid-cols-4">
-            <div><p className="font-bold uppercase text-amber-700">Patient</p><p className="mt-1 font-black text-gray-900">{selectedClient.patientNo || selectedClient.name}</p></div>
+            <div><p className="font-bold uppercase text-amber-700">{patientLabel}</p><p className="mt-1 font-black text-gray-900">{selectedClient.patientNo || selectedClient.name}</p></div>
             <div><p className="font-bold uppercase text-amber-700">Current Due</p><p className="mt-1 font-black text-amber-800">{money(selectedClient.outstandingBalance)}</p></div>
             <div><p className="font-bold uppercase text-amber-700">Latest Invoice</p><p className="mt-1 font-black text-gray-900">{selectedClient.latestInvoiceNo || 'None'}</p></div>
-            <div><p className="font-bold uppercase text-amber-700">Linked Visit</p><p className="mt-1 font-black text-gray-900">{selectedAppointment?.date || 'Manual bill'}</p></div>
+            <div><p className="font-bold uppercase text-amber-700">Linked {visitLabel}</p><p className="mt-1 font-black text-gray-900">{selectedAppointment?.date || 'Manual bill'}</p></div>
           </div>
         )}
 
@@ -147,7 +152,7 @@ function InvoiceFormModal({ isOpen, onClose, onSave, invoice, clients, services,
             {form.items.map((item, idx) => (
               <div key={idx} className="grid grid-cols-12 items-center gap-2">
                 <select className="col-span-5 rounded-lg border border-gray-200 px-2 py-2 text-xs dark:border-white/10 dark:bg-slate-900" value="" onChange={e => selectService(idx, e.target.value)}>
-                  <option value="">{item.description || 'Select service...'}</option>
+                  <option value="">{item.description || `Select ${serviceLabel.toLowerCase()}...`}</option>
                   {services.map(service => <option key={service.id} value={service.id}>{service.name} · {money(service.price)}</option>)}
                 </select>
                 <input className="col-span-3 rounded-lg border border-gray-200 px-2 py-2 text-xs dark:border-white/10 dark:bg-slate-900" value={item.description} onChange={e => updateItem(idx, 'description', e.target.value)} placeholder="Description" />
@@ -189,13 +194,14 @@ function InvoiceFormModal({ isOpen, onClose, onSave, invoice, clients, services,
 }
 
 function InvoiceDetailModal({ invoice, isOpen, onClose, onMarkPaid, onRefund, onDownload, onPrint }) {
-  const { clinicInfo } = useClinic();
+  const { clinicInfo, term } = useClinic();
+  const patientLabel = term('patient', 'Patient');
   if (!invoice) return null;
   const invoiceClinic = { ...clinicInfo, ...(invoice.clinic || {}) };
   const sendWhatsapp = () => {
     const phone = (invoice.client?.phone || '').replace(/\D/g, '');
-    if (!phone) return alert('No WhatsApp number found for this patient.');
-    const message = `Hi ${invoice.client?.name || 'Patient'}, your invoice ${invoice.invoiceNo} from ${invoiceClinic.name} is ${money(invoice.grandTotal)}. Paid: ${money(invoice.amountPaid)}. Balance: ${money(invoice.balanceDue)}.`;
+    if (!phone) return alert(`No WhatsApp number found for this ${patientLabel.toLowerCase()}.`);
+    const message = `Hi ${invoice.client?.name || patientLabel}, your invoice ${invoice.invoiceNo} from ${invoiceClinic.name} is ${money(invoice.grandTotal)}. Paid: ${money(invoice.amountPaid)}. Balance: ${money(invoice.balanceDue)}.`;
     window.open(`https://wa.me/${phone}?text=${encodeURIComponent(message)}`, '_blank');
   };
 
@@ -218,7 +224,7 @@ function InvoiceDetailModal({ invoice, isOpen, onClose, onMarkPaid, onRefund, on
         </div>
         <div className="rounded-xl bg-gray-50 p-4 dark:bg-white/5">
           <p className="mb-1 text-xs font-semibold uppercase tracking-wider text-gray-500">Bill To</p>
-          <p className="font-semibold text-gray-900 dark:text-white">{invoice.client?.name || 'Unknown patient'}</p>
+          <p className="font-semibold text-gray-900 dark:text-white">{invoice.client?.name || `Unknown ${patientLabel.toLowerCase()}`}</p>
           <p className="text-xs text-gray-500">{invoice.client?.phone || 'No phone'}</p>
         </div>
         <table className="w-full text-sm">
@@ -275,6 +281,8 @@ function InvoiceDetailModal({ invoice, isOpen, onClose, onMarkPaid, onRefund, on
 
 export default function Invoices() {
   const receptionist = isReceptionist();
+  const { term } = useClinic();
+  const patientLabel = term('patient', 'Patient');
   const [invoices, setInvoices] = useState([]);
   const [clients, setClients] = useState([]);
   const [services, setServices] = useState([]);
@@ -402,7 +410,7 @@ export default function Invoices() {
   };
 
   const deleteInvoice = async (invoice) => {
-    if (!confirm(`Delete invoice ${invoice.invoiceNo}? Patient balances will be recalculated.`)) return;
+    if (!confirm(`Delete invoice ${invoice.invoiceNo}? ${patientLabel} balances will be recalculated.`)) return;
     try {
       await fetchApi(`/invoices/${invoice.id}`, { method: 'DELETE' });
       await loadData();
@@ -459,7 +467,7 @@ export default function Invoices() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-900 dark:text-white">Invoices & Billing</h1>
-          <p className="mt-0.5 text-sm text-gray-500">Live invoices, payments, refunds, PDFs, and patient balances.</p>
+          <p className="mt-0.5 text-sm text-gray-500">Live invoices, payments, refunds, PDFs, and {patientLabel.toLowerCase()} balances.</p>
         </div>
         <div className="flex gap-2">
           <Button variant="secondary" onClick={loadData}><RefreshCcw className="h-4 w-4" /> Refresh</Button>
@@ -472,7 +480,7 @@ export default function Invoices() {
           ['Total Invoiced', stats.invoiced],
           ['Paid', stats.paid],
           ['Balance Due', stats.balance],
-          ['Patient Dues', stats.patientDues],
+          [`${patientLabel} Dues`, stats.patientDues],
         ].map(([label, value]) => (
           <div key={label} className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-slate-900">
             <div className="mb-3 flex items-center justify-between"><p className="text-xs font-semibold uppercase tracking-wider text-gray-500">{label}</p><Receipt className="h-4 w-4 text-[var(--primary)]" /></div>
@@ -484,7 +492,7 @@ export default function Invoices() {
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-gray-100 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-slate-900">
         <div className="relative min-w-[220px] flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          <input className="w-full rounded-lg border border-gray-200 py-2 pl-9 pr-3 text-sm dark:border-white/10 dark:bg-slate-900" placeholder="Search invoice, patient, phone..." value={search} onChange={e => { setSearch(e.target.value); goToPage(1); }} />
+          <input className="w-full rounded-lg border border-gray-200 py-2 pl-9 pr-3 text-sm dark:border-white/10 dark:bg-slate-900" placeholder={`Search invoice, ${patientLabel.toLowerCase()}, phone...`} value={search} onChange={e => { setSearch(e.target.value); goToPage(1); }} />
         </div>
         <div className="flex gap-1">
           {['all', 'paid', 'partial', 'pending', 'refunded'].map(status => (
@@ -502,7 +510,7 @@ export default function Invoices() {
           <option value="amount_desc">Amount — high to low</option>
           <option value="amount_asc">Amount — low to high</option>
           <option value="balance_desc">Balance due — high to low</option>
-          <option value="patient_asc">Patient name — A to Z</option>
+          <option value="patient_asc">{patientLabel} name — A to Z</option>
           <option value="invoice_desc">Invoice # — newest</option>
         </select>
       </div>
@@ -515,7 +523,7 @@ export default function Invoices() {
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
-              <thead className="bg-gray-50 dark:bg-white/5"><tr>{['Invoice #', 'Date', 'Patient', 'Items', 'Grand Total', 'Paid', 'Balance', 'Status', 'Actions'].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">{h}</th>)}</tr></thead>
+              <thead className="bg-gray-50 dark:bg-white/5"><tr>{['Invoice #', 'Date', patientLabel, 'Items', 'Grand Total', 'Paid', 'Balance', 'Status', 'Actions'].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">{h}</th>)}</tr></thead>
               <tbody className="divide-y divide-gray-50 dark:divide-white/5">
                 {filtered.map(inv => (
                   <tr key={inv.id} className="hover:bg-gray-50 dark:hover:bg-white/5">

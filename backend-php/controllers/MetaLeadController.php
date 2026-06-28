@@ -145,10 +145,10 @@ class MetaLeadController {
     public function remove($input, $user, $id) {
         $db = $this->db();
         $this->requireFeature($db, $user['clinicId']);
-        $stmt = $db->prepare("DELETE FROM MetaLead WHERE id = ? AND clinicId = ?");
+        $stmt = $db->prepare("UPDATE MetaLead SET status = 'archived' WHERE id = ? AND clinicId = ?");
         $stmt->execute([$id, $user['clinicId']]);
-        log_audit($user['clinicId'], $user['id'] ?? null, 'delete', 'MetaLead', $id);
-        send_json(['message' => 'Deleted']);
+        log_audit($user['clinicId'], $user['id'] ?? null, 'archive', 'MetaLead', $id);
+        send_json(['message' => 'Archived']);
     }
 
     public function convert($input, $user, $id) {

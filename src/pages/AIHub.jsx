@@ -1,11 +1,15 @@
 import { useEffect, useState } from 'react';
 import { Activity, Bot, Brain, Loader2, ShieldCheck, Sparkles } from 'lucide-react';
 import { fetchApi } from '../config/api';
+import { useClinic } from '../context/ClinicContext';
 import Badge from '../components/ui/Badge';
 
 const providerLabels = { chatgpt: 'ChatGPT', gemini: 'Gemini', claude: 'Claude' };
 
 export default function AIHub() {
+  const { term } = useClinic();
+  const clinicLabel = term('clinic', 'clinic');
+  const treatmentLabel = term('treatment', 'treatment');
   const [overview, setOverview] = useState({ providers: [], metrics: {}, capabilities: [] });
   const [loading, setLoading] = useState(true);
 
@@ -26,7 +30,7 @@ export default function AIHub() {
     <div className="space-y-5">
       <div>
         <h1 className="text-xl font-bold text-gray-900 dark:text-white">AI Communication Hub</h1>
-        <p className="mt-1 text-sm text-gray-500">Platform-managed AI for auto replies, lead qualification, treatment FAQs, and message generation.</p>
+        <p className="mt-1 text-sm text-gray-500">Platform-managed AI for auto replies, lead qualification, {treatmentLabel} FAQs, and message generation.</p>
       </div>
 
       <div className={`rounded-xl border p-4 text-sm ${features.aiEnabled ? 'border-emerald-200 bg-emerald-50 text-emerald-800' : 'border-amber-200 bg-amber-50 text-amber-800'}`}>
@@ -34,7 +38,7 @@ export default function AIHub() {
         <p className="mt-1 text-xs">
           {features.aiEnabled
             ? `Monthly token limit: ${tokenLimit > 0 ? tokenLimit.toLocaleString() : 'Unlimited'} · Auto replies: ${features.aiAutoReplyEnabled ? 'enabled' : 'off'} · Human approval: ${features.aiHumanApprovalRequired ? 'required' : 'not required'}`
-            : 'Ask the platform superadmin to enable AI for this clinic package.'}
+            : `Ask the platform superadmin to enable AI for this ${clinicLabel.toLowerCase()} package.`}
         </p>
       </div>
 

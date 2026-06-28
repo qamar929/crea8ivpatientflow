@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { Search, X, Loader2, UserPlus } from 'lucide-react';
 import { fetchApi } from '../../config/api';
+import { useClinic } from '../../context/ClinicContext';
 
 // Server-querying patient typeahead — scales to thousands of patients.
 // Searches by name, phone, email, or patient number (PT-XXXX) as you type.
@@ -21,6 +22,10 @@ export default function PatientSearchSelect({
   placeholder = 'Search by name, phone or patient #…',
   inputClassName = '',
 }) {
+  const { term } = useClinic();
+  const person = term('patient', 'Patient');
+  const personLower = person.toLowerCase();
+  const defaultPlaceholder = `Search by name, phone or ${personLower} #…`;
   const [query, setQuery] = useState('');
   const [results, setResults] = useState([]);
   const [open, setOpen] = useState(false);
@@ -102,10 +107,10 @@ export default function PatientSearchSelect({
         <div className="min-w-0">
           <p className="text-sm font-bold text-gray-900 dark:text-white truncate">{selected.name}</p>
           <p className="text-[11px] text-gray-500 dark:text-gray-400 truncate">
-            {[selected.patientNo, selected.phone].filter(Boolean).join(' · ') || 'Selected patient'}
+            {[selected.patientNo, selected.phone].filter(Boolean).join(' · ') || `Selected ${personLower}`}
           </p>
         </div>
-        <button type="button" onClick={clear} title="Change patient" className="p-1 rounded-md text-gray-400 hover:text-rose-600 hover:bg-white dark:hover:bg-white/10 shrink-0">
+        <button type="button" onClick={clear} title={`Change ${personLower}`} className="p-1 rounded-md text-gray-400 hover:text-rose-600 hover:bg-white dark:hover:bg-white/10 shrink-0">
           <X className="w-4 h-4" />
         </button>
       </div>
@@ -119,7 +124,7 @@ export default function PatientSearchSelect({
         <input
           type="text"
           value={query}
-          placeholder={placeholder}
+          placeholder={placeholder === 'Search by name, phone or patient #…' ? defaultPlaceholder : placeholder}
           onChange={(e) => { setQuery(e.target.value); setOpen(true); }}
           onFocus={() => setOpen(true)}
           onKeyDown={onKeyDown}
@@ -149,7 +154,7 @@ export default function PatientSearchSelect({
           ))}
 
           {!loading && query.trim().length > 0 && results.length === 0 && (
-            <div className="px-3 py-3 text-sm text-gray-400">No patients match “{query.trim()}”.</div>
+            <div className="px-3 py-3 text-sm text-gray-400">No {term('patients', 'patients').toLowerCase()} match “{query.trim()}”.</div>
           )}
 
           {onAddNew && (
@@ -158,7 +163,7 @@ export default function PatientSearchSelect({
               onClick={() => { setOpen(false); onAddNew(query.trim()); }}
               className="w-full text-left px-3 py-2.5 flex items-center gap-2 text-sm font-bold text-indigo-600 border-t border-gray-100 dark:border-white/10 hover:bg-indigo-50 dark:hover:bg-indigo-500/10"
             >
-              <UserPlus className="w-4 h-4" /> Add new patient{query.trim() ? ` “${query.trim()}”` : ''}
+              <UserPlus className="w-4 h-4" /> Add new {personLower}{query.trim() ? ` “${query.trim()}”` : ''}
             </button>
           )}
         </div>

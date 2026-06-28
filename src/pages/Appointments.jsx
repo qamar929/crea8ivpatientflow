@@ -5,6 +5,7 @@ import { Calendar, momentLocalizer } from 'react-big-calendar';
 import moment from 'moment';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
 import { fetchApi } from '../config/api';
+import { useClinic } from '../context/ClinicContext';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
@@ -30,13 +31,13 @@ const computeEndTime = (start, durationMins) => {
   return `${String(eh).padStart(2, '0')}:${String(em).padStart(2, '0')}`;
 };
 
-function AppointmentDetail({ appt, onClose, onEdit, onDelete, onWhatsApp, onReschedule }) {
+function AppointmentDetail({ appt, onClose, onEdit, onDelete, onWhatsApp, onReschedule, term }) {
   if (!appt) return null;
   const name = apptClientName(appt);
   return (
     <div className="fixed inset-y-0 right-0 w-96 bg-white dark:bg-slate-900 shadow-2xl z-40 flex flex-col border-l border-gray-100 dark:border-white/10">
       <div className="flex items-center justify-between px-6 py-4 border-b border-gray-100 dark:border-white/10">
-        <h3 className="text-base font-semibold text-gray-900 dark:text-white">Appointment Details</h3>
+        <h3 className="text-base font-semibold text-gray-900 dark:text-white">{term('appointment', 'Appointment')} Details</h3>
         <button onClick={onClose} className="p-1.5 rounded-lg hover:bg-gray-100 dark:hover:bg-white/10 text-gray-400"><X className="w-4 h-4" /></button>
       </div>
       <div className="flex-1 overflow-y-auto p-6 space-y-5">
@@ -65,11 +66,11 @@ function AppointmentDetail({ appt, onClose, onEdit, onDelete, onWhatsApp, onResc
           ))}
         </div>
         <div className="bg-gray-50 dark:bg-white/5 rounded-xl p-4">
-          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Service</p>
+          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">{term('service', 'Service')}</p>
           <p className="text-sm font-medium text-gray-800 dark:text-gray-100">{apptServiceName(appt)}</p>
         </div>
         <div className="bg-gray-50 dark:bg-white/5 rounded-xl p-4">
-          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">Doctor / Staff</p>
+          <p className="text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1">{term('doctor', 'Doctor')} / {term('staff', 'Staff')}</p>
           <p className="text-sm font-medium text-gray-800 dark:text-gray-100">{apptStaffName(appt)}</p>
         </div>
         {appt.notes && (
@@ -106,7 +107,7 @@ const emptyForm = {
   startTime: '10:00', duration: 30, room: '', notes: '', status: 'pending',
 };
 
-function AppointmentFormModal({ isOpen, onClose, onSave, target, clients, staff, services, saving }) {
+function AppointmentFormModal({ isOpen, onClose, onSave, target, clients, staff, services, saving, term }) {
   const isEdit = !!target;
   const [form, setForm] = useState(emptyForm);
 
@@ -148,7 +149,7 @@ function AppointmentFormModal({ isOpen, onClose, onSave, target, clients, staff,
 
   const submit = () => {
     if (!form.clientId || !form.staffId || !form.date || !form.startTime) {
-      alert('Patient, staff, date and time are required.');
+      alert(`${term('patient', 'Patient')}, ${term('staff', 'staff').toLowerCase()}, date and time are required.`);
       return;
     }
     const endTime = computeEndTime(form.startTime, form.duration);
@@ -174,10 +175,10 @@ function AppointmentFormModal({ isOpen, onClose, onSave, target, clients, staff,
   const inputCls = "w-full border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300";
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={isEdit ? 'Edit Appointment' : 'New Appointment'} size="md">
+    <Modal isOpen={isOpen} onClose={onClose} title={isEdit ? `Edit ${term('appointment', 'Appointment')}` : `New ${term('appointment', 'Appointment')}`} size="md">
       <div className="space-y-4">
         <div>
-          <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Patient *</label>
+          <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">{term('patient', 'Patient')} *</label>
           <PatientSearchSelect
             value={form.clientId}
             onChange={(id) => set('clientId', id)}
@@ -185,20 +186,20 @@ function AppointmentFormModal({ isOpen, onClose, onSave, target, clients, staff,
             fallbackClients={clients}
             inputClassName={inputCls}
           />
-          <p className="mt-1 text-[11px] text-gray-400">Type a name, phone number, or patient # (e.g. PT-0042).</p>
+          <p className="mt-1 text-[11px] text-gray-400">Type a name, phone number, or {term('patient', 'patient').toLowerCase()} #.</p>
         </div>
         <div>
-          <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Treatment Service *</label>
+          <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">{term('service', 'Service')} *</label>
           <select className={inputCls} value={form.serviceId} onChange={e => selectService(e.target.value)}>
-            <option value="">Select treatment service...</option>
+            <option value="">Select {term('service', 'service').toLowerCase()}...</option>
             {services.map(s => <option key={s.id} value={s.id}>{s.name} — PKR {Number(s.price).toLocaleString()}</option>)}
-            <option value="other">Other treatment</option>
+            <option value="other">Other {term('treatment', 'treatment').toLowerCase()}</option>
           </select>
         </div>
         {showOther && (
           <div>
-            <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Other Treatment Name *</label>
-            <input value={form.otherTreatment} onChange={e => set('otherTreatment', e.target.value)} placeholder="Write treatment name..." className={inputCls} />
+            <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Other {term('treatment', 'Treatment')} Name *</label>
+            <input value={form.otherTreatment} onChange={e => set('otherTreatment', e.target.value)} placeholder={`Write ${term('treatment', 'treatment').toLowerCase()} name...`} className={inputCls} />
           </div>
         )}
         <div className="grid grid-cols-2 gap-3">
@@ -217,7 +218,7 @@ function AppointmentFormModal({ isOpen, onClose, onSave, target, clients, staff,
           </div>
         )}
         <div>
-          <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Doctor / Staff *</label>
+            <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">{term('doctor', 'Doctor')} / {term('staff', 'Staff')} *</label>
           <select className={inputCls} value={form.staffId} onChange={e => set('staffId', e.target.value)}>
             <option value="">Select staff...</option>
             {staff.map(s => <option key={s.id} value={s.id}>{s.name} — {s.role}</option>)}
@@ -258,7 +259,7 @@ function AppointmentFormModal({ isOpen, onClose, onSave, target, clients, staff,
         </div>
         <div className="flex gap-2 pt-2">
           <Button variant="primary" className="flex-1 justify-center" onClick={submit} disabled={saving}>
-            <Save className="w-4 h-4" /> {saving ? 'Saving...' : isEdit ? 'Save Changes' : 'Book Appointment'}
+            <Save className="w-4 h-4" /> {saving ? 'Saving...' : isEdit ? 'Save Changes' : `Book ${term('appointment', 'Appointment')}`}
           </Button>
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
         </div>
@@ -267,17 +268,17 @@ function AppointmentFormModal({ isOpen, onClose, onSave, target, clients, staff,
   );
 }
 
-function DeleteConfirmModal({ isOpen, onClose, onConfirm, name, deleting }) {
+function DeleteConfirmModal({ isOpen, onClose, onConfirm, name, deleting, term }) {
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Cancel Appointment" size="sm">
+    <Modal isOpen={isOpen} onClose={onClose} title={`Cancel ${term('appointment', 'Appointment')}`} size="sm">
       <div className="space-y-4">
         <p className="text-sm text-gray-700 dark:text-gray-200">
-          Cancel appointment for <span className="font-semibold">{name}</span>? This cannot be undone.
+          Cancel {term('appointment', 'appointment').toLowerCase()} for <span className="font-semibold">{name}</span>? This cannot be undone.
         </p>
         <div className="flex gap-2 justify-end">
           <Button variant="ghost" onClick={onClose}>Keep</Button>
           <Button variant="danger" onClick={onConfirm} disabled={deleting}>
-            <Trash2 className="w-4 h-4" /> {deleting ? 'Cancelling...' : 'Cancel Appointment'}
+            <Trash2 className="w-4 h-4" /> {deleting ? 'Cancelling...' : `Cancel ${term('appointment', 'Appointment')}`}
           </Button>
         </div>
       </div>
@@ -285,7 +286,7 @@ function DeleteConfirmModal({ isOpen, onClose, onConfirm, name, deleting }) {
   );
 }
 
-function RescheduleModal({ appt, onClose, onDone }) {
+function RescheduleModal({ appt, onClose, onDone, term }) {
   const [date, setDate] = useState('');
   const [time, setTime] = useState('');
   const [notify, setNotify] = useState(true);
@@ -319,9 +320,9 @@ function RescheduleModal({ appt, onClose, onDone }) {
   const inputCls = "w-full border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300";
 
   return (
-    <Modal isOpen={!!appt} onClose={onClose} title="Reschedule Appointment" size="sm">
+    <Modal isOpen={!!appt} onClose={onClose} title={`Reschedule ${term('appointment', 'Appointment')}`} size="sm">
       <div className="space-y-4">
-        <p className="text-sm text-gray-500 dark:text-gray-400">Move <span className="font-semibold text-gray-800 dark:text-gray-100">{name}</span>'s appointment to a new date/time.</p>
+        <p className="text-sm text-gray-500 dark:text-gray-400">Move <span className="font-semibold text-gray-800 dark:text-gray-100">{name}</span>'s {term('appointment', 'appointment').toLowerCase()} to a new date/time.</p>
         {err && <div className="rounded-lg border border-red-200 bg-red-50 text-red-700 px-3 py-2 text-sm">{err}</div>}
         <div className="grid grid-cols-2 gap-3">
           <div><label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">New date</label><input type="date" className={inputCls} value={date} onChange={e => setDate(e.target.value)} /></div>
@@ -329,7 +330,7 @@ function RescheduleModal({ appt, onClose, onDone }) {
         </div>
         <label className="flex items-center gap-2 text-sm text-gray-700 dark:text-gray-200">
           <input type="checkbox" checked={notify} onChange={e => setNotify(e.target.checked)} />
-          Open WhatsApp to notify the patient
+          Open WhatsApp to notify the {term('patient', 'patient').toLowerCase()}
         </label>
         <div className="flex justify-end gap-2 pt-1">
           <Button variant="secondary" onClick={onClose} disabled={busy}>Cancel</Button>
@@ -341,6 +342,7 @@ function RescheduleModal({ appt, onClose, onDone }) {
 }
 
 export default function Appointments() {
+  const { term } = useClinic();
   const navigate = useNavigate();
   const [appointments, setAppointments] = useState([]);
   const [clients, setClients] = useState([]);
@@ -460,9 +462,9 @@ export default function Appointments() {
 
   const columns = [
     { key: 'startTime', label: 'Time', render: (v, r) => <span className="font-mono text-xs font-medium">{r.date} {v}</span> },
-    { key: 'client', label: 'Patient', render: (_, r) => <span className="font-medium">{apptClientName(r)}</span> },
-    { key: 'service', label: 'Service', render: (_, r) => apptServiceName(r) },
-    { key: 'staff', label: 'Staff', render: (_, r) => apptStaffName(r) },
+    { key: 'client', label: term('patient', 'Patient'), render: (_, r) => <span className="font-medium">{apptClientName(r)}</span> },
+    { key: 'service', label: term('service', 'Service'), render: (_, r) => apptServiceName(r) },
+    { key: 'staff', label: term('staff', 'Staff'), render: (_, r) => apptStaffName(r) },
     { key: 'room', label: 'Room' },
     { key: 'status', label: 'Status', render: (v) => v ? <Badge label={v} variant={v} /> : null },
     { key: 'regularPrice', label: 'Regular Price', render: (_, r) => <span className="font-medium">{money(getRegularPrice(r))}</span> },
@@ -515,17 +517,17 @@ export default function Appointments() {
             <option value="completed">Completed</option>
             <option value="cancelled">Cancelled</option>
           </select>
-          <select value={sort} onChange={e => setSort(e.target.value)} title="Sort appointments"
+          <select value={sort} onChange={e => setSort(e.target.value)} title={`Sort ${term('appointments', 'appointments').toLowerCase()}`}
             className="border border-gray-200 dark:border-white/10 rounded-lg px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-200 focus:outline-none focus:ring-2 focus:ring-indigo-300 bg-white dark:bg-white/5">
             <option value="date_desc">Date — newest first</option>
             <option value="date_asc">Date — oldest first</option>
-            <option value="patient_asc">Patient — A to Z</option>
-            <option value="doctor_asc">Doctor — A to Z</option>
+            <option value="patient_asc">{term('patient', 'Patient')} — A to Z</option>
+            <option value="doctor_asc">{term('doctor', 'Doctor')} — A to Z</option>
             <option value="amount_desc">Fee — high to low</option>
           </select>
         </div>
         <Button onClick={() => { setEditTarget(null); setShowFormModal(true); }} size="sm">
-          <Plus className="w-4 h-4" /> New Appointment
+          <Plus className="w-4 h-4" /> New {term('appointment', 'Appointment')}
         </Button>
       </div>
 
@@ -546,7 +548,7 @@ export default function Appointments() {
       ) : (
         <div className="bg-white dark:bg-white/5 rounded-xl shadow-sm border border-gray-100 dark:border-white/10">
           <div className="px-5 py-3.5 border-b border-gray-50 dark:border-white/10 flex items-center justify-between">
-            <span className="text-sm font-semibold text-gray-900 dark:text-white">All Appointments</span>
+            <span className="text-sm font-semibold text-gray-900 dark:text-white">All {term('appointments', 'Appointments')}</span>
             <span className="text-xs text-gray-400">{filtered.length} records</span>
           </div>
           <Table columns={columns} data={filtered} onRowClick={(r) => setSelectedAppt(r)} />
@@ -563,6 +565,7 @@ export default function Appointments() {
             onDelete={(a) => setDeleteTarget(a)}
             onReschedule={(a) => { setRescheduleTarget(a); setSelectedAppt(null); }}
             onWhatsApp={(a) => navigate(`/whatsapp?client=${a.clientId || a.client?.id}`)}
+            term={term}
           />
         </>
       )}
@@ -571,6 +574,7 @@ export default function Appointments() {
         appt={rescheduleTarget}
         onClose={() => setRescheduleTarget(null)}
         onDone={() => { setRescheduleTarget(null); loadAppointments(); }}
+        term={term}
       />
 
       <AppointmentFormModal
@@ -582,6 +586,7 @@ export default function Appointments() {
         staff={staff}
         services={services}
         saving={saving}
+        term={term}
       />
       <DeleteConfirmModal
         isOpen={!!deleteTarget}
@@ -589,6 +594,7 @@ export default function Appointments() {
         onConfirm={handleDelete}
         name={deleteTarget ? apptClientName(deleteTarget) : ''}
         deleting={deleting}
+        term={term}
       />
     </div>
   );

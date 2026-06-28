@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Users, Search, Grid, List, Plus, Phone, Mail, BadgeDollarSign, Loader2, Pencil, Trash2, Save } from 'lucide-react';
 import { fetchApi } from '../config/api';
+import { useClinic } from '../context/ClinicContext';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
@@ -13,7 +14,7 @@ const emptyForm = {
   loyaltyTier: 'Bronze', status: 'active',
 };
 
-function ClientFormModal({ isOpen, onClose, onSave, target, saving }) {
+function ClientFormModal({ isOpen, onClose, onSave, target, saving, term }) {
   const isEdit = !!target;
   const [form, setForm] = useState(emptyForm);
 
@@ -44,7 +45,7 @@ function ClientFormModal({ isOpen, onClose, onSave, target, saving }) {
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={isEdit ? 'Edit Patient' : 'Add New Patient'} size="md">
+    <Modal isOpen={isOpen} onClose={onClose} title={isEdit ? `Edit ${term('patient', 'Patient')}` : `Add New ${term('patient', 'Patient')}`} size="md">
       <div className="space-y-4">
         <div>
           <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Full Name *</label>
@@ -95,7 +96,7 @@ function ClientFormModal({ isOpen, onClose, onSave, target, saving }) {
         </div>
         <div className="flex gap-2 pt-2">
           <Button variant="primary" className="flex-1 justify-center" onClick={submit} disabled={saving}>
-            <Save className="w-4 h-4" /> {saving ? 'Saving...' : isEdit ? 'Save Changes' : 'Add Patient'}
+            <Save className="w-4 h-4" /> {saving ? 'Saving...' : isEdit ? 'Save Changes' : `Add ${term('patient', 'Patient')}`}
           </Button>
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
         </div>
@@ -104,9 +105,9 @@ function ClientFormModal({ isOpen, onClose, onSave, target, saving }) {
   );
 }
 
-function DeleteConfirmModal({ isOpen, onClose, onConfirm, name, deleting }) {
+function DeleteConfirmModal({ isOpen, onClose, onConfirm, name, deleting, term }) {
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Delete Patient" size="sm">
+    <Modal isOpen={isOpen} onClose={onClose} title={`Delete ${term('patient', 'Patient')}`} size="sm">
       <div className="space-y-4">
         <p className="text-sm text-gray-700 dark:text-gray-200">
           Delete <span className="font-semibold">{name}</span>? This cannot be undone.
@@ -193,6 +194,7 @@ function ClientCard({ client, onClick, onEdit, onDelete }) {
 
 export default function Clients() {
   const navigate = useNavigate();
+  const { term } = useClinic();
   const [search, setSearch] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [tierFilter, setTierFilter] = useState('all');
@@ -294,7 +296,7 @@ export default function Clients() {
           <div className="relative">
             <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
             <input value={search} onChange={e => { setSearch(e.target.value); goToPage(1); }}
-              placeholder="Search patient no, name, phone..."
+              placeholder={`Search ${term('patient', 'patient').toLowerCase()} no, name, phone...`}
               className="pl-9 pr-4 py-2 bg-white dark:bg-white/5 border border-gray-200 dark:border-white/10 rounded-lg text-sm text-gray-700 dark:text-gray-200 placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-indigo-300 w-52" />
           </div>
           <select value={statusFilter} onChange={e => { setStatusFilter(e.target.value); goToPage(1); }}
@@ -324,12 +326,12 @@ export default function Clients() {
         </div>
 
         <Button onClick={() => { setEditTarget(null); setShowAddModal(true); }} size="sm">
-          <Plus className="w-4 h-4" /> New Patient
+          <Plus className="w-4 h-4" /> New {term('patient', 'Patient')}
         </Button>
       </div>
 
       <div className="flex items-center gap-4 text-sm text-gray-500 dark:text-gray-400 flex-wrap">
-        <span className="font-medium text-gray-700 dark:text-gray-200">Showing {filtered.length} of {pagination.total.toLocaleString()} patients</span>
+        <span className="font-medium text-gray-700 dark:text-gray-200">Showing {filtered.length} of {pagination.total.toLocaleString()} {term('patients', 'patients').toLowerCase()}</span>
         <span>·</span>
         <span>{filtered.filter(c => c.status === 'active').length} active</span>
         <span>·</span>
@@ -354,7 +356,7 @@ export default function Clients() {
           {filtered.length === 0 && (
             <div className="col-span-3 text-center py-16 text-gray-400">
               <Users className="w-10 h-10 mx-auto mb-3 opacity-30" />
-              <p>No patients match your filters</p>
+              <p>No {term('patients', 'patients').toLowerCase()} match your filters</p>
             </div>
           )}
         </div>
@@ -363,7 +365,7 @@ export default function Clients() {
           <table className="w-full text-sm">
             <thead>
               <tr className="bg-gray-50 dark:bg-white/5 border-b border-gray-100 dark:border-white/10">
-                {['Patient', 'Patient No', 'Contact', 'Tier', 'Total Spent', 'Due', 'Status', 'Actions'].map(h => (
+                {[term('patient', 'Patient'), `${term('patient', 'Patient')} No`, 'Contact', 'Tier', 'Total Spent', 'Due', 'Status', 'Actions'].map(h => (
                   <th key={h} className="text-left px-4 py-3 text-xs font-semibold text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">{h}</th>
                 ))}
               </tr>
@@ -411,7 +413,7 @@ export default function Clients() {
             </tbody>
           </table>
           {filtered.length === 0 && (
-            <div className="text-center py-12 text-gray-400 text-sm">No patients found</div>
+            <div className="text-center py-12 text-gray-400 text-sm">No {term('patients', 'patients').toLowerCase()} found</div>
           )}
         </div>
       )}
@@ -432,6 +434,7 @@ export default function Clients() {
         onSave={handleSave}
         target={editTarget}
         saving={saving}
+        term={term}
       />
       <DeleteConfirmModal
         isOpen={!!deleteTarget}
@@ -439,6 +442,7 @@ export default function Clients() {
         onConfirm={handleDelete}
         name={deleteTarget?.name}
         deleting={deleting}
+        term={term}
       />
     </div>
   );

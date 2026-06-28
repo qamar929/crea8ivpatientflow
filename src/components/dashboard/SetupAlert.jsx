@@ -4,10 +4,14 @@ import { AlertTriangle, ArrowRight } from 'lucide-react';
 import { fetchApi } from '../../config/api';
 import { getCurrentRole } from '../../config/roles';
 import { missingClinicFields } from '../../config/requiredSettings';
+import { useClinic } from '../../context/ClinicContext';
 
 // Red alert on the dashboard when the owner hasn't completed the required clinic
 // details (clinic info, invoice rules, payment details). Clicking it jumps to Settings.
 export default function SetupAlert() {
+  const { term } = useClinic();
+  const clinicLabel = term('clinic', 'clinic');
+  const patientLabel = term('patient', 'patient');
   const navigate = useNavigate();
   const role = getCurrentRole();
   const [missing, setMissing] = useState(null);
@@ -39,10 +43,10 @@ export default function SetupAlert() {
         </span>
         <div className="min-w-0 flex-1">
           <p className="text-sm font-bold text-red-800 dark:text-red-200">
-            Complete your clinic setup — {missing.length} required {missing.length === 1 ? 'detail' : 'details'} missing
+            Complete your {clinicLabel.toLowerCase()} setup — {missing.length} required {missing.length === 1 ? 'detail' : 'details'} missing
           </p>
           <p className="mt-0.5 text-xs text-red-700/90 dark:text-red-300/80">
-            These appear on invoices and patient documents. Fill them in to finish setup.
+            These appear on invoices and {patientLabel} documents. Fill them in to finish setup.
           </p>
           <div className="mt-2 space-y-1">
             {Object.entries(groups).map(([group, labels]) => (

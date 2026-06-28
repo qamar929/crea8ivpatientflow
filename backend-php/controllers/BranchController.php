@@ -97,25 +97,11 @@ class BranchController {
             send_error('Branch not found', 404);
         }
 
-        $stmtCounts = $db->prepare("
-            SELECT
-                (SELECT COUNT(*) FROM Staff WHERE branchId = ? AND clinicId = ?) as staffCount,
-                (SELECT COUNT(*) FROM Appointment WHERE branchId = ? AND clinicId = ?) as appointmentCount
-        ");
-        $stmtCounts->execute([$id, $user['clinicId'], $id, $user['clinicId']]);
-        $counts = $stmtCounts->fetch();
-
-        if (intval($counts['staffCount'] ?? 0) === 0 && intval($counts['appointmentCount'] ?? 0) === 0) {
-            $stmtDelete = $db->prepare("DELETE FROM Branch WHERE id = ? AND clinicId = ?");
-            $stmtDelete->execute([$id, $user['clinicId']]);
-            send_json(['message' => 'Deleted', 'deleted' => true]);
-        }
-
         $stmt = $db->prepare("UPDATE Branch SET isActive = 0 WHERE id = ? AND clinicId = ?");
         $stmt->execute([$id, $user['clinicId']]);
 
         send_json([
-            'message' => 'Branch has linked records, so it was deactivated instead of permanently deleted.',
+            'message' => 'Branch was deactivated. Historical records were kept.',
             'deleted' => false,
             'deactivated' => true
         ]);

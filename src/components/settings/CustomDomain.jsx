@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Globe, Copy, Check, Loader2, RefreshCw, Trash2, ShieldCheck, AlertCircle } from 'lucide-react';
 import { fetchApi } from '../../config/api';
+import { useClinic } from '../../context/ClinicContext';
 
 const STATUS_META = {
   none:        { label: 'Not configured', cls: 'bg-gray-100 text-gray-500 dark:bg-white/5 dark:text-gray-400' },
@@ -32,6 +33,8 @@ function CopyField({ label, value }) {
 }
 
 export default function CustomDomain() {
+  const { term } = useClinic();
+  const patientLabel = term('patient', 'patient');
   const [data, setData] = useState(null);
   const [domain, setDomain] = useState('');
   const [error, setError] = useState('');
@@ -79,7 +82,7 @@ export default function CustomDomain() {
           </div>
           <div>
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Custom Domain</h3>
-            <p className="text-xs text-gray-500 dark:text-gray-400">Run your patient portal on your own branded web address.</p>
+            <p className="text-xs text-gray-500 dark:text-gray-400">Run your {patientLabel} portal on your own branded web address.</p>
           </div>
         </div>
         <span className={`px-2.5 py-1 rounded-lg text-xs font-bold whitespace-nowrap ${meta.cls}`}>{meta.label}</span>

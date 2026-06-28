@@ -39,12 +39,18 @@ class FeedbackController {
         return $staffId ?: null;
     }
 
+    private function ensureArchiveColumn($db) {
+        $type = DB_DRIVER === 'sqlite' ? 'TEXT DEFAULT NULL' : 'DATETIME NULL DEFAULT NULL';
+        try { $db->exec("ALTER TABLE Feedback ADD COLUMN archivedAt $type"); } catch (Exception $ignored) {}
+    }
+
     private function recalculateStaffRating($db, $staffId, $clinicId) {
         if (empty($staffId)) {
             return;
         }
 
-        $stmtAvg = $db->prepare("SELECT AVG(overallRating) FROM Feedback WHERE staffId = ? AND clinicId = ?");
+        $this->ensureArchiveColumn($db);
+        $stmtAvg = $db->prepare("SELECT AVG(overallRating) FROM Feedback WHERE staffId = ? AND clinicId = ? AND archivedAt IS NULL");
         $stmtAvg->execute([$staffId, $clinicId]);
         $avg = $stmtAvg->fetchColumn();
         $rating = $avg === null ? 0 : round(floatval($avg), 1);
@@ -58,7 +64,8 @@ class FeedbackController {
         $minRating = $_GET['minRating'] ?? '';
 
         $db = DB::getConnection();
-        $where = ["f.clinicId = ?"];
+        $this->ensureArchiveColumn($db);
+        $where = ["f.clinicId = ?", "f.archivedAt IS NULL"];
         $params = [$user['clinicId']];
 
         if (!empty($staffId)) {
@@ -254,13 +261,14 @@ class FeedbackController {
         try {
             $db->beginTransaction();
 
-            $stmtDelete = $db->prepare("DELETE FROM Feedback WHERE id = ? AND clinicId = ?");
+            $this->ensureArchiveColumn($db);
+            $stmtDelete = $db->prepare("UPDATE Feedback SET archivedAt = CURRENT_TIMESTAMP, isPublic = 0 WHERE id = ? AND clinicId = ?");
             $stmtDelete->execute([$id, $user['clinicId']]);
 
             $this->recalculateStaffRating($db, $existing['staffId'], $user['clinicId']);
 
             $db->commit();
-            send_json(['message' => 'Deleted']);
+            send_json(['message' => 'Archived']);
         } catch (Exception $e) {
             $db->rollBack();
             send_error($e->getMessage(), 500);

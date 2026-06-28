@@ -32,6 +32,12 @@ class UserController {
         if (empty($name) || empty($email) || empty($password) || empty($role)) {
             send_error('name, email, password, and role are required', 400);
         }
+        if (!filter_var($email, FILTER_VALIDATE_EMAIL)) {
+            send_error('A valid email is required', 400);
+        }
+        if (strlen($password) < 10) {
+            send_error('Password must be at least 10 characters', 400);
+        }
 
         if (!in_array($role, $this->allowedRoles)) {
             send_error('Invalid role', 400);
@@ -181,9 +187,10 @@ class UserController {
         $stmt = $db->prepare("DELETE FROM RefreshToken WHERE userId = ?");
         $stmt->execute([$id]);
 
-        $stmt = $db->prepare("DELETE FROM User WHERE id = ? AND clinicId = ?");
+        $stmt = $db->prepare("UPDATE User SET isActive = 0 WHERE id = ? AND clinicId = ?");
         $stmt->execute([$id, $user['clinicId']]);
 
-        send_json(['message' => 'User deleted']);
+        log_audit($user['clinicId'], $user['id'] ?? null, 'user_deactivated', 'User', $id, null, null);
+        send_json(['message' => 'User deactivated']);
     }
 }

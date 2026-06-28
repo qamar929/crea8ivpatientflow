@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Activity, Calendar, CheckCircle2, ClipboardEdit, Loader2, Stethoscope, UserRound } from 'lucide-react';
 import { fetchApi } from '../config/api';
+import { useClinic } from '../context/ClinicContext';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 
@@ -21,6 +22,17 @@ function Stat({ label, value, icon: Icon }) {
 }
 
 export default function ClinicalWorkspace() {
+  const { term } = useClinic();
+  const patientLabel = term('patient', 'Patient');
+  const patientsLabel = term('patients', 'Patients');
+  const appointmentLabel = term('appointment', 'Appointment');
+  const appointmentsLabel = term('appointments', 'Appointments');
+  const staffLabel = term('staff', 'Staff');
+  const treatmentLabel = term('treatment', 'Treatment');
+  const serviceLabel = term('service', 'Service');
+  const servicesLabel = term('services', 'Services');
+  const clinicalWorkspaceLabel = term('clinicalWorkspace', 'Clinical Workspace');
+  const clinicalNotesLabel = term('clinicalNotes', 'Clinical Notes');
   const [appointments, setAppointments] = useState([]);
   const [clients, setClients] = useState([]);
   const [staff, setStaff] = useState([]);
@@ -60,20 +72,20 @@ export default function ClinicalWorkspace() {
     <div className="space-y-5">
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-950 dark:text-white">Clinical Workspace</h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Live clinical workload, treatment appointments, staff capacity and service coverage.</p>
+          <h1 className="text-xl font-bold text-gray-950 dark:text-white">{clinicalWorkspaceLabel}</h1>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Live workload, {treatmentLabel.toLowerCase()} {appointmentsLabel.toLowerCase()}, {staffLabel.toLowerCase()} capacity and {serviceLabel.toLowerCase()} coverage.</p>
           {error && <p className="mt-2 text-xs font-semibold text-rose-600">{error}</p>}
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" size="sm"><ClipboardEdit className="h-4 w-4" /> Add Clinical Note</Button>
-          <Button size="sm"><CheckCircle2 className="h-4 w-4" /> Mark Treatment Complete</Button>
+          <Button variant="secondary" size="sm"><ClipboardEdit className="h-4 w-4" /> Add {clinicalNotesLabel}</Button>
+          <Button size="sm"><CheckCircle2 className="h-4 w-4" /> Mark {treatmentLabel} Complete</Button>
         </div>
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <Stat label="Appointments Today" value={clinical.today} icon={Calendar} />
-        <Stat label="Active Patients" value={clinical.activePatients} icon={UserRound} />
-        <Stat label="Clinical Staff" value={clinical.activeStaff} icon={Stethoscope} />
+        <Stat label={`${appointmentsLabel} Today`} value={clinical.today} icon={Calendar} />
+        <Stat label={`Active ${patientsLabel}`} value={clinical.activePatients} icon={UserRound} />
+        <Stat label={staffLabel} value={clinical.activeStaff} icon={Stethoscope} />
         <Stat label="Completed Cases" value={clinical.completed} icon={CheckCircle2} />
       </div>
 
@@ -81,8 +93,8 @@ export default function ClinicalWorkspace() {
         <div className="luxury-card p-5">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-sm font-bold text-gray-950 dark:text-white">Treatment Appointments</h2>
-              <p className="text-xs text-gray-500">Real appointments from the portal database.</p>
+              <h2 className="text-sm font-bold text-gray-950 dark:text-white">{treatmentLabel} {appointmentsLabel}</h2>
+              <p className="text-xs text-gray-500">Real {appointmentsLabel.toLowerCase()} from the portal database.</p>
             </div>
             <Badge label={money(clinical.plannedRevenue)} variant="active" />
           </div>
@@ -91,8 +103,8 @@ export default function ClinicalWorkspace() {
               <div key={appt.id} className="rounded-xl bg-gray-50 p-3 dark:bg-white/5">
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <p className="text-sm font-black text-gray-950 dark:text-white">{appt.client?.name || 'Patient'}</p>
-                    <p className="text-xs text-gray-500">{appt.service?.name || 'Treatment'} · {appt.staff?.name || 'Clinical staff'} · {appt.date} {appt.startTime}</p>
+                    <p className="text-sm font-black text-gray-950 dark:text-white">{appt.client?.name || patientLabel}</p>
+                    <p className="text-xs text-gray-500">{appt.service?.name || treatmentLabel} · {appt.staff?.name || staffLabel} · {appt.date} {appt.startTime}</p>
                   </div>
                   <div className="flex items-center gap-2">
                     {appt.status && <Badge label={appt.status} variant={appt.status} />}
@@ -101,13 +113,13 @@ export default function ClinicalWorkspace() {
                 </div>
               </div>
             ))}
-            {appointments.length === 0 && <p className="py-10 text-center text-sm text-gray-400">No clinical appointments yet. Add patients, staff and services, then book the first appointment.</p>}
+            {appointments.length === 0 && <p className="py-10 text-center text-sm text-gray-400">No {appointmentsLabel.toLowerCase()} yet. Add {patientsLabel.toLowerCase()}, {staffLabel.toLowerCase()} and {servicesLabel.toLowerCase()}, then book the first {appointmentLabel.toLowerCase()}.</p>}
           </div>
         </div>
 
         <div className="space-y-5">
           <div className="luxury-card p-5">
-            <h2 className="text-sm font-bold text-gray-950 dark:text-white">Clinical Staff</h2>
+            <h2 className="text-sm font-bold text-gray-950 dark:text-white">{staffLabel}</h2>
             <div className="mt-4 space-y-2">
               {staff.slice(0, 8).map((member) => (
                 <div key={member.id} className="flex items-center justify-between rounded-xl bg-gray-50 p-3 dark:bg-white/5">
@@ -118,20 +130,20 @@ export default function ClinicalWorkspace() {
                   {member.status && <Badge label={member.status} variant={member.status} />}
                 </div>
               ))}
-              {staff.length === 0 && <p className="text-sm text-gray-400">No staff added yet.</p>}
+              {staff.length === 0 && <p className="text-sm text-gray-400">No {staffLabel.toLowerCase()} added yet.</p>}
             </div>
           </div>
 
           <div className="luxury-card p-5">
             <div className="flex items-center gap-2">
               <Activity className="h-4 w-4 text-teal-700" />
-              <h2 className="text-sm font-bold text-gray-950 dark:text-white">Service Coverage</h2>
+              <h2 className="text-sm font-bold text-gray-950 dark:text-white">{serviceLabel} Coverage</h2>
             </div>
             <div className="mt-4 flex flex-wrap gap-2">
               {services.slice(0, 16).map((service) => (
                 <span key={service.id} className="rounded-full bg-teal-50 px-3 py-1 text-xs font-bold text-teal-700">{service.name}</span>
               ))}
-              {services.length === 0 && <p className="text-sm text-gray-400">No services added yet.</p>}
+              {services.length === 0 && <p className="text-sm text-gray-400">No {servicesLabel.toLowerCase()} added yet.</p>}
             </div>
           </div>
         </div>

@@ -3,6 +3,50 @@ require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../helpers.php';
 
 class PublicSiteController {
+    private function clientIp() {
+        foreach (['HTTP_CF_CONNECTING_IP', 'HTTP_X_FORWARDED_FOR', 'REMOTE_ADDR'] as $key) {
+            if (!empty($_SERVER[$key])) return substr(trim(explode(',', $_SERVER[$key])[0]), 0, 45);
+        }
+        return 'unknown';
+    }
+
+    private function assertPublicBookingNotRateLimited($db) {
+        try {
+            $ip = $this->clientIp();
+            $window = date('Y-m-d H:i:s', time() - 10 * 60);
+            $stmt = $db->prepare("SELECT COUNT(*) FROM LoginAttempt WHERE email = 'public-booking' AND ip = ? AND createdAt > ?");
+            $stmt->execute([$ip, $window]);
+            if ((int)$stmt->fetchColumn() >= 20) {
+                send_error('Too many booking requests. Please wait a few minutes and try again.', 429);
+            }
+            $db->prepare("INSERT INTO LoginAttempt (email, ip, success, createdAt) VALUES ('public-booking', ?, 1, ?)")
+               ->execute([$ip, date('Y-m-d H:i:s')]);
+        } catch (Exception $e) {
+            // If the auth-security migration has not run yet, never block booking.
+        }
+    }
+
+    private function acquireBookingLock($db, $clinicId, $staffId, $date, $startTime) {
+        if (DB_DRIVER !== 'mysql') return null;
+        $key = 'booking:' . hash('sha256', implode('|', [$clinicId, $staffId, $date, $startTime]));
+        $stmt = $db->prepare("SELECT GET_LOCK(?, 5)");
+        $stmt->execute([$key]);
+        if ((int)$stmt->fetchColumn() !== 1) {
+            send_error('This slot is being booked right now. Please try again.', 409);
+        }
+        return $key;
+    }
+
+    private function releaseBookingLock($db, $key) {
+        if (!$key || DB_DRIVER !== 'mysql') return;
+        try {
+            $stmt = $db->prepare("SELECT RELEASE_LOCK(?)");
+            $stmt->execute([$key]);
+        } catch (Exception $e) {
+            // Connection close also releases MySQL advisory locks.
+        }
+    }
+
     // Additive, idempotent: clinic bank/account details shown on invoices.
     private function ensureClinicPaymentColumns($db) {
         // stampImage holds a base64 data URL (like logo) → needs a large text type.
@@ -290,6 +334,7 @@ class PublicSiteController {
         if (count($input['serviceIds']) === 0) send_error('At least one service is required', 400);
 
         $db = DB::getConnection();
+        $this->assertPublicBookingNotRateLimited($db);
         $clinic = $this->resolveClinicByRequest($db, true);
         $serviceIds = array_values(array_unique($input['serviceIds']));
         $marks = implode(',', array_fill(0, count($serviceIds), '?'));
@@ -316,13 +361,35 @@ class PublicSiteController {
             send_error('Please choose a future appointment slot.', 400);
         }
         $endTime = date('H:i', strtotime("$date $startTime") + ($duration * 60));
+        $idempotencyKey = hash('sha256', implode('|', [
+            $clinic['id'],
+            preg_replace('/\D+/', '', (string)$input['phone']),
+            $input['staffId'],
+            $date,
+            $startTime,
+            implode(',', $serviceIds),
+            trim((string)($input['idempotencyKey'] ?? '')),
+        ]));
+        $lockKey = $this->acquireBookingLock($db, $clinic['id'], $input['staffId'], $date, $startTime);
 
-        $stmt = $db->prepare("SELECT COUNT(*) FROM Appointment WHERE clinicId = ? AND staffId = ? AND date = ? AND status IN ('confirmed', 'pending') AND startTime < ? AND endTime > ?");
-        $stmt->execute([$clinic['id'], $input['staffId'], $date, $endTime, $startTime]);
-        if (intval($stmt->fetchColumn()) > 0) send_error('This slot has just been booked. Please choose another time.', 409);
-
-        $db->beginTransaction();
         try {
+            $stmt = $db->prepare("SELECT id, notes FROM Appointment WHERE clinicId = ? AND notes LIKE ? ORDER BY createdAt DESC LIMIT 1");
+            $stmt->execute([$clinic['id'], '%Idempotency: ' . $idempotencyKey . '%']);
+            $existingBooking = $stmt->fetch();
+            if ($existingBooking) {
+                preg_match('/Public booking (WEB-[A-Z0-9]+)/', $existingBooking['notes'] ?? '', $m);
+                $this->releaseBookingLock($db, $lockKey);
+                send_json(['message' => 'Appointment request already received', 'reference' => $m[1] ?? null, 'duplicate' => true], 200);
+            }
+
+            $stmt = $db->prepare("SELECT COUNT(*) FROM Appointment WHERE clinicId = ? AND staffId = ? AND date = ? AND status IN ('confirmed', 'pending') AND startTime < ? AND endTime > ?");
+            $stmt->execute([$clinic['id'], $input['staffId'], $date, $endTime, $startTime]);
+            if (intval($stmt->fetchColumn()) > 0) {
+                $this->releaseBookingLock($db, $lockKey);
+                send_error('This slot has just been booked. Please choose another time.', 409);
+            }
+
+            $db->beginTransaction();
             $stmt = $db->prepare("SELECT id FROM Client WHERE clinicId = ? AND (phone = ? OR (email IS NOT NULL AND email = ?)) LIMIT 1");
             $stmt->execute([$clinic['id'], $input['phone'], $input['email'] ?? '']);
             $clientId = $stmt->fetchColumn();
@@ -341,14 +408,17 @@ class PublicSiteController {
             $appointmentId = generate_uuid();
             $reference = 'WEB-' . strtoupper(substr(str_replace('-', '', $appointmentId), 0, 8));
             $serviceNames = implode(', ', array_map(function ($service) { return $service['name']; }, $services));
-            $notes = trim(($input['notes'] ?? '') . "\nPublic booking $reference. Services: $serviceNames");
+            $notes = trim(($input['notes'] ?? '') . "\nPublic booking $reference. Services: $serviceNames\nIdempotency: $idempotencyKey");
             $stmt = $db->prepare("INSERT INTO Appointment (id, clinicId, branchId, clientId, staffId, serviceId, date, startTime, endTime, duration, status, notes, price, specialty) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, ?, ?)");
             $stmt->execute([$appointmentId, $clinic['id'], $input['branchId'] ?? null, $clientId, $input['staffId'], $services[0]['id'], $date, $startTime, $endTime, $duration, $notes, $price, $services[0]['specialty']]);
             $db->commit();
+            $this->releaseBookingLock($db, $lockKey);
             send_json(['message' => 'Appointment request received', 'reference' => $reference, 'duration' => $duration, 'total' => $price], 201);
         } catch (Exception $e) {
-            $db->rollBack();
+            if ($db->inTransaction()) $db->rollBack();
             throw $e;
+        } finally {
+            $this->releaseBookingLock($db, $lockKey);
         }
     }
 }

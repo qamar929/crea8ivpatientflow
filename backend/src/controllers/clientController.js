@@ -64,7 +64,7 @@ async function remove(req, res, next) {
 async function getAppointments(req, res, next) {
   try {
     const appointments = await prisma.appointment.findMany({
-      where: { clientId: req.params.id },
+      where: { clientId: req.params.id, clinicId: req.user.clinicId },
       include: { staff: { select: { name: true, role: true } }, service: { select: { name: true } } },
       orderBy: { date: 'desc' },
     });
@@ -75,7 +75,7 @@ async function getAppointments(req, res, next) {
 async function getPackages(req, res, next) {
   try {
     const packages = await prisma.clientPackage.findMany({
-      where: { clientId: req.params.id },
+      where: { clientId: req.params.id, client: { clinicId: req.user.clinicId } },
       include: { package: true },
     });
     res.json(packages);

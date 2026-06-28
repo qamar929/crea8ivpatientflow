@@ -99,7 +99,7 @@ class InvoiceController {
         $stmt = $db->prepare("
             SELECT invoiceNo, amountPaid, balanceDue, status, createdAt
             FROM Invoice
-            WHERE clinicId = ? AND clientId = ? AND status != 'refunded'
+            WHERE clinicId = ? AND clientId = ? AND status NOT IN ('refunded', 'cancelled')
             ORDER BY createdAt DESC
         ");
         $stmt->execute([$clinicId, $clientId]);
@@ -564,14 +564,14 @@ class InvoiceController {
         try {
             $db->beginTransaction();
 
-            $stmtDelete = $db->prepare("DELETE FROM Invoice WHERE id = ? AND clinicId = ?");
-            $stmtDelete->execute([$id, $user['clinicId']]);
+            $stmtArchive = $db->prepare("UPDATE Invoice SET status = 'cancelled', balanceDue = 0 WHERE id = ? AND clinicId = ?");
+            $stmtArchive->execute([$id, $user['clinicId']]);
 
             $this->recomputeClientTotals($db, $user['clinicId'], $invoice['clientId']);
 
-            log_audit($user['clinicId'], $user['id'] ?? null, 'invoice_deleted', 'Invoice', $id, null, ['by' => $user['role'] ?? '']);
+            log_audit($user['clinicId'], $user['id'] ?? null, 'invoice_archived', 'Invoice', $id, null, ['by' => $user['role'] ?? '']);
             $db->commit();
-            send_json(['message' => 'Deleted']);
+            send_json(['message' => 'Invoice archived']);
         } catch (Exception $e) {
             $db->rollBack();
             send_error($e->getMessage(), 500);

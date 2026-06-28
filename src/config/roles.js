@@ -89,7 +89,7 @@ export function normalizeRole(role) {
   if (['accountant', 'finance', 'billing', 'cashier'].includes(value)) return ROLES.accountant;
   if (['reception', 'receptionist', 'frontdesk', 'front-desk', 'front_desk'].includes(value)) return ROLES.receptionist;
   if (['staff', 'assistant', 'dental assistant', 'clinical'].includes(value)) return ROLES.staff;
-  return ROLES.owner;
+  return ROLES.staff;
 }
 
 export function getCurrentUser() {

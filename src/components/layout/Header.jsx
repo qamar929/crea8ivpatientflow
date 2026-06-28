@@ -50,6 +50,30 @@ const pageTitles = {
   '/settings': 'Settings',
 };
 
+const MODULE_KEYS = {
+  '/reception': 'reception',
+  '/appointments': 'appointments',
+  '/clients': 'clients',
+  '/clinical': 'clinical',
+  '/staff': 'staff',
+  '/services': 'services',
+  '/financials': 'financials',
+  '/packages': 'packages',
+  '/invoices': 'invoices',
+  '/inventory': 'inventory',
+  '/gallery': 'gallery',
+  '/feedback': 'feedback',
+  '/marketing': 'marketing',
+  '/whatsapp': 'whatsapp',
+  '/ai': 'ai',
+  '/meta-leads': 'metaLeads',
+  '/imports': 'imports',
+  '/reports': 'reports',
+  '/audit': 'audit',
+  '/branches': 'branches',
+  '/settings': 'settings',
+};
+
 const notificationIcons = {
   appointment: CalendarClock,
   schedule: CalendarClock,
@@ -83,7 +107,7 @@ function timeAgo(value) {
 }
 
 export default function Header() {
-  const { clinicInfo } = useClinic();
+  const { clinicInfo, industryTemplate } = useClinic();
   const { darkMode, toggleDark } = useTheme();
   const location = useLocation();
   const navigate = useNavigate();
@@ -98,8 +122,15 @@ export default function Header() {
   const role = getCurrentRole();
 
   const pathParts = location.pathname.split('/').filter(Boolean);
-  const title = pageTitles[location.pathname] || pageTitles['/' + pathParts[0]] || clinicInfo.name;
-  const breadcrumb = pathParts.map((p, i) => ({ label: pageTitles['/' + p] || p, path: '/' + pathParts.slice(0, i + 1).join('/') }));
+  const titleForPath = (path) => {
+    const moduleKey = MODULE_KEYS[path];
+    return industryTemplate.config.modules?.[moduleKey]?.label || pageTitles[path] || null;
+  };
+  const title = titleForPath(location.pathname) || titleForPath('/' + pathParts[0]) || clinicInfo.name;
+  const breadcrumb = pathParts.map((p, i) => {
+    const path = '/' + pathParts.slice(0, i + 1).join('/');
+    return { label: titleForPath('/' + p) || titleForPath(path) || p, path };
+  });
 
   const loadNotifications = async () => {
     if (localStorage.getItem('clinic_auth') !== 'true') return;

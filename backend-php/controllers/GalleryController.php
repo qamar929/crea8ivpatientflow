@@ -10,14 +10,20 @@ class GalleryController {
         if (!$stmt->fetch()) send_error('Client not found', 404);
     }
 
+    private function ensureArchiveColumn($db) {
+        $type = DB_DRIVER === 'sqlite' ? 'TEXT DEFAULT NULL' : 'DATETIME NULL DEFAULT NULL';
+        try { $db->exec("ALTER TABLE GalleryItem ADD COLUMN archivedAt $type"); } catch (Exception $ignored) {}
+    }
+
     public function list($input, $user, $clientId) {
         $db = DB::getConnection();
+        $this->ensureArchiveColumn($db);
         $this->assertClientInClinic($db, $clientId, $user['clinicId']);
 
         $stmt = $db->prepare(
             "SELECT g.* FROM GalleryItem g
              JOIN Client c ON c.id = g.clientId
-             WHERE g.clientId = ? AND c.clinicId = ?
+             WHERE g.clientId = ? AND c.clinicId = ? AND g.archivedAt IS NULL
              ORDER BY g.createdAt DESC"
         );
         $stmt->execute([$clientId, $user['clinicId']]);
@@ -105,8 +111,9 @@ class GalleryController {
 
     public function remove($input, $user, $id) {
         $db = DB::getConnection();
+        $this->ensureArchiveColumn($db);
 
-        // Only allow deleting items whose client belongs to the caller's clinic
+        // Only allow archiving items whose client belongs to the caller's clinic.
         $stmt = $db->prepare(
             "SELECT g.imageUrl FROM GalleryItem g
              JOIN Client c ON c.id = g.clientId
@@ -116,18 +123,8 @@ class GalleryController {
         $imageUrl = $stmt->fetchColumn();
         if ($imageUrl === false) send_error('Gallery item not found', 404);
 
-        // Resolve the file path safely under this clinic's upload dir
-        if ($imageUrl) {
-            $relative = ltrim(str_replace('/uploads/', '', $imageUrl), '/');
-            $filePath = realpath(UPLOAD_DIR . $relative);
-            $base = realpath(UPLOAD_DIR);
-            if ($filePath && $base && strpos($filePath, $base) === 0 && is_file($filePath)) {
-                @unlink($filePath);
-            }
-        }
-
-        $stmt = $db->prepare("DELETE FROM GalleryItem WHERE id = ? AND clientId IN (SELECT id FROM Client WHERE clinicId = ?)");
+        $stmt = $db->prepare("UPDATE GalleryItem SET archivedAt = CURRENT_TIMESTAMP WHERE id = ? AND clientId IN (SELECT id FROM Client WHERE clinicId = ?)");
         $stmt->execute([$id, $user['clinicId']]);
-        send_json(['message' => 'Deleted']);
+        send_json(['message' => 'Archived']);
     }
 }

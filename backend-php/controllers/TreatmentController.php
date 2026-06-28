@@ -21,7 +21,7 @@ class TreatmentController {
         $db->exec($sql);
     }
 
-    private $statuses = ['planned', 'in_progress', 'completed', 'cancelled'];
+    private $statuses = ['planned', 'in_progress', 'completed', 'cancelled', 'archived'];
     private function col() { return DB_DRIVER === 'sqlite' ? 'procedure' : '`procedure`'; }
 
     private function assertClient($db, $clientId, $clinicId) {
@@ -34,7 +34,7 @@ class TreatmentController {
         $db = DB::getConnection();
         $this->ensureTable($db);
         $this->assertClient($db, $clientId, $user['clinicId']);
-        $stmt = $db->prepare("SELECT * FROM TreatmentPlanItem WHERE clinicId = ? AND clientId = ? ORDER BY sortOrder ASC, createdAt ASC");
+        $stmt = $db->prepare("SELECT * FROM TreatmentPlanItem WHERE clinicId = ? AND clientId = ? AND status <> 'archived' ORDER BY sortOrder ASC, createdAt ASC");
         $stmt->execute([$user['clinicId'], $clientId]);
         send_json($stmt->fetchAll());
     }
@@ -82,8 +82,8 @@ class TreatmentController {
     public function remove($input, $user, $id) {
         $db = DB::getConnection();
         $this->ensureTable($db);
-        $stmt = $db->prepare("DELETE FROM TreatmentPlanItem WHERE id = ? AND clinicId = ?");
+        $stmt = $db->prepare("UPDATE TreatmentPlanItem SET status = 'archived' WHERE id = ? AND clinicId = ?");
         $stmt->execute([$id, $user['clinicId']]);
-        send_json(['message' => 'Deleted']);
+        send_json(['message' => 'Archived']);
     }
 }

@@ -1,8 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { fetchApi } from '../../config/api';
+import { useClinic } from '../../context/ClinicContext';
 
 export default function AppointmentChart() {
+  const { term } = useClinic();
+  const appointmentsLabel = term('appointments', 'Appointments');
+  const appointmentLabel = term('appointment', 'appointment');
   const [appointments, setAppointments] = useState([]);
 
   useEffect(() => {
@@ -22,8 +26,8 @@ export default function AppointmentChart() {
   return (
     <div className="flex h-full flex-col">
       <div className="mb-4">
-        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Appointments This Week</h3>
-        <p className="mt-0.5 text-xs text-gray-400">Live appointment volume</p>
+        <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{appointmentsLabel} This Week</h3>
+        <p className="mt-0.5 text-xs text-gray-400">Live {appointmentLabel} volume</p>
       </div>
       <div className="min-h-0 flex-1">
         <ResponsiveContainer width="100%" height="100%">
@@ -31,7 +35,7 @@ export default function AppointmentChart() {
             <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
             <XAxis dataKey="day" tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
             <YAxis tick={{ fontSize: 11, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
-            <Tooltip formatter={(value) => [value, 'Appointments']} cursor={{ fill: '#f8fafc' }} />
+            <Tooltip formatter={(value) => [value, appointmentsLabel]} cursor={{ fill: '#f8fafc' }} />
             <Bar dataKey="appointments" fill="#0f766e" radius={[6, 6, 0, 0]} maxBarSize={32} />
           </BarChart>
         </ResponsiveContainer>

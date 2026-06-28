@@ -44,9 +44,11 @@ function air_ensure_tables($db) {
             content TEXT DEFAULT '',
             sortOrder INTEGER DEFAULT 0,
             isActive INTEGER DEFAULT 1,
+            archivedAt TEXT DEFAULT NULL,
             createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
             updatedAt TEXT DEFAULT CURRENT_TIMESTAMP
         )");
+        try { $db->exec("ALTER TABLE ClinicKnowledge ADD COLUMN archivedAt TEXT DEFAULT NULL"); } catch (Exception $ignored) {}
         $db->exec("CREATE INDEX IF NOT EXISTS ClinicKnowledge_clinic ON ClinicKnowledge(clinicId, category)");
         $db->exec("CREATE TABLE IF NOT EXISTS ConversationMemory (
             id TEXT PRIMARY KEY,
@@ -56,9 +58,11 @@ function air_ensure_tables($db) {
             memoryKey TEXT NOT NULL,
             memoryValue TEXT DEFAULT '',
             source TEXT DEFAULT 'manual',
+            archivedAt TEXT DEFAULT NULL,
             createdAt TEXT DEFAULT CURRENT_TIMESTAMP,
             updatedAt TEXT DEFAULT CURRENT_TIMESTAMP
         )");
+        try { $db->exec("ALTER TABLE ConversationMemory ADD COLUMN archivedAt TEXT DEFAULT NULL"); } catch (Exception $ignored) {}
         $db->exec("CREATE INDEX IF NOT EXISTS ConversationMemory_clinic ON ConversationMemory(clinicId, contactPhone)");
         $db->exec("CREATE UNIQUE INDEX IF NOT EXISTS ConversationMemory_unique ON ConversationMemory(clinicId, contactPhone, memoryKey)");
     } else {
@@ -88,11 +92,13 @@ function air_ensure_tables($db) {
             content MEDIUMTEXT,
             sortOrder INT DEFAULT 0,
             isActive TINYINT DEFAULT 1,
+            archivedAt TIMESTAMP NULL DEFAULT NULL,
             createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             INDEX ClinicKnowledge_clinic (clinicId, category),
             CONSTRAINT FK_ClinicKnowledge_Clinic FOREIGN KEY (clinicId) REFERENCES Clinic(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        try { $db->exec("ALTER TABLE ClinicKnowledge ADD COLUMN archivedAt TIMESTAMP NULL DEFAULT NULL"); } catch (Exception $ignored) {}
         $db->exec("CREATE TABLE IF NOT EXISTS ConversationMemory (
             id VARCHAR(64) PRIMARY KEY,
             clinicId VARCHAR(64) NOT NULL,
@@ -101,12 +107,14 @@ function air_ensure_tables($db) {
             memoryKey VARCHAR(60) NOT NULL,
             memoryValue TEXT,
             source VARCHAR(20) DEFAULT 'manual',
+            archivedAt TIMESTAMP NULL DEFAULT NULL,
             createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updatedAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
             UNIQUE KEY ConversationMemory_unique (clinicId, contactPhone, memoryKey),
             INDEX ConversationMemory_clinic (clinicId, contactPhone),
             CONSTRAINT FK_ConversationMemory_Clinic FOREIGN KEY (clinicId) REFERENCES Clinic(id) ON DELETE CASCADE
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
+        try { $db->exec("ALTER TABLE ConversationMemory ADD COLUMN archivedAt TIMESTAMP NULL DEFAULT NULL"); } catch (Exception $ignored) {}
     }
 }
 
@@ -190,10 +198,10 @@ function air_persona_save($db, $clinicId, $input) {
 function air_knowledge_list($db, $clinicId, $category = null) {
     air_ensure_tables($db);
     if ($category) {
-        $stmt = $db->prepare("SELECT * FROM ClinicKnowledge WHERE clinicId = ? AND category = ? ORDER BY sortOrder ASC, createdAt ASC");
+        $stmt = $db->prepare("SELECT * FROM ClinicKnowledge WHERE clinicId = ? AND category = ? AND archivedAt IS NULL ORDER BY sortOrder ASC, createdAt ASC");
         $stmt->execute([$clinicId, $category]);
     } else {
-        $stmt = $db->prepare("SELECT * FROM ClinicKnowledge WHERE clinicId = ? ORDER BY category ASC, sortOrder ASC, createdAt ASC");
+        $stmt = $db->prepare("SELECT * FROM ClinicKnowledge WHERE clinicId = ? AND archivedAt IS NULL ORDER BY category ASC, sortOrder ASC, createdAt ASC");
         $stmt->execute([$clinicId]);
     }
     return array_map(function ($r) {
@@ -205,7 +213,7 @@ function air_knowledge_list($db, $clinicId, $category = null) {
 
 function air_knowledge_get($db, $clinicId, $id) {
     air_ensure_tables($db);
-    $stmt = $db->prepare("SELECT * FROM ClinicKnowledge WHERE id = ? AND clinicId = ?");
+    $stmt = $db->prepare("SELECT * FROM ClinicKnowledge WHERE id = ? AND clinicId = ? AND archivedAt IS NULL");
     $stmt->execute([$id, $clinicId]);
     return $stmt->fetch() ?: null;
 }
@@ -236,7 +244,7 @@ function air_knowledge_upsert($db, $clinicId, $id, $input) {
 
 function air_knowledge_delete($db, $clinicId, $id) {
     air_ensure_tables($db);
-    $stmt = $db->prepare("DELETE FROM ClinicKnowledge WHERE id = ? AND clinicId = ?");
+    $stmt = $db->prepare("UPDATE ClinicKnowledge SET isActive = 0, archivedAt = CURRENT_TIMESTAMP, updatedAt = CURRENT_TIMESTAMP WHERE id = ? AND clinicId = ? AND archivedAt IS NULL");
     $stmt->execute([$id, $clinicId]);
     return $stmt->rowCount() > 0;
 }
@@ -245,10 +253,10 @@ function air_knowledge_delete($db, $clinicId, $id) {
 function air_memory_list($db, $clinicId, $contactPhone = null) {
     air_ensure_tables($db);
     if ($contactPhone) {
-        $stmt = $db->prepare("SELECT * FROM ConversationMemory WHERE clinicId = ? AND contactPhone = ? ORDER BY updatedAt DESC");
+        $stmt = $db->prepare("SELECT * FROM ConversationMemory WHERE clinicId = ? AND contactPhone = ? AND archivedAt IS NULL ORDER BY updatedAt DESC");
         $stmt->execute([$clinicId, $contactPhone]);
     } else {
-        $stmt = $db->prepare("SELECT * FROM ConversationMemory WHERE clinicId = ? ORDER BY updatedAt DESC LIMIT 500");
+        $stmt = $db->prepare("SELECT * FROM ConversationMemory WHERE clinicId = ? AND archivedAt IS NULL ORDER BY updatedAt DESC LIMIT 500");
         $stmt->execute([$clinicId]);
     }
     return $stmt->fetchAll();
@@ -263,11 +271,11 @@ function air_memory_remember($db, $clinicId, $contactPhone, $memoryKey, $memoryV
     if (DB_DRIVER === 'sqlite') {
         $sql = "INSERT INTO ConversationMemory (id, clinicId, contactPhone, contactName, memoryKey, memoryValue, source)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(clinicId, contactPhone, memoryKey) DO UPDATE SET memoryValue=excluded.memoryValue, contactName=excluded.contactName, source=excluded.source, updatedAt=CURRENT_TIMESTAMP";
+                ON CONFLICT(clinicId, contactPhone, memoryKey) DO UPDATE SET memoryValue=excluded.memoryValue, contactName=excluded.contactName, source=excluded.source, archivedAt=NULL, updatedAt=CURRENT_TIMESTAMP";
     } else {
         $sql = "INSERT INTO ConversationMemory (id, clinicId, contactPhone, contactName, memoryKey, memoryValue, source)
                 VALUES (?, ?, ?, ?, ?, ?, ?)
-                ON DUPLICATE KEY UPDATE memoryValue=VALUES(memoryValue), contactName=VALUES(contactName), source=VALUES(source), updatedAt=CURRENT_TIMESTAMP";
+                ON DUPLICATE KEY UPDATE memoryValue=VALUES(memoryValue), contactName=VALUES(contactName), source=VALUES(source), archivedAt=NULL, updatedAt=CURRENT_TIMESTAMP";
     }
     $db->prepare($sql)->execute([generate_uuid(), $clinicId, (string)$contactPhone, (string)$contactName, $memoryKey, (string)$memoryValue, $source]);
     return true;
@@ -275,7 +283,7 @@ function air_memory_remember($db, $clinicId, $contactPhone, $memoryKey, $memoryV
 
 function air_memory_delete($db, $clinicId, $id) {
     air_ensure_tables($db);
-    $stmt = $db->prepare("DELETE FROM ConversationMemory WHERE id = ? AND clinicId = ?");
+    $stmt = $db->prepare("UPDATE ConversationMemory SET archivedAt = CURRENT_TIMESTAMP, updatedAt = CURRENT_TIMESTAMP WHERE id = ? AND clinicId = ? AND archivedAt IS NULL");
     $stmt->execute([$id, $clinicId]);
     return $stmt->rowCount() > 0;
 }
@@ -351,7 +359,7 @@ function air_preview_reply($db, $clinicId, $message, $personaOverride = null, $c
         ['role' => 'system', 'content' => $system],
         ['role' => 'user', 'content' => (string)$message],
     ];
-    return ai_complete($db, $messages, ['maxTokens' => 260, 'temperature' => 0.5]);
+    return ai_complete($db, $messages, ['maxTokens' => 260, 'temperature' => 0.5, 'clinicId' => $clinicId, 'purpose' => 'ai_receptionist_preview']);
 }
 
 // ===================================================== Phase 4: lead engine ==
@@ -405,7 +413,7 @@ function air_extract_lead($db, $clinicId, $message) {
         $raw = ai_complete($db, [
             ['role' => 'system', 'content' => $sys],
             ['role' => 'user', 'content' => (string)$message],
-        ], ['maxTokens' => 180, 'temperature' => 0]);
+        ], ['maxTokens' => 180, 'temperature' => 0, 'clinicId' => $clinicId, 'purpose' => 'ai_receptionist_extract']);
     } catch (Exception $e) {
         return null;
     }
@@ -432,15 +440,33 @@ function air_create_appointment_from_lead($db, $clinicId, $client, $lead) {
     $ts = strtotime((string)($lead['preferredDate'] ?? ''));
     if (!$ts) return ['created' => false, 'reason' => 'no_date'];
     $date = date('Y-m-d', $ts);
+    if (strtotime($date . ' 23:59:59') < time()) return ['created' => false, 'reason' => 'past_date'];
+
+    $staffStmt = $db->prepare("SELECT id, branchId, specialty, workingDays, workingHours FROM Staff WHERE id = ? AND clinicId = ? AND status = 'active'");
+    $staffStmt->execute([$staffId, $clinicId]);
+    $staff = $staffStmt->fetch();
+    if (!$staff) return ['created' => false, 'reason' => 'staff_unavailable'];
+
     $time = '10:00';
     if (!empty($lead['preferredTime'])) { $tt = strtotime($lead['preferredTime']); if ($tt) $time = date('H:i', $tt); }
     $endTime = date('H:i', strtotime($time) + 30 * 60);
+    if (strtotime("$date $time") <= time()) return ['created' => false, 'reason' => 'past_time'];
+
+    $day = date('D', strtotime($date));
+    $workingDays = array_map('trim', explode(',', (string)($staff['workingDays'] ?? '')));
+    if ($workingDays && !in_array($day, $workingDays, true)) return ['created' => false, 'reason' => 'outside_working_days'];
+    [$open, $close] = array_pad(explode('-', (string)($staff['workingHours'] ?? '09:00-17:00')), 2, '');
+    if ($open && $close && ($time < $open || $endTime > $close)) return ['created' => false, 'reason' => 'outside_working_hours'];
+
+    $conflict = $db->prepare("SELECT COUNT(*) FROM Appointment WHERE clinicId = ? AND staffId = ? AND date = ? AND status IN ('confirmed', 'pending') AND startTime < ? AND endTime > ?");
+    $conflict->execute([$clinicId, $staffId, $date, $endTime, $time]);
+    if ((int)$conflict->fetchColumn() > 0) return ['created' => false, 'reason' => 'slot_conflict'];
 
     $id = generate_uuid();
     $notes = 'Booked by AI Receptionist' . (!empty($lead['treatmentInterest']) ? ' — interest: ' . $lead['treatmentInterest'] : '') . '.';
     $qr = generate_qr_data_url($id, $client['name'] ?? 'Patient', $date, $time);
     $db->prepare("INSERT INTO Appointment (id, clinicId, branchId, clientId, staffId, serviceId, date, startTime, endTime, duration, status, room, notes, price, specialty, qrCode) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)")
-       ->execute([$id, $clinicId, null, $client['id'], $staffId, null, $date, $time, $endTime, 30, 'pending', null, $notes, 0, '', $qr]);
+       ->execute([$id, $clinicId, $staff['branchId'] ?? null, $client['id'], $staffId, null, $date, $time, $endTime, 30, 'pending', null, $notes, 0, $staff['specialty'] ?? 'general', $qr]);
     whatsapp_automation_dispatch_trigger($clinicId, 'appointment_booked', $id, $client['id']);
     return ['created' => true, 'appointmentId' => $id, 'date' => $date, 'startTime' => $time];
 }

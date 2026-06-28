@@ -59,8 +59,8 @@ class AIReceptionistController {
         $db = $this->db();
         $ok = air_knowledge_delete($db, $user['clinicId'], $id);
         if (!$ok) send_error('Knowledge entry not found', 404);
-        log_audit($user['clinicId'], $user['id'] ?? null, 'delete', 'ClinicKnowledge', $id, null, null);
-        send_json(['deleted' => true]);
+        log_audit($user['clinicId'], $user['id'] ?? null, 'knowledge_archived', 'ClinicKnowledge', $id, null, null);
+        send_json(['archived' => true]);
     }
 
     // ---- Conversation memory (visibility + manual cleanup; written by automation later) ----

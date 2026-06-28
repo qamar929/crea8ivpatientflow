@@ -1,5 +1,6 @@
 import { X, Printer, CheckCircle, QrCode } from 'lucide-react';
 import { useEffect } from 'react';
+import { useClinic } from '../../context/ClinicContext';
 
 // Generate a deterministic fake QR pattern from a string seed
 function FakeQR({ seed = 'QR', size = 140 }) {
@@ -55,6 +56,9 @@ function FakeQR({ seed = 'QR', size = 140 }) {
 }
 
 export default function QRCheckin({ appointment, isOpen, onClose, onCheckin }) {
+  const { term } = useClinic();
+  const patientLabel = term('patient', 'Client');
+  const serviceLabel = term('service', 'Service');
   useEffect(() => {
     if (isOpen) document.body.style.overflow = 'hidden';
     else document.body.style.overflow = '';
@@ -87,11 +91,11 @@ export default function QRCheckin({ appointment, isOpen, onClose, onCheckin }) {
           {/* Appointment details */}
           <div className="w-full bg-gray-50 rounded-xl p-4 space-y-2.5">
             <div className="flex justify-between text-sm">
-              <span className="text-gray-500 font-medium">Client</span>
+              <span className="text-gray-500 font-medium">{patientLabel}</span>
               <span className="font-semibold text-gray-900">{appointment.clientName}</span>
             </div>
             <div className="flex justify-between text-sm">
-              <span className="text-gray-500 font-medium">Service</span>
+              <span className="text-gray-500 font-medium">{serviceLabel}</span>
               <span className="font-semibold text-gray-900 text-right max-w-[55%] truncate">{appointment.service}</span>
             </div>
             <div className="flex justify-between text-sm">

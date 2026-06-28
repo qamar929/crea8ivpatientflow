@@ -392,16 +392,21 @@ class AppointmentController {
         send_json($stmt->fetch());
     }
 
-    // Permanently remove an appointment record (distinct from cancel, which
-    // keeps it with status='cancelled' for history).
+    // Archive appointment through the historical DELETE route. We retain the
+    // row for clinical/legal history and reporting; cancelled slots stop
+    // blocking future bookings because conflict checks only include pending/confirmed.
     public function remove($input, $user, $id) {
         $db = DB::getConnection();
-        $stmt = $db->prepare("SELECT id FROM Appointment WHERE id = ? AND clinicId = ?");
+        $stmt = $db->prepare("SELECT id, notes FROM Appointment WHERE id = ? AND clinicId = ?");
         $stmt->execute([$id, $user['clinicId']]);
-        if (!$stmt->fetch()) send_error('Appointment not found', 404);
+        $appointment = $stmt->fetch();
+        if (!$appointment) send_error('Appointment not found', 404);
 
-        $db->prepare("DELETE FROM Appointment WHERE id = ? AND clinicId = ?")->execute([$id, $user['clinicId']]);
-        send_json(['message' => 'Appointment deleted']);
+        $note = trim(($appointment['notes'] ?? '') . "\nArchived from appointment list by " . ($user['role'] ?? 'user') . ' on ' . date('Y-m-d H:i:s'));
+        $db->prepare("UPDATE Appointment SET status = 'cancelled', notes = ? WHERE id = ? AND clinicId = ?")
+           ->execute([$note, $id, $user['clinicId']]);
+        log_audit($user['clinicId'], $user['id'] ?? null, 'appointment_archived', 'Appointment', $id, null, null);
+        send_json(['message' => 'Appointment archived']);
     }
 
     public function checkIn($input, $user, $id) {

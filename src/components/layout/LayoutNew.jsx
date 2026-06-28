@@ -7,6 +7,7 @@ import { NavLink, Outlet, useNavigate } from 'react-router-dom';
 import { Calendar, ClipboardList, FileBarChart, LayoutDashboard, Receipt, Stethoscope, Users } from 'lucide-react';
 import clsx from 'clsx';
 import { useTheme } from '../../context/ThemeContext';
+import { useClinic } from '../../context/ClinicContext';
 import { canAccessPath, getCurrentRole } from '../../config/roles';
 
 const mobileNav = [
@@ -21,8 +22,15 @@ const mobileNav = [
 
 export default function LayoutNew() {
   const { darkMode } = useTheme();
+  const { term } = useClinic();
   const role = getCurrentRole();
   const navigate = useNavigate();
+  const dynamicMobileNav = mobileNav.map(item => {
+    if (item.to === '/appointments') return { ...item, label: term('appointments', 'Appts') };
+    if (item.to === '/clients') return { ...item, label: term('patients', 'Patients') };
+    if (item.to === '/clinical') return { ...item, label: term('clinicalWorkspace', 'Clinical') };
+    return item;
+  });
 
   useEffect(() => {
     const handleShortcuts = (event) => {
@@ -61,7 +69,7 @@ export default function LayoutNew() {
         <MobileQuickActions />
         <nav className="md:hidden fixed bottom-0 inset-x-0 z-40 bg-white/80 dark:bg-slate-900/80 backdrop-blur-xl border-t border-white/50 dark:border-white/10 shadow-2xl px-2 py-2">
           <div className="flex items-center justify-around gap-1">
-            {mobileNav.filter((item) => canAccessPath(item.to, role)).map(({ to, icon: Icon, label }) => (
+            {dynamicMobileNav.filter((item) => canAccessPath(item.to, role)).map(({ to, icon: Icon, label }) => (
               <NavLink
                 key={to}
                 to={to}

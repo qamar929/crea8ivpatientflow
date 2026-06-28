@@ -44,7 +44,14 @@ function Field({ label, hint, children }) {
 const inputCls = 'w-full rounded-lg border border-gray-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-orange-400 focus:ring-2 focus:ring-orange-100 dark:border-white/10 dark:bg-slate-900 dark:text-white dark:focus:ring-orange-500/20';
 
 export default function AIReceptionist() {
-  const { clinicInfo } = useClinic();
+  const { clinicInfo, term } = useClinic();
+  const patientLabel = term('patient', 'patient');
+  const patientsLabel = term('patients', 'patients');
+  const appointmentLabel = term('appointment', 'appointment');
+  const appointmentsLabel = term('appointments', 'appointments');
+  const doctorLabel = term('doctor', 'doctor');
+  const serviceLabel = term('service', 'service');
+  const treatmentLabel = term('treatment', 'treatment');
   const [loading, setLoading] = useState(true);
   const [step, setStep] = useState(1);
   const [persona, setPersona] = useState(null);
@@ -151,7 +158,7 @@ export default function AIReceptionist() {
         <div className="grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-orange-500 to-orange-600 text-white shadow-lg shadow-orange-500/30"><Bot className="h-6 w-6" /></div>
         <div>
           <h1 className="text-xl font-bold text-gray-900 dark:text-white">AI Receptionist Builder</h1>
-          <p className="text-sm text-gray-500">Give {clinicInfo?.name || 'your clinic'} its own WhatsApp receptionist — set its voice, teach it your clinic, and test it before going live.</p>
+          <p className="text-sm text-gray-500">Give {clinicInfo?.name || 'your business'} its own WhatsApp receptionist — set its voice, teach it your business, and test it before going live.</p>
         </div>
         <div className="ml-auto">
           <span className={`rounded-full px-3 py-1 text-xs font-bold ${persona.isActive ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300' : 'bg-gray-100 text-gray-500 dark:bg-white/10'}`}>
@@ -189,7 +196,7 @@ export default function AIReceptionist() {
         <section className="rounded-2xl border border-gray-100 bg-white p-6 shadow-sm dark:border-white/10 dark:bg-slate-900">
           {step === 1 && (
             <div className="space-y-4">
-              <StepHead n={1} title="Tone & identity" sub="Patients should feel they're talking to a real person from your clinic." />
+              <StepHead n={1} title="Tone & identity" sub={`${patientsLabel} should feel they're talking to a real person from your team.`} />
               <div className="grid gap-4 sm:grid-cols-2">
                 <Field label="Receptionist name" hint="e.g. Sara, Ayesha, Bilal"><input className={inputCls} value={persona.receptionistName} onChange={(e) => set({ receptionistName: e.target.value })} placeholder="Sara" /></Field>
                 <Field label="Assistant gender">
@@ -207,13 +214,13 @@ export default function AIReceptionist() {
                 </div>
               </Field>
               <Field label="Personality style" hint="Optional — a short phrase, e.g. 'calm and reassuring', 'upbeat and concierge-like'"><input className={inputCls} value={persona.personalityStyle} onChange={(e) => set({ personalityStyle: e.target.value })} placeholder="warm and concierge-like" /></Field>
-              <Tip>Each clinic's receptionist should feel unique. A luxury skin clinic and a family dental practice should not sound the same.</Tip>
+              <Tip>Each business receptionist should feel unique. A salon, agency, studio, clinic, and consultancy should not sound the same.</Tip>
             </div>
           )}
 
           {step === 2 && (
             <div className="space-y-4">
-              <StepHead n={2} title="Language & writing style" sub="Most Pakistani clinics do best with Roman Urdu or a natural Urdu + English mix." />
+              <StepHead n={2} title="Language & writing style" sub="Most Pakistani businesses do best with Roman Urdu or a natural Urdu + English mix." />
               <Field label="Primary language">
                 <div className="flex flex-wrap gap-2">
                   {options.languages.map((l) => (
@@ -223,25 +230,25 @@ export default function AIReceptionist() {
                 </div>
               </Field>
               <Field label="Writing style" hint="Optional — e.g. 'short messages, friendly emojis, no slang'"><input className={inputCls} value={persona.writingStyle} onChange={(e) => set({ writingStyle: e.target.value })} placeholder="Short, friendly, a few emojis" /></Field>
-              <Field label="Brand values" hint="Optional — what your clinic stands for; the AI will reflect this"><input className={inputCls} value={persona.brandValues} onChange={(e) => set({ brandValues: e.target.value })} placeholder="Honest advice, painless care, on-time appointments" /></Field>
-              <Tip>The receptionist always replies in your chosen language, but automatically switches if a patient writes in a different one.</Tip>
+              <Field label="Brand values" hint="Optional — what your business stands for; the AI will reflect this"><input className={inputCls} value={persona.brandValues} onChange={(e) => set({ brandValues: e.target.value })} placeholder={`Honest advice, on-time ${appointmentsLabel}, clear communication`} /></Field>
+              <Tip>The receptionist always replies in your chosen language, but automatically switches if a {patientLabel} writes in a different one.</Tip>
             </div>
           )}
 
           {step === 3 && (
             <div className="space-y-4">
-              <StepHead n={3} title="Greetings, intro & rules" sub="Teach the AI how to open a chat and the do's and don'ts of your clinic." />
+              <StepHead n={3} title="Greetings, intro & rules" sub="Teach the AI how to open a chat and the do's and don'ts of your business." />
               <Field label="Greeting style" hint="How the first message should sound">
                 <input className={inputCls} value={persona.greetingStyle} onChange={(e) => set({ greetingStyle: e.target.value })} placeholder="Assalamualaikum, thank you for contacting The Smile Xperts 🦷" />
               </Field>
-              <Field label="Clinic introduction" hint="A line or two the AI can use to introduce the clinic">
-                <textarea rows={2} className={inputCls} value={persona.clinicIntro} onChange={(e) => set({ clinicIntro: e.target.value })} placeholder="We're a modern dental clinic in F-8 Islamabad offering cleaning, whitening, braces and implants." />
+              <Field label="Business introduction" hint="A line or two the AI can use to introduce the business">
+                <textarea rows={2} className={inputCls} value={persona.clinicIntro} onChange={(e) => set({ clinicIntro: e.target.value })} placeholder={`We're a modern business offering ${serviceLabel.toLowerCase()}s, ${appointmentsLabel.toLowerCase()}, and helpful follow-up.`} />
               </Field>
               <Field label="Sample replies" hint="Paste a few of your real replies — the AI learns your style from these (one per line)">
                 <textarea rows={4} className={inputCls} value={persona.sampleReplies} onChange={(e) => set({ sampleReplies: e.target.value })} placeholder={'Ji bilkul! Whitening ka session 45 minutes ka hota hai.\nAap kis din aana prefer karenge?'} />
               </Field>
-              <Field label="Conversation rules" hint="Anything the AI must always / never do for your clinic">
-                <textarea rows={3} className={inputCls} value={persona.conversationRules} onChange={(e) => set({ conversationRules: e.target.value })} placeholder={'Always offer a free consultation for braces.\nNever quote exact surgery prices — invite for a checkup.'} />
+              <Field label="Conversation rules" hint="Anything the AI must always / never do for your business">
+                <textarea rows={3} className={inputCls} value={persona.conversationRules} onChange={(e) => set({ conversationRules: e.target.value })} placeholder={`Always offer a clear next ${appointmentLabel}.\nNever quote custom pricing without team review.`} />
               </Field>
               <Tip>Safety is built in: the AI never diagnoses, never promises results, and hands off to your team when unsure — you don't need to add those rules.</Tip>
             </div>
@@ -249,7 +256,7 @@ export default function AIReceptionist() {
 
           {step === 4 && (
             <div className="space-y-4">
-              <StepHead n={4} title="Knowledge base" sub="The AI answers ONLY from what you add here — so it never invents prices, doctors or hours." />
+              <StepHead n={4} title="Knowledge base" sub={`The AI answers ONLY from what you add here — so it never invents prices, ${doctorLabel}s or hours.`} />
               <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 dark:border-white/10 dark:bg-white/5">
                 <div className="grid gap-3 sm:grid-cols-[160px_1fr]">
                   <Field label="Category">
@@ -259,8 +266,8 @@ export default function AIReceptionist() {
                   </Field>
                   <Field label="Title" hint="Optional short label"><input className={inputCls} value={kForm.title} onChange={(e) => setKForm((f) => ({ ...f, title: e.target.value }))} placeholder="Teeth whitening" /></Field>
                 </div>
-                <div className="mt-3"><Field label="Content" hint="The actual facts: prices, hours, doctor bios, policies, FAQs…">
-                  <textarea rows={3} className={inputCls} value={kForm.content} onChange={(e) => setKForm((f) => ({ ...f, content: e.target.value }))} placeholder="Teeth whitening costs PKR 15,000 for a 45-minute session. Results last 6–12 months." />
+                <div className="mt-3"><Field label="Content" hint={`The actual facts: prices, hours, ${doctorLabel} bios, policies, FAQs...`}>
+                  <textarea rows={3} className={inputCls} value={kForm.content} onChange={(e) => setKForm((f) => ({ ...f, content: e.target.value }))} placeholder={`${treatmentLabel} details, price, duration, availability, and next steps.`} />
                 </Field></div>
                 <button onClick={addKnowledge} disabled={saving} className="mt-3 inline-flex items-center gap-2 rounded-lg bg-orange-600 px-4 py-2 text-sm font-bold text-white hover:bg-orange-700 disabled:opacity-60">
                   <Plus className="h-4 w-4" /> Add to knowledge base
@@ -271,7 +278,7 @@ export default function AIReceptionist() {
                 <div className="rounded-xl border border-dashed border-gray-300 p-8 text-center dark:border-white/15">
                   <BookOpen className="mx-auto h-8 w-8 text-gray-300" />
                   <p className="mt-2 text-sm font-bold text-gray-600 dark:text-gray-300">No knowledge yet</p>
-                  <p className="mx-auto mt-1 max-w-sm text-xs text-gray-400">Add your pricing list, opening hours, doctor profiles and common FAQs. The more you add, the smarter and safer your receptionist becomes.</p>
+                  <p className="mx-auto mt-1 max-w-sm text-xs text-gray-400">Add your pricing list, opening hours, team profiles and common FAQs. The more you add, the smarter and safer your receptionist becomes.</p>
                 </div>
               ) : (
                 <div className="space-y-2">
@@ -292,7 +299,7 @@ export default function AIReceptionist() {
 
           {(step === 5 || step === 6) && (
             <div className="space-y-4">
-              <StepHead n={step} title={step === 5 ? 'Preview responses' : 'Test in sandbox'} sub={step === 5 ? 'Tap a sample question to see how your receptionist would reply.' : 'Chat exactly like a patient would. Nothing here is sent to anyone.'} />
+              <StepHead n={step} title={step === 5 ? 'Preview responses' : 'Test in sandbox'} sub={step === 5 ? 'Tap a sample question to see how your receptionist would reply.' : `Chat exactly like a ${patientLabel} would. Nothing here is sent to anyone.`} />
               <div className="flex items-center gap-2 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-500 dark:border-white/10 dark:bg-white/5">
                 <Play className="h-4 w-4" /> Video walkthrough coming soon — for now, try the examples below.
               </div>
@@ -316,7 +323,7 @@ export default function AIReceptionist() {
                   {chatBusy && <div className="flex justify-start"><div className="rounded-2xl bg-white px-3.5 py-2 text-sm text-gray-400 shadow-sm dark:bg-slate-800"><Loader2 className="h-4 w-4 animate-spin" /></div></div>}
                 </div>
                 <div className="flex items-center gap-2 border-t border-gray-200 p-2 dark:border-white/10">
-                  <input className={inputCls} value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && sendSandbox()} placeholder="Type a patient message…" />
+                  <input className={inputCls} value={chatInput} onChange={(e) => setChatInput(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && sendSandbox()} placeholder={`Type a ${patientLabel} message...`} />
                   <button onClick={() => sendSandbox()} disabled={chatBusy} className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-orange-600 text-white hover:bg-orange-700 disabled:opacity-60"><Send className="h-4 w-4" /></button>
                 </div>
               </div>
@@ -335,7 +342,7 @@ export default function AIReceptionist() {
               </div>
               <div className="flex items-start gap-2 rounded-xl border border-emerald-200 bg-emerald-50 p-3 text-xs text-emerald-800 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-200">
                 <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0" />
-                Safety guardrails are always on: no diagnosis, no outcome promises, no cross-clinic data, and automatic hand-off to your team when unsure.
+                Safety guardrails are always on: no unsupported advice, no outcome promises, no cross-tenant data, and automatic hand-off to your team when unsure.
               </div>
               <button onClick={activate} disabled={saving} className={`inline-flex items-center gap-2 rounded-lg px-5 py-2.5 text-sm font-bold text-white disabled:opacity-60 ${persona.isActive ? 'bg-gray-500' : 'bg-emerald-600 hover:bg-emerald-700'}`}>
                 <Power className="h-4 w-4" /> {persona.isActive ? 'Re-save & keep active' : 'Activate AI Receptionist'}

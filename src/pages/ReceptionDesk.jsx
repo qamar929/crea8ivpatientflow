@@ -4,6 +4,7 @@ import { AlertTriangle, CalendarCheck, Clock, CreditCard, Loader2, MessageCircle
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import { fetchApi } from '../config/api';
+import { useClinic } from '../context/ClinicContext';
 
 const money = (value = 0) => `PKR ${Number(value || 0).toLocaleString()}`;
 
@@ -22,6 +23,12 @@ function DeskCard({ icon: Icon, label, value, tone = 'text-gray-950' }) {
 }
 
 export default function ReceptionDesk() {
+  const { term } = useClinic();
+  const patientLabel = term('patient', 'Patient');
+  const appointmentLabel = term('appointment', 'Appointment');
+  const appointmentsLabel = term('appointments', 'Appointments');
+  const treatmentLabel = term('treatment', term('service', 'Service'));
+  const doctorLabel = term('doctor', 'Doctor');
   const [appointments, setAppointments] = useState([]);
   const [invoices, setInvoices] = useState([]);
   const [clients, setClients] = useState([]);
@@ -60,11 +67,11 @@ export default function ReceptionDesk() {
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-950 dark:text-white">Reception Desk</h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Same-day appointments, invoice preparation, patient search, and cash handover.</p>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Same-day {appointmentsLabel.toLowerCase()}, invoice preparation, {patientLabel.toLowerCase()} search, and cash handover.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary" size="sm"><Send className="h-4 w-4" /> Send Owner Close</Button>
-          <Link to="/appointments"><Button size="sm"><CalendarCheck className="h-4 w-4" /> New Appointment</Button></Link>
+          <Link to="/appointments"><Button size="sm"><CalendarCheck className="h-4 w-4" /> New {appointmentLabel}</Button></Link>
         </div>
       </div>
 
@@ -75,9 +82,9 @@ export default function ReceptionDesk() {
 
       <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
         {[
-          ['Book Appointment', 'Create and manage live clinic appointments', '/appointments'],
-          ['Create Invoice', 'Prepare patient bill from live services', '/invoices'],
-          ['Patient Search', 'Find patient profile and dues', '/clients'],
+          [`Book ${appointmentLabel}`, `Create and manage live ${appointmentsLabel.toLowerCase()}`, '/appointments'],
+          ['Create Invoice', `Prepare ${patientLabel.toLowerCase()} bill from live services`, '/invoices'],
+          [`${patientLabel} Search`, `Find ${patientLabel.toLowerCase()} profile and dues`, '/clients'],
           ['WhatsApp', 'Send reminders and confirmations', '/whatsapp'],
         ].map(([label, helper, to]) => (
           <Link key={label} to={to} className="rounded-lg border border-gray-100 bg-white p-4 shadow-sm transition-all hover:-translate-y-0.5 hover:border-teal-200 hover:shadow-lg dark:border-white/10 dark:bg-slate-900">
@@ -88,7 +95,7 @@ export default function ReceptionDesk() {
       </div>
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <DeskCard icon={CalendarCheck} label="Today's Appointments" value={todayAppointments.length} />
+        <DeskCard icon={CalendarCheck} label={`Today's ${appointmentsLabel}`} value={todayAppointments.length} />
         <DeskCard icon={Receipt} label="Bills To Prepare" value={todayAppointments.filter(a => a.status !== 'completed').length} />
         <DeskCard icon={WalletCards} label="Cash Received Today" value={money(cashReceived)} tone="text-teal-700" />
         <DeskCard icon={CreditCard} label="Card/Bank Received" value={money(cardBankReceived)} tone="text-[var(--primary)]" />
@@ -98,12 +105,12 @@ export default function ReceptionDesk() {
         <div className="luxury-card p-5 xl:col-span-2">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <h2 className="text-sm font-bold text-gray-950 dark:text-white">Today's Chair Schedule</h2>
+              <h2 className="text-sm font-bold text-gray-950 dark:text-white">Today's Schedule</h2>
               <p className="text-xs text-gray-500 dark:text-gray-400">Quick check-in, invoice, and WhatsApp actions.</p>
             </div>
             <div className="relative">
               <Search className="absolute left-3 top-2.5 h-4 w-4 text-gray-400" />
-              <input value={search} onChange={e => setSearch(e.target.value)} className="premium-input w-full rounded-lg py-2 pl-9 pr-3 text-sm sm:w-72" placeholder="Search patient, treatment, doctor..." />
+              <input value={search} onChange={e => setSearch(e.target.value)} className="premium-input w-full rounded-lg py-2 pl-9 pr-3 text-sm sm:w-72" placeholder={`Search ${patientLabel.toLowerCase()}, ${treatmentLabel.toLowerCase()}, ${doctorLabel.toLowerCase()}...`} />
             </div>
           </div>
 
@@ -112,9 +119,9 @@ export default function ReceptionDesk() {
               <thead>
                 <tr className="border-b border-gray-100 text-left text-[10px] uppercase tracking-wider text-gray-400">
                   <th className="py-3 font-semibold">Time</th>
-                  <th className="py-3 font-semibold">Patient</th>
-                  <th className="py-3 font-semibold">Treatment</th>
-                  <th className="py-3 font-semibold">Doctor</th>
+                  <th className="py-3 font-semibold">{patientLabel}</th>
+                  <th className="py-3 font-semibold">{treatmentLabel}</th>
+                  <th className="py-3 font-semibold">{doctorLabel}</th>
                   <th className="py-3 font-semibold">Status</th>
                   <th className="py-3 text-right font-semibold">Action</th>
                 </tr>
@@ -123,9 +130,9 @@ export default function ReceptionDesk() {
                 {filteredAppointments.map(appointment => (
                   <tr key={appointment.id}>
                     <td className="py-3 font-bold text-gray-900">{appointment.startTime}</td>
-                    <td className="py-3"><p className="font-semibold text-gray-900">{appointment.client?.name || appointment.clientName || 'Patient'}</p></td>
-                    <td className="py-3 text-gray-600">{appointment.service?.name || appointment.serviceName || 'Treatment'}</td>
-                    <td className="py-3 text-gray-600">{appointment.staff?.name || appointment.staffName || 'Doctor'}</td>
+                    <td className="py-3"><p className="font-semibold text-gray-900">{appointment.client?.name || appointment.clientName || patientLabel}</p></td>
+                    <td className="py-3 text-gray-600">{appointment.service?.name || appointment.serviceName || treatmentLabel}</td>
+                    <td className="py-3 text-gray-600">{appointment.staff?.name || appointment.staffName || doctorLabel}</td>
                     <td className="py-3"><Badge label={appointment.status} variant={appointment.status} /></td>
                     <td className="py-3">
                       <div className="flex justify-end gap-2">
@@ -135,7 +142,7 @@ export default function ReceptionDesk() {
                     </td>
                   </tr>
                 ))}
-                {filteredAppointments.length === 0 && <tr><td colSpan={6} className="py-12 text-center text-sm text-gray-400">No appointments today.</td></tr>}
+                {filteredAppointments.length === 0 && <tr><td colSpan={6} className="py-12 text-center text-sm text-gray-400">No {appointmentsLabel.toLowerCase()} today.</td></tr>}
               </tbody>
             </table>
           </div>
@@ -147,7 +154,7 @@ export default function ReceptionDesk() {
               <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-700" />
               <div>
                 <p className="text-sm font-bold text-amber-950">Reception Safety</p>
-                <p className="mt-1 text-xs text-amber-700">Old dues and invoices are calculated from live patient balances only.</p>
+                <p className="mt-1 text-xs text-amber-700">Old dues and invoices are calculated from live {patientLabel.toLowerCase()} balances only.</p>
               </div>
             </div>
           </div>

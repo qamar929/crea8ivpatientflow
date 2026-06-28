@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeft, Calendar, CreditCard, Loader2, Mail, MessageCircle, Phone, UserRound, FileText, Upload, Trash2, Image as ImageIcon } from 'lucide-react';
 import { fetchApi, API_URL } from '../config/api';
+import { useClinic } from '../context/ClinicContext';
 
 const FILE_BASE = API_URL.replace(/\/api\/v1\/?$/, '');
 const fileUrl = (u) => (u && u.startsWith('http') ? u : FILE_BASE + u);
@@ -93,6 +94,8 @@ const TP_STATUS = {
 };
 
 function TreatmentPlan({ clientId }) {
+  const { term } = useClinic();
+  const treatmentLabel = term('treatment', 'Treatment');
   const [items, setItems] = useState(null);
   const [form, setForm] = useState({ procedure: '', tooth: '', cost: '' });
   const [err, setErr] = useState('');
@@ -110,7 +113,7 @@ function TreatmentPlan({ clientId }) {
     } catch (e) { setErr(e.message); } finally { setBusy(false); }
   };
   const setStatus = async (item, status) => { try { await fetchApi(`/treatment-plan/${item.id}`, { method: 'PUT', body: JSON.stringify({ status }) }); load(); } catch (e) { setErr(e.message); } };
-  const del = async (item) => { if (!window.confirm('Remove this treatment?')) return; try { await fetchApi(`/treatment-plan/${item.id}`, { method: 'DELETE' }); load(); } catch (e) { setErr(e.message); } };
+  const del = async (item) => { if (!window.confirm(`Remove this ${treatmentLabel.toLowerCase()}?`)) return; try { await fetchApi(`/treatment-plan/${item.id}`, { method: 'DELETE' }); load(); } catch (e) { setErr(e.message); } };
 
   const total = (items || []).filter((i) => i.status !== 'cancelled').reduce((s, i) => s + Number(i.cost || 0), 0);
   const fld = 'rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 px-2.5 py-1.5 text-sm dark:text-white focus:outline-none focus:ring-2 focus:ring-indigo-300';
@@ -118,7 +121,7 @@ function TreatmentPlan({ clientId }) {
   return (
     <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/5">
       <div className="flex items-center justify-between">
-        <h3 className="text-sm font-black text-gray-950 dark:text-white">Treatment Plan</h3>
+        <h3 className="text-sm font-black text-gray-950 dark:text-white">{treatmentLabel} Plan</h3>
         {total > 0 && <span className="text-xs font-bold text-gray-500">Plan total: {money(total)}</span>}
       </div>
       {err && <p className="mt-2 text-xs text-red-600">{err}</p>}
@@ -139,12 +142,12 @@ function TreatmentPlan({ clientId }) {
               <button onClick={() => del(it)} className="rounded p-1 text-gray-400 hover:bg-rose-50 hover:text-rose-600"><Trash2 className="h-3.5 w-3.5" /></button>
             </div>
           ))}
-          {items.length === 0 && <p className="py-4 text-center text-sm text-gray-400">No treatments planned yet.</p>}
+          {items.length === 0 && <p className="py-4 text-center text-sm text-gray-400">No {treatmentLabel.toLowerCase()}s planned yet.</p>}
         </div>
       )}
 
       <div className="mt-3 flex flex-wrap items-center gap-2 border-t border-gray-100 pt-3 dark:border-white/10">
-        <input className={`${fld} flex-1 min-w-[140px]`} placeholder="Procedure (e.g. Root canal)" value={form.procedure} onChange={(e) => setForm({ ...form, procedure: e.target.value })} />
+        <input className={`${fld} flex-1 min-w-[140px]`} placeholder={`${treatmentLabel} details`} value={form.procedure} onChange={(e) => setForm({ ...form, procedure: e.target.value })} />
         <input className={`${fld} w-24`} placeholder="Tooth" value={form.tooth} onChange={(e) => setForm({ ...form, tooth: e.target.value })} />
         <input className={`${fld} w-28`} type="number" placeholder="Cost" value={form.cost} onChange={(e) => setForm({ ...form, cost: e.target.value })} />
         <Button size="sm" onClick={add} disabled={busy || !form.procedure.trim()}>Add</Button>
@@ -154,6 +157,14 @@ function TreatmentPlan({ clientId }) {
 }
 
 export default function ClientProfile() {
+  const { term } = useClinic();
+  const patientLabel = term('patient', 'Patient');
+  const patientsLabel = term('patients', 'Patients');
+  const appointmentLabel = term('appointment', 'Appointment');
+  const appointmentsLabel = term('appointments', 'Appointments');
+  const staffLabel = term('staff', 'Staff');
+  const clinicalNotesLabel = term('clinicalNotes', 'Clinical Notes');
+  const visitLabel = term('visit', 'Visit');
   const { id } = useParams();
   const navigate = useNavigate();
   const [client, setClient] = useState(null);
@@ -184,8 +195,8 @@ export default function ClientProfile() {
   if (error || !client) {
     return (
       <div className="py-20 text-center">
-        <p className="text-sm font-semibold text-gray-500">{error || 'Patient not found'}</p>
-        <Button className="mt-4" onClick={() => navigate('/clients')}>Back to Patients</Button>
+        <p className="text-sm font-semibold text-gray-500">{error || `${patientLabel} not found`}</p>
+        <Button className="mt-4" onClick={() => navigate('/clients')}>Back to {patientsLabel}</Button>
       </div>
     );
   }
@@ -194,14 +205,14 @@ export default function ClientProfile() {
     <div className="space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <button onClick={() => navigate('/clients')} className="flex items-center gap-2 text-sm font-semibold text-gray-500 hover:text-gray-900">
-          <ArrowLeft className="h-4 w-4" /> Back to Patients
+          <ArrowLeft className="h-4 w-4" /> Back to {patientsLabel}
         </button>
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary" size="sm" onClick={() => navigate(`/whatsapp?client=${client.id}`)}>
             <MessageCircle className="h-4 w-4" /> WhatsApp
           </Button>
           <Button size="sm" onClick={() => navigate('/appointments')}>
-            <Calendar className="h-4 w-4" /> Book Appointment
+            <Calendar className="h-4 w-4" /> Book {appointmentLabel}
           </Button>
         </div>
       </div>
@@ -214,7 +225,7 @@ export default function ClientProfile() {
                 {client.initials || client.name?.slice(0, 2)?.toUpperCase()}
               </div>
               <h2 className="mt-3 text-lg font-black text-gray-950 dark:text-white">{client.name}</h2>
-              <p className="text-xs text-gray-400">{client.patientNo || 'No patient number'}</p>
+              <p className="text-xs text-gray-400">{client.patientNo || `No ${patientLabel.toLowerCase()} number`}</p>
               <div className="mt-3 flex justify-center">{client.status && <Badge label={client.status} variant={client.status} />}</div>
             </div>
             <div className="mt-5 space-y-3 text-sm">
@@ -227,20 +238,20 @@ export default function ClientProfile() {
           <div className="grid grid-cols-2 gap-3">
             <InfoCard label="Total Spent" value={money(client.totalSpent)} />
             <InfoCard label="Loyalty Tier" value={client.loyaltyTier} />
-            <InfoCard label="Visits" value={totals.visits} />
+            <InfoCard label={`${visitLabel}s`} value={totals.visits} />
             <InfoCard label="Upcoming" value={totals.upcoming} />
           </div>
         </aside>
 
         <main className="space-y-5">
           <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/5">
-            <h3 className="text-sm font-black text-gray-950 dark:text-white">Appointment History</h3>
+            <h3 className="text-sm font-black text-gray-950 dark:text-white">{appointmentLabel} History</h3>
             <div className="mt-4 space-y-2">
               {appointments.map((appt) => (
                 <div key={appt.id} className="flex flex-col gap-2 rounded-xl bg-gray-50 p-3 dark:bg-white/5 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <p className="text-sm font-bold text-gray-950 dark:text-white">{appt.service?.name || appt.serviceName || 'Appointment'}</p>
-                    <p className="text-xs text-gray-500">{appt.date} · {appt.startTime} · {appt.staff?.name || appt.staffName || 'Staff'}</p>
+                    <p className="text-sm font-bold text-gray-950 dark:text-white">{appt.service?.name || appt.serviceName || appointmentLabel}</p>
+                    <p className="text-xs text-gray-500">{appt.date} · {appt.startTime} · {appt.staff?.name || appt.staffName || staffLabel}</p>
                   </div>
                   <div className="flex items-center gap-3">
                     {appt.status && <Badge label={appt.status} variant={appt.status} />}
@@ -248,13 +259,13 @@ export default function ClientProfile() {
                   </div>
                 </div>
               ))}
-              {appointments.length === 0 && <p className="py-8 text-center text-sm text-gray-400">No appointments yet.</p>}
+              {appointments.length === 0 && <p className="py-8 text-center text-sm text-gray-400">No {appointmentsLabel.toLowerCase()} yet.</p>}
             </div>
           </div>
 
           <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-white/5">
-            <h3 className="text-sm font-black text-gray-950 dark:text-white">Clinical Notes</h3>
-            <p className="mt-2 text-sm text-gray-500">{client.notes || 'No clinical notes recorded yet.'}</p>
+            <h3 className="text-sm font-black text-gray-950 dark:text-white">{clinicalNotesLabel}</h3>
+            <p className="mt-2 text-sm text-gray-500">{client.notes || `No ${clinicalNotesLabel.toLowerCase()} recorded yet.`}</p>
           </div>
 
           <TreatmentPlan clientId={client.id} />

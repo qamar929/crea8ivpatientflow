@@ -32,11 +32,15 @@ const parseCommissionRates = (raw) => {
 };
 
 function StaffDetailModal({ staff, onClose }) {
+  const { term } = useClinic();
+  const staffLabel = term('staff', 'Staff');
+  const appointmentsLabel = term('appointments', 'appointments');
+  const patientLabel = term('patient', 'patient');
   if (!staff) return null;
   const commissionRates = parseCommissionRates(staff.treatmentCommissionRates);
 
   return (
-    <Modal isOpen={!!staff} onClose={onClose} title="Staff Profile" size="lg">
+    <Modal isOpen={!!staff} onClose={onClose} title={`${staffLabel} Profile`} size="lg">
       <div className="space-y-5">
         <div className="flex items-start gap-4">
           <div className="w-16 h-16 rounded-2xl flex items-center justify-center text-white text-xl font-bold shadow-md shrink-0"
@@ -145,7 +149,7 @@ function StaffDetailModal({ staff, onClose }) {
 
         <div className="grid grid-cols-3 gap-3">
           {[
-            { label: 'This Month', value: staff.appointmentsThisMonth || 0, sub: 'appointments', color: 'text-indigo-600' },
+            { label: 'This Month', value: staff.appointmentsThisMonth || 0, sub: appointmentsLabel.toLowerCase(), color: 'text-indigo-600' },
             { label: 'All Time', value: staff.appointmentsHandled || 0, sub: 'total handled', color: 'text-gray-900 dark:text-white' },
             { label: 'Revenue', value: `PKR ${((staff.revenue || 0) / 1000000).toFixed(1)}M`, sub: 'generated', color: 'text-emerald-600' },
           ].map(s => (
@@ -158,7 +162,7 @@ function StaffDetailModal({ staff, onClose }) {
         </div>
 
         <div className="rounded-xl border border-gray-100 bg-gray-50 p-4 text-xs text-gray-500 dark:border-white/10 dark:bg-white/5 dark:text-gray-300">
-          Staff performance is calculated from real appointments, revenue and patient feedback. Historical charts will appear once monthly analytics are recorded.
+          {staffLabel} performance is calculated from real {appointmentsLabel.toLowerCase()}, revenue and {patientLabel.toLowerCase()} feedback. Historical charts will appear once monthly analytics are recorded.
         </div>
       </div>
     </Modal>
@@ -175,6 +179,10 @@ const emptyStaffForm = {
 };
 
 function StaffFormModal({ isOpen, onClose, onSave, target, saving }) {
+  const { term } = useClinic();
+  const doctorLabel = term('doctor', 'Doctor');
+  const staffLabel = term('staff', 'Staff');
+  const treatmentLabel = term('treatment', 'Treatment');
   const isEdit = !!target;
   const [form, setForm] = useState(emptyStaffForm);
 
@@ -242,24 +250,24 @@ function StaffFormModal({ isOpen, onClose, onSave, target, saving }) {
   const inputCls = "w-full border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300";
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={isEdit ? 'Edit Staff Profile' : 'Create Staff Profile'} size="xl">
+    <Modal isOpen={isOpen} onClose={onClose} title={isEdit ? `Edit ${staffLabel} Profile` : `Create ${staffLabel} Profile`} size="xl">
       <div className="space-y-4">
         <div>
           <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Full Name *</label>
-          <input value={form.name} onChange={e => set('name', e.target.value)} placeholder="Dr. ..." className={inputCls} />
+          <input value={form.name} onChange={e => set('name', e.target.value)} placeholder={`${doctorLabel} name`} className={inputCls} />
         </div>
         <div>
           <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Role</label>
           <select value={form.role} onChange={e => set('role', e.target.value)} className={inputCls}>
-            <option>Dentist</option>
-            <option>Dental Assistant</option>
-            <option>Receptionist</option>
-            <option>Manager</option>
+            <option value="Dentist">{doctorLabel}</option>
+            <option value="Dental Assistant">{staffLabel}</option>
+            <option value="Receptionist">Receptionist</option>
+            <option value="Manager">Manager</option>
           </select>
         </div>
         <div>
           <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Designation</label>
-          <input value={form.designation} onChange={e => set('designation', e.target.value)} placeholder="Lead Dentist, Endodontist..." className={inputCls} />
+          <input value={form.designation} onChange={e => set('designation', e.target.value)} placeholder={`Lead ${doctorLabel}, specialist...`} className={inputCls} />
         </div>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <div>
@@ -287,7 +295,7 @@ function StaffFormModal({ isOpen, onClose, onSave, target, saving }) {
         </div>
         <div>
           <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Qualifications</label>
-          <input value={form.qualifications} onChange={e => set('qualifications', e.target.value)} placeholder="BDS, MBBS..." className={inputCls} />
+          <input value={form.qualifications} onChange={e => set('qualifications', e.target.value)} placeholder="Certifications, licenses, or qualifications" className={inputCls} />
         </div>
 
         <div className="border border-gray-100 dark:border-white/10 rounded-xl p-4 bg-gray-50 dark:bg-white/5">
@@ -319,7 +327,7 @@ function StaffFormModal({ isOpen, onClose, onSave, target, saving }) {
             <input type="number" value={form.packageRate} onChange={e => set('packageRate', e.target.value)} aria-label="Package commission" className={inputCls} />
           </div>
           <div className="grid grid-cols-3 gap-3 mt-1 text-[10px] text-gray-500 dark:text-gray-400">
-            <span>Consultation %</span><span>Procedure %</span><span>Package %</span>
+            <span>Consultation %</span><span>{treatmentLabel} %</span><span>Package %</span>
           </div>
         </div>
 
@@ -331,8 +339,8 @@ function StaffFormModal({ isOpen, onClose, onSave, target, saving }) {
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <select value={form.portalRole} onChange={e => set('portalRole', e.target.value)} className="border border-indigo-100 dark:border-indigo-500/30 bg-white dark:bg-white/5 dark:text-white rounded-lg px-3 py-2 text-sm">
-                <option value="doctor">Doctor</option>
-                <option value="staff">Staff</option>
+                <option value="doctor">{doctorLabel}</option>
+                <option value="staff">{staffLabel}</option>
                 <option value="receptionist">Receptionist</option>
                 <option value="manager">Manager</option>
               </select>
@@ -358,8 +366,10 @@ function StaffFormModal({ isOpen, onClose, onSave, target, saving }) {
 }
 
 function DeleteConfirmModal({ isOpen, onClose, onConfirm, name, deleting }) {
+  const { term } = useClinic();
+  const staffLabel = term('staff', 'Staff');
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Remove Staff" size="sm">
+    <Modal isOpen={isOpen} onClose={onClose} title={`Remove ${staffLabel}`} size="sm">
       <div className="space-y-4">
         <p className="text-sm text-gray-700 dark:text-gray-200">
           Deactivate <span className="font-semibold">{name}</span>? This cannot be undone.
@@ -376,7 +386,8 @@ function DeleteConfirmModal({ isOpen, onClose, onConfirm, name, deleting }) {
 }
 
 export default function Staff() {
-  const { clinicInfo } = useClinic();
+  const { clinicInfo, term } = useClinic();
+  const staffLabel = term('staff', 'Staff');
   const [staffList, setStaffList] = useState([]);
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
@@ -459,7 +470,7 @@ export default function Staff() {
     <div className="space-y-5">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'Total Staff', value: staffList.length, color: 'text-gray-900 dark:text-white', bg: 'bg-gray-50 dark:bg-white/5' },
+          { label: `Total ${staffLabel}`, value: staffList.length, color: 'text-gray-900 dark:text-white', bg: 'bg-gray-50 dark:bg-white/5' },
           { label: 'On Duty Today', value: onDuty, color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-500/10' },
           { label: 'On Leave', value: staffList.filter(s => s.status === 'on-leave').length, color: 'text-orange-500', bg: 'bg-orange-50 dark:bg-orange-500/10' },
           { label: 'Payroll + Commission', value: money(payrollEstimate), color: 'text-emerald-600', bg: 'bg-emerald-50 dark:bg-emerald-500/10' },
@@ -482,7 +493,7 @@ export default function Staff() {
           </select>
         </div>
         <Button onClick={() => { setEditTarget(null); setShowAddModal(true); }} size="sm">
-          <Plus className="w-4 h-4" /> Add Staff
+          <Plus className="w-4 h-4" /> Add {staffLabel}
         </Button>
       </div>
 
@@ -541,7 +552,7 @@ export default function Staff() {
           </div>
         ))}
         {filtered.length === 0 && (
-          <div className="col-span-3 text-center py-16 text-gray-400 text-sm">No staff found.</div>
+          <div className="col-span-3 text-center py-16 text-gray-400 text-sm">No {staffLabel.toLowerCase()} found.</div>
         )}
       </div>
 

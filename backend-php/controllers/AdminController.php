@@ -179,7 +179,7 @@ class AdminController {
         $monthStart = date('Y-m-01 00:00:00');
 
         $counts = [];
-        foreach (['active', 'trial', 'grace', 'suspended', 'pending'] as $s) {
+        foreach (['active', 'trial', 'grace', 'suspended', 'pending', 'archived'] as $s) {
             $stmt = $db->prepare("SELECT COUNT(*) FROM Clinic WHERE status = ? AND id != 'platform'");
             $stmt->execute([$s]);
             $counts[$s] = (int)$stmt->fetchColumn();
@@ -200,7 +200,7 @@ class AdminController {
         $stmt = $db->prepare(
             "SELECT s.clinicId, c.name, s.expiresAt FROM Subscription s
              JOIN Clinic c ON c.id = s.clinicId
-             WHERE s.status = 'active' AND s.expiresAt BETWEEN ? AND ?
+             WHERE s.status = 'active' AND c.status <> 'archived' AND s.expiresAt BETWEEN ? AND ?
              ORDER BY s.expiresAt ASC"
         );
         $stmt->execute([$now, $in30]);
@@ -253,6 +253,7 @@ class AdminController {
             "SELECT c.id, c.name, c.slug, c.customDomain, c.domainStatus, c.sslStatus,
                     c.status, c.clinicType, c.trialEndsAt,
                     c.suspendedAt, c.suspensionReason, c.createdAt,
+                    COALESCE(fs.industryTemplate, 'healthcare') AS industryTemplate,
                     COALESCE(fs.marketingEnabled, 0) AS marketingEnabled,
                     COALESCE(fs.whatsappEnabled, 0) AS whatsappEnabled,
                     COALESCE(fs.aiEnabled, 0) AS aiEnabled,
@@ -324,6 +325,8 @@ class AdminController {
             'platformAiProviders' => $providers,
             'package' => pf_package_get($db, $id),
             'packages' => array_values(pf_packages()),
+            'industryTemplates' => industry_templates_list($db),
+            'industryTemplate' => industry_template_get($db, $features['industryTemplate'] ?? INDUSTRY_TEMPLATE_DEFAULT),
         ]);
     }
 
@@ -350,7 +353,11 @@ class AdminController {
         $stmt->execute([$id]);
         if (!$stmt->fetch()) send_error('Tenant not found', 404);
 
-        $features = tenant_features_save($db, $id, $input['features'] ?? []);
+        try {
+            $features = tenant_features_save($db, $id, $input['features'] ?? []);
+        } catch (Exception $e) {
+            send_error($e->getMessage(), 400);
+        }
 
         if (isset($input['whatsapp']) && is_array($input['whatsapp'])) {
             $w = $input['whatsapp'];
@@ -690,7 +697,7 @@ class AdminController {
         if ($name === '') send_error('Clinic name is required', 400);
         if ($ownerEmail === '' || !filter_var($ownerEmail, FILTER_VALIDATE_EMAIL)) send_error('A valid owner email is required', 400);
         if ($ownerName === '') $ownerName = $name . ' Owner';
-        if ($ownerPassword !== '' && strlen($ownerPassword) < 8) send_error('Owner password must be at least 8 characters', 400);
+        if ($ownerPassword !== '' && strlen($ownerPassword) < 10) send_error('Owner password must be at least 10 characters', 400);
 
         $stmt = $db->prepare("SELECT id FROM User WHERE email = ?");
         $stmt->execute([$ownerEmail]);
@@ -778,45 +785,44 @@ class AdminController {
         send_json(['message' => 'Clinic updated']);
     }
 
-    // Permanently delete a clinic and ALL of its data (superadmin). Destructive.
+    // Archive a clinic without deleting patient, billing, appointment or media data.
+    // Kept on the historical DELETE route for backward compatibility with the
+    // admin UI, but intentionally no longer performs a hard delete.
     public function deleteTenant($input, $user, $id) {
-        if ($id === 'platform') send_error('The platform tenant cannot be deleted', 400);
+        if ($id === 'platform') send_error('The platform tenant cannot be archived', 400);
 
         $db = DB::getConnection();
-        $stmt = $db->prepare("SELECT name FROM Clinic WHERE id = ?");
+        $stmt = $db->prepare("SELECT name, status FROM Clinic WHERE id = ?");
         $stmt->execute([$id]);
         $clinic = $stmt->fetch();
         if (!$clinic) send_error('Tenant not found', 404);
+        if ($clinic['status'] === 'archived') {
+            send_json(['message' => 'Clinic "' . $clinic['name'] . '" is already archived']);
+        }
 
         try {
             $db->beginTransaction();
 
-            // Child rows that reference users/clients/packages/etc. of this clinic
+            // Revoke live sessions and deactivate users, but keep all historical data.
             $db->prepare("DELETE FROM RefreshToken WHERE userId IN (SELECT id FROM User WHERE clinicId = ?)")->execute([$id]);
-            $db->prepare("DELETE FROM PasswordReset WHERE userId IN (SELECT id FROM User WHERE clinicId = ?)")->execute([$id]);
-            $db->prepare("DELETE FROM SupportMessage WHERE ticketId IN (SELECT id FROM SupportTicket WHERE clinicId = ?)")->execute([$id]);
-            $db->prepare("DELETE FROM PackageItem WHERE packageId IN (SELECT id FROM Package WHERE clinicId = ?)")->execute([$id]);
-            $db->prepare("DELETE FROM ClientPackage WHERE clientId IN (SELECT id FROM Client WHERE clinicId = ?)")->execute([$id]);
-            $db->prepare("DELETE FROM InventoryTransaction WHERE itemId IN (SELECT id FROM InventoryItem WHERE clinicId = ?)")->execute([$id]);
-            $db->prepare("DELETE FROM GalleryItem WHERE clientId IN (SELECT id FROM Client WHERE clinicId = ?)")->execute([$id]);
-
-            // Tables that carry clinicId directly
-            foreach (['Appointment','Invoice','Feedback','Campaign','Notification','Payment','Subscription',
-                      'SupportTicket','RegistrationLead','InventoryItem','Package','Service','Staff','Client',
-                      'Branch','PublicSiteConfig','AuditLog','User'] as $t) {
-                $db->prepare("DELETE FROM $t WHERE clinicId = ?")->execute([$id]);
+            try {
+                $db->prepare("UPDATE PasswordReset SET usedAt = CURRENT_TIMESTAMP WHERE userId IN (SELECT id FROM User WHERE clinicId = ?) AND usedAt IS NULL")->execute([$id]);
+            } catch (Exception $ignored) {
+                // Older installs may not have password reset history yet.
             }
-            $db->prepare("DELETE FROM Clinic WHERE id = ?")->execute([$id]);
+            $db->prepare("UPDATE User SET isActive = 0 WHERE clinicId = ?")->execute([$id]);
+            $db->prepare("UPDATE Clinic SET status = 'archived', suspendedAt = ?, suspensionReason = ? WHERE id = ?")
+               ->execute([date('Y-m-d H:i:s'), trim($input['reason'] ?? 'Archived by platform admin'), $id]);
 
             $db->commit();
         } catch (Exception $e) {
             $db->rollBack();
-            error_log('deleteTenant failed: ' . $e->getMessage());
-            send_error('Delete failed: ' . $e->getMessage(), 500);
+            error_log('archiveTenant failed: ' . $e->getMessage());
+            send_error('Archive failed: ' . $e->getMessage(), 500);
         }
 
-        log_audit('platform', $user['id'], 'tenant_deleted', 'Clinic', $id, ['name' => $clinic['name']], null);
-        send_json(['message' => 'Clinic "' . $clinic['name'] . '" and all of its data were permanently deleted']);
+        log_audit('platform', $user['id'], 'tenant_archived', 'Clinic', $id, ['name' => $clinic['name'], 'status' => $clinic['status']], null);
+        send_json(['message' => 'Clinic "' . $clinic['name'] . '" was archived. No clinic data was deleted.']);
     }
 
     // ------------------------------------------------------------------

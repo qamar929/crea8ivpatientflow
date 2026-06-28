@@ -3,12 +3,21 @@ import { CheckCircle2, DatabaseBackup, Download, FileBarChart, Loader2, Printer,
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import { fetchApi } from '../config/api';
+import { useClinic } from '../context/ClinicContext';
 import { isOwner } from '../config/roles';
 
 const money = (value = 0) => `PKR ${Number(value || 0).toLocaleString()}`;
 
 export default function Reports() {
   const owner = isOwner();
+  const { term } = useClinic();
+  const patientLabel = term('patient', 'Patient');
+  const appointmentLabel = term('appointment', 'Appointment');
+  const appointmentsLabel = term('appointments', 'Appointments');
+  const doctorLabel = term('doctor', 'Doctor');
+  const staffLabel = term('staff', 'Staff');
+  const serviceLabel = term('service', 'Service');
+  const servicesLabel = term('services', 'Services');
   const [data, setData] = useState({ financials: {}, invoices: [], appointments: [], staff: [], services: [] });
   const [loading, setLoading] = useState(true);
 
@@ -59,7 +68,7 @@ export default function Reports() {
       <div className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
         <div>
           <h1 className="text-xl font-bold text-gray-950 dark:text-white">Reports Center</h1>
-          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Live revenue, dues, appointments, doctor commission, and audit-ready summaries. Demo reports removed.</p>
+          <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">Live revenue, dues, {appointmentsLabel.toLowerCase()}, {doctorLabel.toLowerCase()} commission, and audit-ready summaries. Demo reports removed.</p>
         </div>
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary" size="sm"><Printer className="h-4 w-4" /> Print</Button>
@@ -71,7 +80,7 @@ export default function Reports() {
         {[
           ['Collected', money(data.financials.totalRevenue)],
           ['Outstanding', money(data.financials.outstandingPayments)],
-          ['Appointments', data.appointments.length],
+          [appointmentsLabel, data.appointments.length],
           ['Invoices', data.invoices.length],
         ].map(([label, value]) => (
           <div key={label} className="luxury-card p-4">
@@ -87,7 +96,7 @@ export default function Reports() {
         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">Only real invoices appear here.</p>
         <div className="mt-4 overflow-x-auto">
           <table className="w-full min-w-[760px] text-sm">
-            <thead><tr className="border-b border-gray-100 text-left text-[10px] uppercase tracking-wider text-gray-400">{['Invoice', 'Patient', 'Total', 'Paid', 'Balance', 'Status'].map(h => <th key={h} className="py-3 font-semibold">{h}</th>)}</tr></thead>
+            <thead><tr className="border-b border-gray-100 text-left text-[10px] uppercase tracking-wider text-gray-400">{['Invoice', patientLabel, 'Total', 'Paid', 'Balance', 'Status'].map(h => <th key={h} className="py-3 font-semibold">{h}</th>)}</tr></thead>
             <tbody className="divide-y divide-gray-50 dark:divide-white/5">
               {data.invoices.map(invoice => (
                 <tr key={invoice.id}>
@@ -109,15 +118,15 @@ export default function Reports() {
         <div className="luxury-card p-5 xl:col-span-2">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-sm font-bold text-gray-950 dark:text-white">Doctor Commission & Salary</h2>
-              <p className="text-xs text-gray-500 dark:text-gray-400">Calculated from real appointment-linked invoices only.</p>
+              <h2 className="text-sm font-bold text-gray-950 dark:text-white">{doctorLabel} Commission & Salary</h2>
+              <p className="text-xs text-gray-500 dark:text-gray-400">Calculated from real {appointmentLabel.toLowerCase()}-linked invoices only.</p>
             </div>
             <Badge label={owner ? 'Owner Only' : 'Locked'} variant={owner ? 'active' : 'inactive'} />
           </div>
           {owner ? (
             <div className="mt-4 overflow-x-auto">
               <table className="w-full min-w-[720px] text-sm">
-                <thead><tr className="border-b border-gray-100 text-left text-[10px] uppercase tracking-wider text-gray-400">{['Staff', 'Revenue', 'Commission', 'Salary', 'Cases', 'Payout'].map(h => <th key={h} className="py-3 text-right first:text-left font-semibold">{h}</th>)}</tr></thead>
+                <thead><tr className="border-b border-gray-100 text-left text-[10px] uppercase tracking-wider text-gray-400">{[staffLabel, 'Revenue', 'Commission', 'Salary', 'Cases', 'Payout'].map(h => <th key={h} className="py-3 text-right first:text-left font-semibold">{h}</th>)}</tr></thead>
                 <tbody className="divide-y divide-gray-50 dark:divide-white/5">
                   {staffRows.map(row => (
                     <tr key={row.id}>
@@ -129,7 +138,7 @@ export default function Reports() {
                       <td className="py-3 text-right font-black text-teal-700">{money(row.payout)}</td>
                     </tr>
                   ))}
-                  {staffRows.length === 0 && <tr><td colSpan={6} className="py-12 text-center text-sm text-gray-400">No staff records.</td></tr>}
+                  {staffRows.length === 0 && <tr><td colSpan={6} className="py-12 text-center text-sm text-gray-400">No {staffLabel.toLowerCase()} records.</td></tr>}
                 </tbody>
               </table>
             </div>
@@ -139,7 +148,7 @@ export default function Reports() {
         </div>
 
         <div className="luxury-card p-5">
-          <h2 className="text-sm font-bold text-gray-950 dark:text-white">Service Revenue Leaders</h2>
+          <h2 className="text-sm font-bold text-gray-950 dark:text-white">{serviceLabel} Revenue Leaders</h2>
           <div className="mt-4 space-y-3">
             {(serviceRevenue.length ? serviceRevenue : data.services.map(service => ({ name: service.name, revenue: 0 }))).slice(0, 8).map(service => (
               <div key={service.name}>
@@ -166,7 +175,7 @@ export default function Reports() {
         <div className="luxury-card p-5 xl:col-span-2">
           <div className="flex items-center gap-2"><FileBarChart className="h-4 w-4 text-teal-700" /><h2 className="text-sm font-bold text-gray-950 dark:text-white">Live Readiness Checklist</h2></div>
           <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-2">
-            {['Demo collections removed', 'Doctors seeded from real clinic data', 'Services editable from CRUD', 'Invoices use live payment data'].map(item => (
+            {['Demo collections removed', `${doctorLabel}s seeded from real clinic data`, `${servicesLabel} editable from CRUD`, 'Invoices use live payment data'].map(item => (
               <div key={item} className="flex items-start gap-2 rounded-lg border border-gray-100 bg-white p-3 dark:border-white/10 dark:bg-slate-900"><CheckCircle2 className="mt-0.5 h-4 w-4 text-teal-700" /><p className="text-xs font-semibold leading-relaxed text-gray-700">{item}</p></div>
             ))}
           </div>

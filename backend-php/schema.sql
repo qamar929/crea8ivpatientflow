@@ -1,29 +1,13 @@
 -- The Smile Experts Portal Database Schema (MySQL)
 -- Suitable for phpMyAdmin/Hostinger/cPanel MySQL Databases
 
-SET FOREIGN_KEY_CHECKS = 0;
-DROP TABLE IF EXISTS `Notification`;
-DROP TABLE IF EXISTS `PublicSiteConfig`;
-DROP TABLE IF EXISTS `ClinicFeatureSetting`;
-DROP TABLE IF EXISTS `AuditLog`;
-DROP TABLE IF EXISTS `Campaign`;
-DROP TABLE IF EXISTS `GalleryItem`;
-DROP TABLE IF EXISTS `Feedback`;
-DROP TABLE IF EXISTS `InventoryTransaction`;
-DROP TABLE IF EXISTS `InventoryItem`;
-DROP TABLE IF EXISTS `Invoice`;
-DROP TABLE IF EXISTS `ClientPackage`;
-DROP TABLE IF EXISTS `PackageItem`;
-DROP TABLE IF EXISTS `Package`;
-DROP TABLE IF EXISTS `Appointment`;
-DROP TABLE IF EXISTS `Service`;
-DROP TABLE IF EXISTS `Client`;
-DROP TABLE IF EXISTS `Staff`;
-DROP TABLE IF EXISTS `RefreshToken`;
-DROP TABLE IF EXISTS `User`;
-DROP TABLE IF EXISTS `Branch`;
-DROP TABLE IF EXISTS `Clinic`;
-SET FOREIGN_KEY_CHECKS = 1;
+-- SAFETY NOTE:
+-- This file is a fresh-install reference only. It must never drop or recreate
+-- tables in a live tenant database. Production changes must use additive
+-- migrations in backend-php/migrations with a backup/rollback plan.
+--
+-- Historical DROP TABLE statements were intentionally removed to comply with
+-- the no-data-loss deployment rule.
 
 -- Clinic Table
 CREATE TABLE `Clinic` (
@@ -63,6 +47,7 @@ CREATE TABLE `PublicSiteConfig` (
 -- SaaS feature controls managed by platform superadmin
 CREATE TABLE `ClinicFeatureSetting` (
   `clinicId` VARCHAR(64) NOT NULL,
+  `industryTemplate` VARCHAR(80) DEFAULT NULL,
   `marketingEnabled` TINYINT(1) NOT NULL DEFAULT 0,
   `metaLeadsEnabled` TINYINT(1) NOT NULL DEFAULT 0,
   `importsEnabled` TINYINT(1) NOT NULL DEFAULT 0,
@@ -77,6 +62,18 @@ CREATE TABLE `ClinicFeatureSetting` (
   `updatedAt` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
   PRIMARY KEY (`clinicId`),
   CONSTRAINT `FK_ClinicFeatureSetting_Clinic` FOREIGN KEY (`clinicId`) REFERENCES `Clinic` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Industry template definitions used by the UI terminology engine.
+-- Built-in rows are seeded idempotently by industryTemplateService.php.
+CREATE TABLE `IndustryTemplate` (
+  `templateKey` VARCHAR(80) PRIMARY KEY,
+  `name` VARCHAR(160) NOT NULL,
+  `configJson` JSON NOT NULL,
+  `isActive` TINYINT(1) DEFAULT 1,
+  `sortOrder` INT DEFAULT 0,
+  `createdAt` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  `updatedAt` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Branch Table

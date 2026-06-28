@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { FlaskConical, Plus, Loader2, Search, Pencil, Trash2, X, AlertTriangle } from 'lucide-react';
 import { fetchApi } from '../config/api';
+import { useClinic } from '../context/ClinicContext';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 import PatientSearchSelect from '../components/ui/PatientSearchSelect';
@@ -18,6 +19,10 @@ const inputCls = 'w-full border border-gray-200 dark:border-white/10 bg-white da
 const labelCls = 'block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1';
 
 export default function Lab() {
+  const { term } = useClinic();
+  const patientLabel = term('patient', 'Patient');
+  const treatmentLabel = term('treatment', term('service', 'Service'));
+  const labLabel = term('lab', 'Lab');
   const [cases, setCases] = useState(null);
   const [counts, setCounts] = useState({});
   const [filter, setFilter] = useState('all');
@@ -33,17 +38,17 @@ export default function Lab() {
   };
   useEffect(() => { const t = setTimeout(load, search ? 250 : 0); return () => clearTimeout(t); /* eslint-disable-next-line */ }, [filter, search]);
 
-  const remove = async (c) => { if (!window.confirm('Delete this lab case?')) return; try { await fetchApi(`/lab/${c.id}`, { method: 'DELETE' }); load(); } catch (e) { setError(e.message); } };
+  const remove = async (c) => { if (!window.confirm(`Delete this ${labLabel.toLowerCase()} case?`)) return; try { await fetchApi(`/lab/${c.id}`, { method: 'DELETE' }); load(); } catch (e) { setError(e.message); } };
   const quickStatus = async (c, status) => { try { await fetchApi(`/lab/${c.id}`, { method: 'PUT', body: JSON.stringify({ status }) }); load(); } catch (e) { setError(e.message); } };
 
   return (
     <div className="space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2"><FlaskConical className="h-5 w-5 text-[var(--primary)]" /> Lab Management</h1>
-          <p className="mt-0.5 text-sm text-gray-500">Track work sent to dental &amp; aesthetic labs — what's due and what's overdue.</p>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white flex items-center gap-2"><FlaskConical className="h-5 w-5 text-[var(--primary)]" /> {labLabel} Management</h1>
+          <p className="mt-0.5 text-sm text-gray-500">Track outside work, due dates, and overdue follow-ups.</p>
         </div>
-        <Button onClick={() => setEdit('new')}><Plus className="h-4 w-4" /> New Lab Case</Button>
+        <Button onClick={() => setEdit('new')}><Plus className="h-4 w-4" /> New {labLabel} Case</Button>
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -60,7 +65,7 @@ export default function Lab() {
       <div className="flex flex-wrap items-center gap-3 rounded-xl border border-gray-100 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-slate-900">
         <div className="relative min-w-[220px] flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400" />
-          <input className="w-full rounded-lg border border-gray-200 py-2 pl-9 pr-3 text-sm dark:border-white/10 dark:bg-slate-900 dark:text-white" placeholder="Search patient, lab, procedure..." value={search} onChange={(e) => setSearch(e.target.value)} />
+          <input className="w-full rounded-lg border border-gray-200 py-2 pl-9 pr-3 text-sm dark:border-white/10 dark:bg-slate-900 dark:text-white" placeholder={`Search ${patientLabel.toLowerCase()}, ${labLabel.toLowerCase()}, ${treatmentLabel.toLowerCase()}...`} value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <div className="flex flex-wrap gap-1">
           {FILTERS.map(([k, l]) => (
@@ -75,12 +80,12 @@ export default function Lab() {
         {!cases ? (
           <div className="py-16 text-center"><Loader2 className="mx-auto h-6 w-6 animate-spin text-[var(--primary)]" /></div>
         ) : cases.length === 0 ? (
-          <p className="py-16 text-center text-sm text-gray-400">No lab cases{filter !== 'all' ? ' in this view' : ' yet'}.</p>
+          <p className="py-16 text-center text-sm text-gray-400">No {labLabel.toLowerCase()} cases{filter !== 'all' ? ' in this view' : ' yet'}.</p>
         ) : (
           <div className="overflow-x-auto">
             <table className="w-full text-sm min-w-[820px]">
               <thead><tr className="text-left text-xs uppercase tracking-wider text-gray-400 border-b border-gray-100 dark:border-white/5">
-                <th className="px-4 py-3">Patient</th><th className="px-4 py-3">Lab</th><th className="px-4 py-3">Procedure</th>
+                <th className="px-4 py-3">{patientLabel}</th><th className="px-4 py-3">{labLabel}</th><th className="px-4 py-3">{treatmentLabel}</th>
                 <th className="px-4 py-3">Sent</th><th className="px-4 py-3">Due</th><th className="px-4 py-3">Status</th><th className="px-4 py-3 text-right">Actions</th>
               </tr></thead>
               <tbody className="divide-y divide-gray-100 dark:divide-white/5">
@@ -116,6 +121,11 @@ export default function Lab() {
 }
 
 function LabModal({ labCase, onClose, onSaved }) {
+  const { term } = useClinic();
+  const patientLabel = term('patient', 'Patient');
+  const doctorLabel = term('doctor', 'Doctor');
+  const treatmentLabel = term('treatment', term('service', 'Service'));
+  const labLabel = term('lab', 'Lab');
   const isEdit = !!labCase;
   const [f, setF] = useState({
     clientId: labCase?.clientId || '', patientName: labCase?.patientName || '', labName: labCase?.labName || '',
@@ -139,19 +149,19 @@ function LabModal({ labCase, onClose, onSaved }) {
   };
 
   return (
-    <Modal isOpen onClose={onClose} title={isEdit ? 'Edit Lab Case' : 'New Lab Case'} size="md">
+    <Modal isOpen onClose={onClose} title={isEdit ? `Edit ${labLabel} Case` : `New ${labLabel} Case`} size="md">
       <div className="space-y-3">
         {err && <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{err}</div>}
         <div>
-          <label className={labelCls}>Patient</label>
+          <label className={labelCls}>{patientLabel}</label>
           <PatientSearchSelect value={f.clientId} initialLabel={f.patientName} onChange={(id, p) => { set('clientId', id); if (p?.name) set('patientName', p.name); }} inputClassName={inputCls} />
           <input className={`${inputCls} mt-2`} placeholder="Or type a name (walk-in / not registered)" value={f.patientName} onChange={(e) => set('patientName', e.target.value)} />
         </div>
         <div className="grid grid-cols-2 gap-3">
-          <div><label className={labelCls}>Lab name *</label><input className={inputCls} value={f.labName} onChange={(e) => set('labName', e.target.value)} placeholder="e.g. Abdullah Dental Lab" /></div>
-          <div><label className={labelCls}>Procedure</label><input className={inputCls} value={f.procedure} onChange={(e) => set('procedure', e.target.value)} placeholder="e.g. 3-unit bridge" /></div>
+          <div><label className={labelCls}>{labLabel} name *</label><input className={inputCls} value={f.labName} onChange={(e) => set('labName', e.target.value)} placeholder={`e.g. ${labLabel} Partner`} /></div>
+          <div><label className={labelCls}>{treatmentLabel}</label><input className={inputCls} value={f.procedure} onChange={(e) => set('procedure', e.target.value)} placeholder={`e.g. ${treatmentLabel} details`} /></div>
           <div><label className={labelCls}>Shade</label><input className={inputCls} value={f.shade} onChange={(e) => set('shade', e.target.value)} placeholder="e.g. A2" /></div>
-          <div><label className={labelCls}>Doctor</label><input className={inputCls} value={f.doctorName} onChange={(e) => set('doctorName', e.target.value)} /></div>
+          <div><label className={labelCls}>{doctorLabel}</label><input className={inputCls} value={f.doctorName} onChange={(e) => set('doctorName', e.target.value)} /></div>
           <div><label className={labelCls}>Sent date</label><input type="date" className={inputCls} value={f.sentDate} onChange={(e) => set('sentDate', e.target.value)} /></div>
           <div><label className={labelCls}>Due date</label><input type="date" className={inputCls} value={f.dueDate} onChange={(e) => set('dueDate', e.target.value)} /></div>
           <div><label className={labelCls}>Cost (PKR)</label><input type="number" className={inputCls} value={f.cost} onChange={(e) => set('cost', e.target.value)} /></div>
@@ -161,11 +171,11 @@ function LabModal({ labCase, onClose, onSaved }) {
             </select>
           </div>
         </div>
-        <div><label className={labelCls}>Items sent to lab</label><input className={inputCls} value={f.itemsSent} onChange={(e) => set('itemsSent', e.target.value)} placeholder="e.g. 2 impressions, 1 bite, 2 abutments" /></div>
+        <div><label className={labelCls}>Items sent to {labLabel.toLowerCase()}</label><input className={inputCls} value={f.itemsSent} onChange={(e) => set('itemsSent', e.target.value)} placeholder="Reference items, files, or assets" /></div>
         <div><label className={labelCls}>Notes</label><textarea rows={2} className={inputCls} value={f.notes} onChange={(e) => set('notes', e.target.value)} /></div>
         <div className="flex justify-end gap-2 pt-1">
           <Button variant="secondary" onClick={onClose} disabled={saving}>Cancel</Button>
-          <Button onClick={submit} disabled={saving || !f.labName.trim()}>{saving ? 'Saving…' : (isEdit ? 'Save changes' : 'Add lab case')}</Button>
+          <Button onClick={submit} disabled={saving || !f.labName.trim()}>{saving ? 'Saving…' : (isEdit ? 'Save changes' : `Add ${labLabel.toLowerCase()} case`)}</Button>
         </div>
       </div>
     </Modal>

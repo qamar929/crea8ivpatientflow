@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Archive, Bot, Calendar, Database, Facebook, FileBarChart, Image, Loader2, Megaphone, Package, Receipt, Settings, Shield, Stethoscope, Users, UserCheck, WalletCards } from 'lucide-react';
+import { Archive, Bot, Building2, Calendar, Database, DollarSign, Facebook, FileBarChart, FlaskConical, Image, LifeBuoy, Loader2, Megaphone, MessageCircle, MessageSquare, Package, Receipt, Settings, Shield, Stethoscope, Users, UserCheck, WalletCards } from 'lucide-react';
 import { fetchApi } from '../config/api';
+import { useClinic } from '../context/ClinicContext';
 import StatCard from '../components/ui/StatCard';
 import SetupAlert from '../components/dashboard/SetupAlert';
 import RevenueChart from '../components/charts/RevenueChart';
@@ -10,27 +11,30 @@ import Badge from '../components/ui/Badge';
 
 const money = (value = 0) => `PKR ${Number(value || 0).toLocaleString()}`;
 
+const iconMap = { Archive, Bot, Building2, Calendar, Database, DollarSign, Facebook, FileBarChart, FlaskConical, Image, LifeBuoy, Megaphone, MessageCircle, MessageSquare, Package, Receipt, Settings, Shield, Stethoscope, Users, UserCheck, WalletCards };
+
 const portalModules = [
-  { to: '/reception', icon: WalletCards, title: 'Reception Desk', desc: 'Today appointments, invoices, check-in and handover' },
-  { to: '/clinical', icon: Stethoscope, title: 'Clinical Workspace', desc: 'Treatment notes and patient clinical workflow' },
-  { to: '/clients', icon: Users, title: 'Patients', desc: 'Patient records, history, dues and follow-ups' },
-  { to: '/appointments', icon: Calendar, title: 'Appointments', desc: 'Calendar, doctor availability and booking' },
-  { to: '/invoices', icon: Receipt, title: 'Invoices & Dues', desc: 'Live billing CRUD, payments, refunds and PDFs' },
-  { to: '/staff', icon: UserCheck, title: 'Staff & Doctors', desc: 'Doctor profiles, salaries, commissions and access' },
-  { to: '/services', icon: Stethoscope, title: 'Treatment Services', desc: 'Treatment categories, durations and pricing' },
-  { to: '/branches', icon: Archive, title: 'Branches', desc: 'Branch CRUD and WhatsApp routing' },
-  { to: '/packages', icon: Package, title: 'Packages', desc: 'Clinic plans and bundled services' },
-  { to: '/whatsapp', icon: Megaphone, title: 'WhatsApp Center', desc: 'Patient engagement and campaigns' },
-  { to: '/ai', icon: Bot, title: 'AI Hub', desc: 'ChatGPT, Gemini, Claude config and failover' },
-  { to: '/meta-leads', icon: Facebook, title: 'Meta Lead Center', desc: 'Facebook and Instagram leads to CRM workflow' },
-  { to: '/imports', icon: Database, title: 'Import Center', desc: 'CSV, Excel, Google Sheets and CRM migration jobs' },
-  { to: '/reports', icon: FileBarChart, title: 'Reports', desc: 'Live reports with zero fake collections' },
-  { to: '/gallery', icon: Image, title: 'Gallery', desc: 'Approved public and clinical media' },
-  { to: '/audit', icon: Shield, title: 'Security Audit', desc: 'Track portal activity and changes' },
-  { to: '/settings', icon: Settings, title: 'Branding Settings', desc: 'Clinic profile, public site and branding' },
+  { key: 'reception', to: '/reception' },
+  { key: 'clinical', to: '/clinical' },
+  { key: 'clients', to: '/clients' },
+  { key: 'appointments', to: '/appointments' },
+  { key: 'invoices', to: '/invoices' },
+  { key: 'staff', to: '/staff' },
+  { key: 'services', to: '/services' },
+  { key: 'branches', to: '/branches' },
+  { key: 'packages', to: '/packages' },
+  { key: 'whatsapp', to: '/whatsapp' },
+  { key: 'ai', to: '/ai' },
+  { key: 'metaLeads', to: '/meta-leads' },
+  { key: 'imports', to: '/imports' },
+  { key: 'reports', to: '/reports' },
+  { key: 'gallery', to: '/gallery' },
+  { key: 'audit', to: '/audit' },
+  { key: 'settings', to: '/settings' },
 ];
 
 export default function Dashboard() {
+  const { industryTemplate, term } = useClinic();
   const [data, setData] = useState({ appointments: [], clients: [], staff: [], services: [], invoices: [], financials: null });
   const [loading, setLoading] = useState(true);
 
@@ -68,31 +72,31 @@ export default function Dashboard() {
     <div className="space-y-6">
       <SetupAlert />
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <StatCard title="Today's Appointments" value={String(todayAppts.length)} icon={Calendar} />
+        <StatCard title={industryTemplate.config.dashboard.todayAppointments} value={String(todayAppts.length)} icon={Calendar} />
         <StatCard title="Collected This Month" value={money(data.financials?.totalRevenue)} icon={Receipt} />
-        <StatCard title="Active Patients" value={String(data.clients.filter(c => c.status !== 'inactive').length)} icon={Users} />
-        <StatCard title="Active Staff" value={String(activeStaff.length)} icon={UserCheck} />
+        <StatCard title={industryTemplate.config.dashboard.activePatients} value={String(data.clients.filter(c => c.status !== 'inactive').length)} icon={Users} />
+        <StatCard title={industryTemplate.config.dashboard.activeStaff} value={String(activeStaff.length)} icon={UserCheck} />
       </div>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="luxury-card h-72 p-5 lg:col-span-2"><RevenueChart /></div>
         <div className="luxury-card p-5">
           <div className="mb-4 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Today's Schedule</h3>
-            <span className="rounded-full bg-[var(--primary)]/10 px-2 py-0.5 text-xs font-medium text-[var(--primary)]">{todayAppts.length} appts</span>
+            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">{industryTemplate.config.dashboard.scheduleTitle}</h3>
+            <span className="rounded-full bg-[var(--primary)]/10 px-2 py-0.5 text-xs font-medium text-[var(--primary)]">{todayAppts.length} {term('appointments', 'appointments').toLowerCase()}</span>
           </div>
           <div className="max-h-52 space-y-2.5 overflow-y-auto pr-0.5">
             {todayAppts.map(appt => (
               <div key={appt.id} className="flex items-start gap-3 rounded-lg p-2.5 hover:bg-gray-50/80 dark:hover:bg-white/5">
                 <div className="w-14 shrink-0 text-xs font-bold text-gray-900">{appt.startTime}</div>
                 <div className="min-w-0 flex-1">
-                  <p className="truncate text-xs font-semibold text-gray-800">{appt.client?.name || appt.clientName || 'Patient'}</p>
-                  <p className="truncate text-[11px] text-gray-500">{appt.service?.name || appt.serviceName || 'Treatment'}</p>
+                  <p className="truncate text-xs font-semibold text-gray-800">{appt.client?.name || appt.clientName || term('patient', 'Patient')}</p>
+                  <p className="truncate text-[11px] text-gray-500">{appt.service?.name || appt.serviceName || term('treatment', 'Treatment')}</p>
                 </div>
                 <Badge label={appt.status} variant={appt.status} />
               </div>
             ))}
-            {todayAppts.length === 0 && <p className="py-12 text-center text-sm text-gray-400">No appointments today.</p>}
+            {todayAppts.length === 0 && <p className="py-12 text-center text-sm text-gray-400">No {term('appointments', 'appointments').toLowerCase()} today.</p>}
           </div>
         </div>
       </div>
@@ -100,7 +104,7 @@ export default function Dashboard() {
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
         <div className="luxury-card h-64 p-5"><ServiceChart /></div>
         <div className="luxury-card p-5">
-          <h3 className="mb-4 text-sm font-semibold text-gray-900 dark:text-white">Top Doctors</h3>
+          <h3 className="mb-4 text-sm font-semibold text-gray-900 dark:text-white">{industryTemplate.config.dashboard.topStaff}</h3>
           <div className="space-y-3">
             {topStaff.map(member => (
               <div key={member.id} className="flex items-center justify-between rounded-lg bg-gray-50 p-3 dark:bg-white/5">
@@ -119,26 +123,31 @@ export default function Dashboard() {
           <div className="space-y-3 text-sm">
             <div className="flex justify-between"><span className="text-gray-500">Pending invoices</span><b>{pendingInvoices.length}</b></div>
             <div className="flex justify-between"><span className="text-gray-500">Outstanding</span><b>{money(data.financials?.outstandingPayments)}</b></div>
-            <div className="flex justify-between"><span className="text-gray-500">Services configured</span><b>{data.services.length}</b></div>
+            <div className="flex justify-between"><span className="text-gray-500">{industryTemplate.config.dashboard.servicesConfigured}</span><b>{data.services.length}</b></div>
           </div>
         </div>
       </div>
 
       <div className="luxury-card p-5">
-        <h2 className="text-sm font-bold text-gray-950 dark:text-white">Portal Features</h2>
+        <h2 className="text-sm font-bold text-gray-950 dark:text-white">{industryTemplate.config.dashboard.portalFeatures}</h2>
         <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">All modules below are live entry points. CRUD-enabled modules update the database directly.</p>
         <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {portalModules.map(({ to, icon: Icon, title, desc }) => (
+          {portalModules.map(({ key, to }) => {
+            const mod = industryTemplate.templateKey === 'healthcare'
+              ? (industryTemplate.config.dashboardModules?.[key] || industryTemplate.config.modules?.[key] || {})
+              : (industryTemplate.config.modules?.[key] || industryTemplate.config.dashboardModules?.[key] || {});
+            const Icon = iconMap[mod.icon] || Settings;
+            return (
             <Link key={to} to={to} className="group rounded-lg border border-gray-100 bg-white p-4 transition-all hover:-translate-y-0.5 hover:border-teal-200 hover:shadow-lg dark:border-white/10 dark:bg-slate-900">
               <div className="flex items-start gap-3">
                 <div className="rounded-lg bg-teal-50 p-2 text-teal-700 transition-colors group-hover:bg-teal-700 group-hover:text-white"><Icon className="h-4 w-4" /></div>
                 <div className="min-w-0">
-                  <p className="text-xs font-black text-gray-950 dark:text-white">{title}</p>
-                  <p className="mt-1 text-[11px] leading-relaxed text-gray-500">{desc}</p>
+                  <p className="text-xs font-black text-gray-950 dark:text-white">{mod.label}</p>
+                  <p className="mt-1 text-[11px] leading-relaxed text-gray-500">{mod.desc}</p>
                 </div>
               </div>
             </Link>
-          ))}
+          );})}
         </div>
       </div>
     </div>

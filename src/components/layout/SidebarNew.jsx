@@ -74,8 +74,35 @@ const FEATURE_LOCKS = {
   '/imports': 'importsEnabled',
 };
 
+const MODULE_KEYS = {
+  '/reception': 'reception',
+  '/appointments': 'appointments',
+  '/clients': 'clients',
+  '/clinical': 'clinical',
+  '/staff': 'staff',
+  '/services': 'services',
+  '/financials': 'financials',
+  '/packages': 'packages',
+  '/invoices': 'invoices',
+  '/lab': 'lab',
+  '/inventory': 'inventory',
+  '/gallery': 'gallery',
+  '/feedback': 'feedback',
+  '/marketing': 'marketing',
+  '/whatsapp': 'whatsapp',
+  '/ai': 'ai',
+  '/ai-receptionist': 'aiReceptionist',
+  '/meta-leads': 'metaLeads',
+  '/imports': 'imports',
+  '/reports': 'reports',
+  '/branches': 'branches',
+  '/audit': 'audit',
+  '/support': 'support',
+  '/settings': 'settings',
+};
+
 export default function SidebarNew() {
-  const { clinicInfo, features } = useClinic();
+  const { clinicInfo, features, industryTemplate } = useClinic();
   const [collapsed, setCollapsed] = useState(false);
   const role = getCurrentRole();
 
@@ -147,6 +174,8 @@ export default function SidebarNew() {
             )}
             <div className="space-y-0.5">
               {visibleItems.map(({ to, icon: Icon, label }) => {
+                const templateModule = industryTemplate.config.modules?.[MODULE_KEYS[to]] || {};
+                const navLabel = templateModule.label || label;
                 return (
                   <NavLink
                     key={to}
@@ -159,10 +188,10 @@ export default function SidebarNew() {
                           : 'text-white/60 hover:text-white hover:bg-white/10 border-l-2 border-transparent'
                       )
                     }
-                    title={collapsed ? label : undefined}
+                    title={collapsed ? navLabel : undefined}
                   >
                     <Icon className="w-[18px] h-[18px] shrink-0" />
-                    {!collapsed && <span className="truncate">{label}</span>}
+                    {!collapsed && <span className="truncate">{navLabel}</span>}
                   </NavLink>
                 );
               })}

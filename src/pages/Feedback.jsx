@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Edit2, Loader2, MessageSquare, Plus, Star, ThumbsDown, ThumbsUp, Trash2 } from 'lucide-react';
 import { fetchApi } from '../config/api';
+import { useClinic } from '../context/ClinicContext';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
@@ -22,6 +23,11 @@ const emptyForm = {
 const makeInitials = (name = '') => name.split(' ').filter(Boolean).map(part => part[0]).join('').slice(0, 2).toUpperCase() || 'PT';
 
 function FeedbackModal({ isOpen, onClose, onSave, feedback, clients, staff, appointments, saving }) {
+  const { term } = useClinic();
+  const patientLabel = term('patient', 'Patient');
+  const staffLabel = term('staff', 'Staff');
+  const appointmentLabel = term('appointment', 'Appointment');
+  const serviceLabel = term('service', 'Service');
   const [form, setForm] = useState(emptyForm);
 
   useEffect(() => {
@@ -41,7 +47,7 @@ function FeedbackModal({ isOpen, onClose, onSave, feedback, clients, staff, appo
   const set = (key, value) => setForm(current => ({ ...current, [key]: value }));
   const submit = () => {
     if (!form.clientId) {
-      alert('Patient is required.');
+      alert(`${patientLabel} is required.`);
       return;
     }
     onSave({
@@ -59,31 +65,31 @@ function FeedbackModal({ isOpen, onClose, onSave, feedback, clients, staff, appo
       <div className="space-y-4">
         <div className="grid gap-4 sm:grid-cols-2">
           <label className="text-xs font-semibold text-gray-700 dark:text-gray-200">
-            Patient
+            {patientLabel}
             <select className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" value={form.clientId} onChange={e => set('clientId', e.target.value)}>
-              <option value="">Select patient</option>
+              <option value="">Select {patientLabel.toLowerCase()}</option>
               {clients.map(client => <option key={client.id} value={client.id}>{client.patientNo ? `${client.patientNo} · ` : ''}{client.name}</option>)}
             </select>
           </label>
           <label className="text-xs font-semibold text-gray-700 dark:text-gray-200">
-            Staff
+            {staffLabel}
             <select className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" value={form.staffId} onChange={e => set('staffId', e.target.value)}>
-              <option value="">Optional staff</option>
+              <option value="">Optional {staffLabel.toLowerCase()}</option>
               {staff.map(member => <option key={member.id} value={member.id}>{member.name}</option>)}
             </select>
           </label>
         </div>
         <label className="block text-xs font-semibold text-gray-700 dark:text-gray-200">
-          Appointment
+          {appointmentLabel}
           <select className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" value={form.appointmentId} onChange={e => set('appointmentId', e.target.value)}>
-            <option value="">No appointment link</option>
-            {appointments.map(appt => <option key={appt.id} value={appt.id}>{appt.date} · {appt.client?.name || appt.clientName || 'Patient'} · {appt.service?.name || appt.serviceName || 'Service'}</option>)}
+            <option value="">No {appointmentLabel.toLowerCase()} link</option>
+            {appointments.map(appt => <option key={appt.id} value={appt.id}>{appt.date} · {appt.client?.name || appt.clientName || patientLabel} · {appt.service?.name || appt.serviceName || serviceLabel}</option>)}
           </select>
         </label>
         <div className="grid gap-4 sm:grid-cols-3">
           {[
-            ['staffRating', 'Staff Rating'],
-            ['serviceRating', 'Service Rating'],
+            ['staffRating', `${staffLabel} Rating`],
+            ['serviceRating', `${serviceLabel} Rating`],
             ['overallRating', 'Overall Rating'],
           ].map(([key, label]) => (
             <label key={key} className="text-xs font-semibold text-gray-700 dark:text-gray-200">
@@ -96,12 +102,12 @@ function FeedbackModal({ isOpen, onClose, onSave, feedback, clients, staff, appo
         </div>
         <label className="block text-xs font-semibold text-gray-700 dark:text-gray-200">
           Comment
-          <textarea rows={4} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" value={form.comment} onChange={e => set('comment', e.target.value)} placeholder="Patient feedback..." />
+          <textarea rows={4} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" value={form.comment} onChange={e => set('comment', e.target.value)} placeholder={`${patientLabel} feedback...`} />
         </label>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="flex items-center gap-3 rounded-xl border border-gray-200 p-3 text-xs font-bold dark:border-white/10">
             <input type="checkbox" checked={form.wouldRecommend} onChange={e => set('wouldRecommend', e.target.checked)} />
-            Patient would recommend
+            {patientLabel} would recommend
           </label>
           <label className="flex items-center gap-3 rounded-xl border border-gray-200 p-3 text-xs font-bold dark:border-white/10">
             <input type="checkbox" checked={form.isPublic} onChange={e => set('isPublic', e.target.checked)} />
@@ -118,6 +124,10 @@ function FeedbackModal({ isOpen, onClose, onSave, feedback, clients, staff, appo
 }
 
 export default function Feedback() {
+  const { term } = useClinic();
+  const patientLabel = term('patient', 'Patient');
+  const staffLabel = term('staff', 'Staff');
+  const serviceLabel = term('service', 'Service');
   const [feedback, setFeedback] = useState([]);
   const [summary, setSummary] = useState({ total: 0, avgOverall: 0, avgStaff: 0, avgService: 0, recommendRate: 0 });
   const [clients, setClients] = useState([]);
@@ -198,8 +208,8 @@ export default function Feedback() {
     <div className="space-y-5">
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-xl font-bold text-gray-900 dark:text-white">Patient Feedback & Staff Performance</h1>
-          <p className="mt-0.5 text-sm text-gray-500">Live CRUD for patient reviews with automatic staff rating updates.</p>
+          <h1 className="text-xl font-bold text-gray-900 dark:text-white">{patientLabel} Feedback & {staffLabel} Performance</h1>
+          <p className="mt-0.5 text-sm text-gray-500">Live CRUD for {patientLabel.toLowerCase()} reviews with automatic {staffLabel.toLowerCase()} rating updates.</p>
         </div>
         <Button onClick={() => { setEditFeedback(null); setShowForm(true); }}><Plus className="h-4 w-4" /> Add Feedback</Button>
       </div>
@@ -209,7 +219,7 @@ export default function Feedback() {
           { label: 'Overall Rating', value: `${Number(summary.avgOverall || 0).toFixed(1)}★`, color: 'text-amber-500' },
           { label: 'Total Reviews', value: summary.total || 0, color: 'text-[var(--primary)]' },
           { label: 'Recommend Rate', value: `${summary.recommendRate || 0}%`, color: 'text-green-600' },
-          { label: 'Avg Staff Rating', value: Number(summary.avgStaff || 0).toFixed(1), color: 'text-purple-600' },
+          { label: `Avg ${staffLabel} Rating`, value: Number(summary.avgStaff || 0).toFixed(1), color: 'text-purple-600' },
         ].map(card => (
           <div key={card.label} className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-slate-900">
             <p className="mb-3 text-xs font-semibold uppercase tracking-wider text-gray-500">{card.label}</p>
@@ -222,7 +232,7 @@ export default function Feedback() {
         <div className="space-y-4 lg:col-span-2">
           <div className="flex flex-wrap items-center gap-3 rounded-xl border border-gray-100 bg-white p-4 shadow-sm dark:border-white/10 dark:bg-slate-900">
             <select className="rounded-lg border border-gray-200 px-3 py-2 text-xs dark:border-white/10 dark:bg-slate-900" value={staffFilter} onChange={e => setStaffFilter(e.target.value)}>
-              <option value="all">All Staff</option>
+              <option value="all">All {staffLabel}</option>
               {staff.map(member => <option key={member.id} value={member.id}>{member.name}</option>)}
             </select>
             <select className="rounded-lg border border-gray-200 px-3 py-2 text-xs dark:border-white/10 dark:bg-slate-900" value={ratingFilter} onChange={e => setRatingFilter(Number(e.target.value))}>
@@ -242,8 +252,8 @@ export default function Feedback() {
           ) : (
             <div className="space-y-3">
               {filtered.map(row => {
-                const clientName = row.client?.name || 'Unknown patient';
-                const staffName = row.appointment?.staff?.name || staff.find(s => s.id === row.staffId)?.name || 'No staff linked';
+                const clientName = row.client?.name || `Unknown ${patientLabel.toLowerCase()}`;
+                const staffName = row.appointment?.staff?.name || staff.find(s => s.id === row.staffId)?.name || `No ${staffLabel.toLowerCase()} linked`;
                 return (
                   <div key={row.id} className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-slate-900">
                     <div className="mb-3 flex items-start justify-between gap-3">
@@ -264,8 +274,8 @@ export default function Feedback() {
                     </div>
                     <div className="mb-3 flex flex-wrap gap-4 rounded-xl bg-gray-50 p-3 dark:bg-white/5">
                       {[
-                        ['Staff', row.staffRating],
-                        ['Service', row.serviceRating],
+                        [staffLabel, row.staffRating],
+                        [serviceLabel, row.serviceRating],
                         ['Overall', row.overallRating],
                       ].map(([label, rating]) => (
                         <div key={label} className="flex items-center gap-2">
@@ -292,9 +302,9 @@ export default function Feedback() {
 
         <div className="space-y-4">
           <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-slate-900">
-            <h3 className="mb-4 text-sm font-bold text-gray-900 dark:text-white">Staff Performance</h3>
+            <h3 className="mb-4 text-sm font-bold text-gray-900 dark:text-white">{staffLabel} Performance</h3>
             {staffPerformance.length === 0 ? (
-              <p className="py-8 text-center text-sm text-gray-400">No staff records found.</p>
+              <p className="py-8 text-center text-sm text-gray-400">No {staffLabel.toLowerCase()} records found.</p>
             ) : (
               <div className="space-y-3">
                 {staffPerformance.map(member => (

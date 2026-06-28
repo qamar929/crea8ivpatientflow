@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Calendar, CreditCard, FileText, MessageCircle, Receipt, Search, Zap, X } from 'lucide-react';
 import { mobileQuickActions } from '../../data/dentalOperations';
+import { useClinic } from '../../context/ClinicContext';
 
 const iconMap = {
   Search,
@@ -13,6 +14,10 @@ const iconMap = {
 };
 
 export default function MobileQuickActions() {
+  const { term } = useClinic();
+  const patientLabel = term('patient', 'patient');
+  const appointmentLabel = term('appointment', 'Appointment');
+  const labelFor = (label) => label === 'Appointment' ? appointmentLabel : label;
   const [isOpen, setIsOpen] = useState(false);
 
   return (
@@ -51,7 +56,7 @@ export default function MobileQuickActions() {
           <input
             data-global-search
             className="w-full bg-transparent text-sm font-medium text-gray-800 outline-none placeholder:text-gray-400 dark:text-white"
-            placeholder="Search patient no, phone, name..."
+            placeholder={`Search ${patientLabel} no, phone, name...`}
           />
         </div>
         <div className="grid grid-cols-6 gap-1">
@@ -65,7 +70,7 @@ export default function MobileQuickActions() {
                 className="flex min-h-[44px] flex-col items-center justify-center gap-1 rounded-lg text-[9px] font-bold text-gray-600 transition-colors hover:bg-teal-50 hover:text-teal-700 dark:text-gray-300 dark:hover:bg-white/10"
               >
                 <Icon className="h-4 w-4" />
-                <span className="leading-none">{action.label}</span>
+                <span className="leading-none">{labelFor(action.label)}</span>
               </Link>
             );
           })}
@@ -74,4 +79,3 @@ export default function MobileQuickActions() {
     </>
   );
 }
-

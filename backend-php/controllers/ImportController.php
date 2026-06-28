@@ -103,9 +103,9 @@ class ImportController {
     public function remove($input, $user, $id) {
         $db = $this->db();
         $this->requireFeature($db, $user['clinicId']);
-        $stmt = $db->prepare("DELETE FROM ImportJob WHERE id = ? AND clinicId = ?");
+        $stmt = $db->prepare("UPDATE ImportJob SET status = 'archived' WHERE id = ? AND clinicId = ?");
         $stmt->execute([$id, $user['clinicId']]);
-        log_audit($user['clinicId'], $user['id'] ?? null, 'delete', 'ImportJob', $id);
-        send_json(['message' => 'Deleted']);
+        log_audit($user['clinicId'], $user['id'] ?? null, 'archive', 'ImportJob', $id);
+        send_json(['message' => 'Archived']);
     }
 }

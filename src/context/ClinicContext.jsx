@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import { fetchApi, fetchPublicApi } from '../config/api';
 import { syncBrandingMetadata } from '../utils/branding';
 import { PORTAL_CLINIC_SLUG } from '../config/portalPath';
+import { HEALTHCARE_TEMPLATE_KEY, resolveIndustryTemplate, termFromTemplate } from '../config/industryTemplates';
 
 // A signed-in clinic user (not the platform superadmin) should always see
 // their own clinic's saved branding, regardless of which domain they use.
@@ -57,6 +58,7 @@ const defaultClinicInfo = {
 };
 
 const defaultFeatures = {
+  industryTemplate: HEALTHCARE_TEMPLATE_KEY,
   marketingEnabled: false,
   metaLeadsEnabled: false,
   importsEnabled: false,
@@ -76,6 +78,7 @@ export function ClinicProvider({ children }) {
   // (e.g. the platform domain crea8ivmedia.com) the portal shows PatientFlow.
   const [clinicMatched, setClinicMatched] = useState(false);
   const [features, setFeatures] = useState(defaultFeatures);
+  const [industryTemplate, setIndustryTemplate] = useState(() => resolveIndustryTemplate());
   const [featuresLoaded, setFeaturesLoaded] = useState(false);
   const [clinicInfo, setClinicInfo] = useState(() => {
     try {
@@ -141,6 +144,7 @@ export function ClinicProvider({ children }) {
     fetchApi('/features')
       .then((data) => {
         setFeatures((current) => ({ ...current, ...data }));
+        setIndustryTemplate(resolveIndustryTemplate(data?.industryConfig));
         if (data?.clinic) {
           setClinicMatched(true);
           setClinicInfo((current) => ({ ...current, ...compact(data.clinic), _clinicId: data.clinic.id }));
@@ -171,16 +175,20 @@ export function ClinicProvider({ children }) {
     setClinicInfo((current) => ({ ...current, ...updates }));
   };
 
+  const term = (key, fallback = '') => termFromTemplate(industryTemplate, key, fallback);
+
   const value = useMemo(() => ({
     activeSpecialty,
     setActiveSpecialty,
     clinicInfo,
     features,
+    industryTemplate,
+    term,
     featuresLoaded,
     updateClinicInfo,
     clinicMatched,
     isPlatform: !clinicMatched,
-  }), [activeSpecialty, clinicInfo, clinicMatched, features, featuresLoaded]);
+  }), [activeSpecialty, clinicInfo, clinicMatched, features, featuresLoaded, industryTemplate]);
 
   return (
     <ClinicContext.Provider value={value}>

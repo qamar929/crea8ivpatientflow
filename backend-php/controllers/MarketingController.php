@@ -24,7 +24,7 @@ class MarketingController {
                 'campaigns' => [],
             ]);
         }
-        $stmt = $db->prepare("SELECT * FROM Campaign WHERE clinicId = ? ORDER BY createdAt DESC");
+        $stmt = $db->prepare("SELECT * FROM Campaign WHERE clinicId = ? AND status <> 'archived' ORDER BY createdAt DESC");
         $stmt->execute([$user['clinicId']]);
         $campaigns = $stmt->fetchAll();
         send_json(['enabled' => true, 'campaigns' => $campaigns]);
@@ -33,7 +33,7 @@ class MarketingController {
     public function getById($input, $user, $id) {
         $db = DB::getConnection();
         $this->requireMarketing($db, $user['clinicId']);
-        $stmt = $db->prepare("SELECT * FROM Campaign WHERE id = ? AND clinicId = ?");
+        $stmt = $db->prepare("SELECT * FROM Campaign WHERE id = ? AND clinicId = ? AND status <> 'archived'");
         $stmt->execute([$id, $user['clinicId']]);
         $campaign = $stmt->fetch();
         if (!$campaign) {
@@ -107,9 +107,9 @@ class MarketingController {
     public function remove($input, $user, $id) {
         $db = DB::getConnection();
         $this->requireMarketing($db, $user['clinicId']);
-        $stmt = $db->prepare("DELETE FROM Campaign WHERE id = ? AND clinicId = ?");
+        $stmt = $db->prepare("UPDATE Campaign SET status = 'archived' WHERE id = ? AND clinicId = ?");
         $stmt->execute([$id, $user['clinicId']]);
-        send_json(['message' => 'Deleted']);
+        send_json(['message' => 'Archived']);
     }
 
     public function send($input, $user, $id) {

@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Stethoscope, Plus, Clock, Pencil, Trash2, Star, Save, Loader2 } from 'lucide-react';
 import { fetchApi } from '../config/api';
+import { useClinic } from '../context/ClinicContext';
 import Button from '../components/ui/Button';
 import Modal from '../components/ui/Modal';
 
@@ -14,6 +15,9 @@ const categoryColors = {
 const emptyForm = { name: '', category: '', price: '', duration: '', description: '', popular: false };
 
 function ServiceFormModal({ isOpen, onClose, onSave, target, saving }) {
+  const { term } = useClinic();
+  const serviceLabel = term('service', 'Service');
+  const treatmentLabel = term('treatment', 'Treatment');
   const isEdit = !!target;
   const [form, setForm] = useState(emptyForm);
 
@@ -47,11 +51,11 @@ function ServiceFormModal({ isOpen, onClose, onSave, target, saving }) {
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={isEdit ? 'Edit Service' : 'Add New Service'} size="md">
+    <Modal isOpen={isOpen} onClose={onClose} title={isEdit ? `Edit ${serviceLabel}` : `Add New ${serviceLabel}`} size="md">
       <div className="space-y-4">
         <div>
-          <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Service Name *</label>
-          <input value={form.name} onChange={e => set('name', e.target.value)} placeholder="e.g. Root Canal Treatment"
+          <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">{serviceLabel} Name *</label>
+          <input value={form.name} onChange={e => set('name', e.target.value)} placeholder={`e.g. ${treatmentLabel}`}
             className="w-full border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300" />
         </div>
         <div>
@@ -82,7 +86,7 @@ function ServiceFormModal({ isOpen, onClose, onSave, target, saving }) {
         </label>
         <div className="flex gap-2 pt-2">
           <Button variant="primary" className="flex-1 justify-center" onClick={submit} disabled={saving}>
-            <Save className="w-4 h-4" /> {saving ? 'Saving...' : isEdit ? 'Save Changes' : 'Add Service'}
+            <Save className="w-4 h-4" /> {saving ? 'Saving...' : isEdit ? 'Save Changes' : `Add ${serviceLabel}`}
           </Button>
           <Button variant="secondary" onClick={onClose}>Cancel</Button>
         </div>
@@ -92,8 +96,10 @@ function ServiceFormModal({ isOpen, onClose, onSave, target, saving }) {
 }
 
 function DeleteConfirmModal({ isOpen, onClose, onConfirm, name, deleting }) {
+  const { term } = useClinic();
+  const serviceLabel = term('service', 'Service');
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title="Delete Service" size="sm">
+    <Modal isOpen={isOpen} onClose={onClose} title={`Delete ${serviceLabel}`} size="sm">
       <div className="space-y-4">
         <p className="text-sm text-gray-700 dark:text-gray-200">
           Delete <span className="font-semibold">{name}</span>? This cannot be undone.
@@ -166,6 +172,10 @@ function ServiceCard({ service, onEdit, onDelete }) {
 }
 
 export default function Services() {
+  const { term } = useClinic();
+  const serviceLabel = term('service', 'Service');
+  const servicesLabel = term('services', 'Services');
+  const treatmentLabel = term('treatment', 'Treatment');
   const [services, setServices] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -230,8 +240,8 @@ export default function Services() {
     <div className="space-y-5">
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
         {[
-          { label: 'Total Services', value: services.length, color: 'text-gray-900 dark:text-white', bg: 'bg-gray-50 dark:bg-white/5' },
-          { label: 'Treatment Services', value: services.length, color: 'text-teal-700', bg: 'bg-teal-50 dark:bg-teal-500/10' },
+          { label: `Total ${servicesLabel}`, value: services.length, color: 'text-gray-900 dark:text-white', bg: 'bg-gray-50 dark:bg-white/5' },
+          { label: `${treatmentLabel} ${servicesLabel}`, value: services.length, color: 'text-teal-700', bg: 'bg-teal-50 dark:bg-teal-500/10' },
           { label: 'Categories', value: categoryCount, color: 'text-rose-700', bg: 'bg-rose-50 dark:bg-rose-500/10' },
           { label: 'Popular', value: services.filter(s => s.popular).length, color: 'text-amber-700', bg: 'bg-amber-50 dark:bg-amber-500/10' },
         ].map(s => (
@@ -244,10 +254,10 @@ export default function Services() {
 
       <div className="flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
         <div className="rounded-xl bg-gray-100 dark:bg-white/5 px-4 py-2 text-xs font-semibold text-gray-600 dark:text-gray-300">
-          {services.length} active treatment services
+          {services.length} active {treatmentLabel.toLowerCase()} {servicesLabel.toLowerCase()}
         </div>
         <Button onClick={() => { setEditTarget(null); setShowModal(true); }} size="sm">
-          <Plus className="w-4 h-4" /> Add Service
+          <Plus className="w-4 h-4" /> Add {serviceLabel}
         </Button>
       </div>
 
@@ -258,7 +268,7 @@ export default function Services() {
             onDelete={(s) => setDeleteTarget(s)} />
         ))}
         {filtered.length === 0 && (
-          <div className="col-span-3 text-center py-16 text-gray-400 text-sm">No services found.</div>
+          <div className="col-span-3 text-center py-16 text-gray-400 text-sm">No {servicesLabel.toLowerCase()} found.</div>
         )}
       </div>
 

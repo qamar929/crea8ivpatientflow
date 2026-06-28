@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AlertCircle, DollarSign, Download, Loader2, TrendingDown, TrendingUp } from 'lucide-react';
 import { fetchApi } from '../config/api';
+import { useClinic } from '../context/ClinicContext';
 import Badge from '../components/ui/Badge';
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -21,6 +22,10 @@ function SummaryCard({ label, value, icon: Icon, iconBg, iconColor }) {
 }
 
 export default function Financials() {
+  const { term } = useClinic();
+  const patientLabel = term('patient', 'Patient');
+  const serviceLabel = term('service', 'Service');
+  const servicesLabel = term('services', 'services');
   const [summary, setSummary] = useState({ totalRevenue: 0, totalExpenses: 0, netProfit: 0, outstandingPayments: 0 });
   const [monthly, setMonthly] = useState([]);
   const [transactions, setTransactions] = useState([]);
@@ -49,7 +54,7 @@ export default function Financials() {
     });
     return Object.entries(grouped).map(([name, revenue]) => ({ name, revenue }));
   }, [transactions]);
-  const serviceData = categoryData.length ? categoryData : [{ name: 'No paid services yet', revenue: 0 }];
+  const serviceData = categoryData.length ? categoryData : [{ name: `No paid ${servicesLabel} yet`, revenue: 0 }];
   const paidCount = transactions.filter(txn => txn.status === 'paid').length;
   const pendingCount = transactions.filter(txn => txn.status === 'pending' || txn.status === 'partial').length;
 
@@ -93,7 +98,7 @@ export default function Financials() {
       </div>
 
       <div className="rounded-xl border border-gray-100 bg-white p-5 shadow-sm dark:border-white/10 dark:bg-slate-900">
-        <h3 className="mb-1 text-sm font-semibold text-gray-900 dark:text-white">Service Revenue</h3>
+        <h3 className="mb-1 text-sm font-semibold text-gray-900 dark:text-white">{serviceLabel} Revenue</h3>
         <p className="mb-4 text-xs text-gray-400">Live invoice items. Empty means no collected amount yet.</p>
         <div className="h-44">
           <ResponsiveContainer width="100%" height="100%">
@@ -121,7 +126,7 @@ export default function Financials() {
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
             <thead className="bg-gray-50">
-              <tr>{['Invoice', 'Date', 'Patient', 'Service', 'Amount', 'Status'].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">{h}</th>)}</tr>
+              <tr>{['Invoice', 'Date', patientLabel, serviceLabel, 'Amount', 'Status'].map(h => <th key={h} className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-gray-500">{h}</th>)}</tr>
             </thead>
             <tbody className="divide-y divide-gray-50 dark:divide-white/5">
               {transactions.map(txn => (

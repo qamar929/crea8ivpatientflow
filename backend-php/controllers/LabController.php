@@ -5,7 +5,7 @@ require_once __DIR__ . '/../helpers.php';
 // Lab case tracking: work sent out to dental/aesthetic labs (crowns, dentures,
 // aligners, etc.) — lab, procedure, sent/due/received dates, status. Flat table.
 class LabController {
-    private $statuses = ['sent', 'received', 'fitted', 'cancelled'];
+    private $statuses = ['sent', 'received', 'fitted', 'cancelled', 'archived'];
 
     private function ensureTable($db) {
         $sql = DB_DRIVER === 'sqlite'
@@ -36,7 +36,7 @@ class LabController {
         $status = $_GET['status'] ?? '';
         $clientId = $_GET['clientId'] ?? '';
         $search = $_GET['search'] ?? '';
-        $where = ['clinicId = ?']; $params = [$user['clinicId']];
+        $where = ["clinicId = ?", "status <> 'archived'"]; $params = [$user['clinicId']];
         if ($status === 'overdue') {
             $where[] = "status = 'sent' AND dueDate IS NOT NULL AND dueDate <> '' AND dueDate < ?";
             $params[] = date('Y-m-d');
@@ -55,7 +55,7 @@ class LabController {
         $rows = $stmt->fetchAll();
         // Summary counts for the page header.
         $counts = ['sent' => 0, 'received' => 0, 'fitted' => 0, 'overdue' => 0];
-        $cs = $db->prepare("SELECT status, COUNT(*) c FROM LabCase WHERE clinicId = ? GROUP BY status");
+        $cs = $db->prepare("SELECT status, COUNT(*) c FROM LabCase WHERE clinicId = ? AND status <> 'archived' GROUP BY status");
         $cs->execute([$user['clinicId']]);
         foreach ($cs->fetchAll() as $r) { if (isset($counts[$r['status']])) $counts[$r['status']] = intval($r['c']); }
         $od = $db->prepare("SELECT COUNT(*) FROM LabCase WHERE clinicId = ? AND status='sent' AND dueDate IS NOT NULL AND dueDate <> '' AND dueDate < ?");
@@ -130,8 +130,8 @@ class LabController {
     public function remove($input, $user, $id) {
         $db = DB::getConnection();
         $this->ensureTable($db);
-        $db->prepare("DELETE FROM LabCase WHERE id = ? AND clinicId = ?")->execute([$id, $user['clinicId']]);
-        log_audit($user['clinicId'], $user['id'] ?? null, 'lab_case_deleted', 'LabCase', $id, null, null);
-        send_json(['message' => 'Deleted']);
+        $db->prepare("UPDATE LabCase SET status = 'archived' WHERE id = ? AND clinicId = ?")->execute([$id, $user['clinicId']]);
+        log_audit($user['clinicId'], $user['id'] ?? null, 'lab_case_archived', 'LabCase', $id, null, null);
+        send_json(['message' => 'Archived']);
     }
 }

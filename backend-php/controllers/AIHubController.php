@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../services/tenantFeatureService.php';
+require_once __DIR__ . '/../services/aiService.php';
 
 class AIHubController {
     private function db() {
@@ -86,6 +87,15 @@ class AIHubController {
 
         $enabled = array_filter($providers, fn($p) => !empty($p['enabled']));
         $ready = array_filter($providers, fn($p) => $p['health'] === 'ready');
+        $tenantTokenUsage = 0;
+        try {
+            ai_ensure_usage_table($db);
+            $usageStmt = $db->prepare("SELECT COALESCE(SUM(totalTokens), 0) FROM AIUsageLog WHERE clinicId = ? AND createdAt >= ?");
+            $usageStmt->execute([$user['clinicId'], ai_month_start()]);
+            $tenantTokenUsage = (int)$usageStmt->fetchColumn();
+        } catch (Exception $e) {
+            $tenantTokenUsage = 0;
+        }
 
         send_json([
             'providers' => $providers,
@@ -99,7 +109,7 @@ class AIHubController {
             'metrics' => [
                 'enabledProviders' => count($enabled),
                 'readyProviders' => count($ready),
-                'tokenUsage' => array_sum(array_map(fn($p) => intval($p['tokenUsage'] ?? 0), $providers)),
+                'tokenUsage' => $tenantTokenUsage,
                 'costEstimate' => array_sum(array_map(fn($p) => floatval($p['costEstimate'] ?? 0), $providers)),
                 'failoverReady' => count($ready) >= 2,
             ],

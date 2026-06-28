@@ -43,6 +43,10 @@ function getCurrentUser() {
 }
 
 function AccountManagement() {
+  const { term } = useClinic();
+  const doctorLabel = term('doctor', 'Doctor');
+  const clinicLabel = term('clinic', 'clinic');
+  const roleOptions = PORTAL_ROLES.map(role => role.value === 'doctor' ? { ...role, label: doctorLabel } : role);
   const currentUser = getCurrentUser();
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(false);
@@ -165,7 +169,7 @@ function AccountManagement() {
           <div>
             <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Account Management</h3>
             <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
-              Manage portal users, roles, and credentials for your clinic
+              Manage portal users, roles, and credentials for your {clinicLabel.toLowerCase()}
             </p>
           </div>
         </div>
@@ -279,7 +283,7 @@ function AccountManagement() {
           <div>
             <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Role</label>
             <select value={addForm.role} onChange={(e) => setAddForm({ ...addForm, role: e.target.value })} className="w-full border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40">
-              {PORTAL_ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+              {roleOptions.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
             </select>
           </div>
           {addForm.role === 'owner' && (
@@ -316,7 +320,7 @@ function AccountManagement() {
           <div>
             <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">Role</label>
             <select value={editForm.role} onChange={(e) => setEditForm({ ...editForm, role: e.target.value })} className="w-full border border-gray-200 dark:border-white/10 bg-white dark:bg-white/[0.03] text-gray-900 dark:text-white rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-[var(--primary)]/40">
-              {PORTAL_ROLES.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
+              {roleOptions.map((r) => <option key={r.value} value={r.value}>{r.label}</option>)}
             </select>
           </div>
           {editForm.role === 'owner' && (
@@ -421,7 +425,16 @@ function ToggleRow({ label, description, checked, onChange }) {
 
 export default function Settings() {
   const { theme, setTheme, clinicName, setClinicName } = useTheme();
-  const { clinicInfo, updateClinicInfo } = useClinic();
+  const { clinicInfo, updateClinicInfo, term } = useClinic();
+  const clinicLabel = term('clinic', 'Clinic');
+  const patientLabel = term('patient', 'patient');
+  const appointmentLabel = term('appointment', 'appointment');
+  const appointmentsLabel = term('appointments', 'appointments');
+  const doctorLabel = term('doctor', 'Doctor');
+  const staffLabel = term('staff', 'staff');
+  const serviceLabel = term('service', 'service');
+  const servicesLabel = term('services', 'Services');
+  const recallLabel = term('recall', 'recall');
 
   const [saved, setSaved] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -618,7 +631,7 @@ export default function Settings() {
       {/* Save bar */}
       <div className="flex items-center justify-between bg-white rounded-xl border border-gray-100 shadow-sm px-5 py-3.5">
         <div>
-          <p className="text-sm font-semibold text-gray-900">Clinic Configuration</p>
+          <p className="text-sm font-semibold text-gray-900">{clinicLabel} Configuration</p>
           <p className="text-xs text-gray-400">Changes apply instantly across all modules</p>
         </div>
         <Button onClick={handleSave} size="sm" className="min-w-[110px] justify-center" disabled={saving}>
@@ -637,7 +650,7 @@ export default function Settings() {
             {missingRequired.length} required {missingRequired.length === 1 ? 'detail is' : 'details are'} missing
           </p>
           <p className="mt-0.5 text-xs text-red-700">
-            These appear on invoices and patient documents. Complete the fields highlighted in red, then Save.
+            These appear on invoices and {patientLabel} documents. Complete the fields highlighted in red, then Save.
           </p>
           <p className="mt-2 text-xs text-red-700"><span className="font-semibold">Missing:</span> {missingRequired.map((f) => f.label).join(', ')}</p>
         </div>
@@ -645,10 +658,10 @@ export default function Settings() {
 
       {/* Clinic Info */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-        <SectionHeader icon={Building2} title="Clinic Information" description="Basic details shown across the platform" />
+        <SectionHeader icon={Building2} title={`${clinicLabel} Information`} description="Basic details shown across the platform" />
         <div className="space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-1">Clinic Name</label>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">{clinicLabel} Name</label>
             <input
               value={localName}
               onChange={e => setLocalName(e.target.value)}
@@ -735,7 +748,7 @@ export default function Settings() {
 
       {/* Brand Profile */}
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm p-5">
-        <SectionHeader icon={FileText} title="Brand Profile & Invoice Rules" description="Controls invoice headers, patient documents, and clinic messaging" />
+        <SectionHeader icon={FileText} title="Brand Profile & Invoice Rules" description={`Controls invoice headers, ${patientLabel} documents, and ${clinicLabel.toLowerCase()} messaging`} />
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1">Mission</label>
@@ -746,7 +759,7 @@ export default function Settings() {
             <textarea rows={3} value={localVision} onChange={e => setLocalVision(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-300" />
           </div>
           <div className="lg:col-span-2">
-            <label className="block text-xs font-semibold text-gray-600 mb-1">Services Overview</label>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">{servicesLabel} Overview</label>
             <textarea rows={3} value={localServicesOverview} onChange={e => setLocalServicesOverview(e.target.value)} className="w-full border border-gray-200 rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-300" />
           </div>
           <div>
@@ -755,7 +768,7 @@ export default function Settings() {
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1">Payment Terms</label>
-            <textarea rows={4} value={localPaymentTerms} onChange={e => setLocalPaymentTerms(e.target.value)} placeholder={"One point per line — shown as bullets on the invoice:\nPayment due at time of treatment\nBalance to be cleared within 7 days\nReports collected after full payment"} className={`w-full border ${reqCls(localPaymentTerms)} rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-300`} />
+            <textarea rows={4} value={localPaymentTerms} onChange={e => setLocalPaymentTerms(e.target.value)} placeholder={`One point per line - shown as bullets on the invoice:\nPayment due at time of ${serviceLabel}\nBalance to be cleared within 7 days\nDocuments collected after full payment`} className={`w-full border ${reqCls(localPaymentTerms)} rounded-lg px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-300`} />
             <p className="text-[10px] text-gray-400 mt-1">Write each term on its own line. Each line becomes a bullet on the invoice.</p>
           </div>
           <div className="lg:col-span-2">
@@ -765,7 +778,7 @@ export default function Settings() {
 
           <div className="lg:col-span-2 mt-1">
             <p className="text-xs font-bold uppercase tracking-wider text-gray-400">Payment / Account Details</p>
-            <p className="text-[11px] text-gray-400">Shown on every invoice so patients know where to pay. Leave blank to hide.</p>
+            <p className="text-[11px] text-gray-400">Shown on every invoice so {patientLabel}s know where to pay. Leave blank to hide.</p>
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1">Bank Name</label>
@@ -794,7 +807,7 @@ export default function Settings() {
 
           <div className="lg:col-span-2">
             <label className="block text-xs font-semibold text-gray-600 mb-1">Stamp / Signature (optional)</label>
-            <p className="text-[11px] text-gray-400 mb-2">Shown in the signature area of every invoice. Use a transparent PNG of your clinic stamp or an authorized signature.</p>
+            <p className="text-[11px] text-gray-400 mb-2">Shown in the signature area of every invoice. Use a transparent PNG of your {clinicLabel.toLowerCase()} stamp or an authorized signature.</p>
             <div className="flex items-center gap-3 flex-wrap">
               <div className="h-16 w-32 rounded-lg border border-gray-200 bg-white flex items-center justify-center overflow-hidden">
                 {localStamp
@@ -821,7 +834,7 @@ export default function Settings() {
           <div className="flex items-start gap-3">
             <ClinicLogoMark logo={localLogo} alt={`${localName} logo preview`} className="w-12 h-12 rounded-xl flex items-center justify-center text-white font-bold shrink-0 overflow-hidden" style={{ background: localPrimary }} />
             <div className="min-w-0">
-              <p className="text-sm font-bold text-gray-900">{localName || 'Clinic Name'}</p>
+              <p className="text-sm font-bold text-gray-900">{localName || `${clinicLabel} Name`}</p>
               <p className="text-xs text-gray-500">{localTagline}</p>
               <p className="text-xs text-gray-500 mt-1">{localAddress}</p>
               <p className="text-xs text-gray-500">{localPhone} · {localEmail}</p>
@@ -870,7 +883,7 @@ export default function Settings() {
 
           {/* Logo upload */}
           <div>
-            <label className="block text-xs font-semibold text-gray-600 mb-2">Clinic Logo</label>
+            <label className="block text-xs font-semibold text-gray-600 mb-2">{clinicLabel} Logo</label>
             <div className="flex items-center gap-3 flex-wrap">
               <ClinicLogoMark
                 logo={localLogo}
@@ -913,13 +926,13 @@ export default function Settings() {
         <SectionHeader icon={Bell} title="Notifications & Automation" description="Configure when and how to contact clients and staff" />
         <div className="space-y-0">
           <ToggleRow
-            label="SMS Appointment Reminders"
-            description="Send SMS 24h before each appointment"
+            label={`SMS ${appointmentLabel} Reminders`}
+            description={`Send SMS 24h before each ${appointmentLabel}`}
             checked={notifications.smsReminders}
             onChange={() => toggleNotif('smsReminders')}
           />
           <ToggleRow
-            label="Email Appointment Reminders"
+            label={`Email ${appointmentLabel} Reminders`}
             description="Send email confirmation and reminders"
             checked={notifications.emailReminders}
             onChange={() => toggleNotif('emailReminders')}
@@ -943,8 +956,8 @@ export default function Settings() {
             onChange={() => toggleNotif('packageExpiry')}
           />
           <ToggleRow
-            label="Staff Shift Alerts"
-            description="Notify staff of upcoming shifts and schedule changes"
+            label={`${staffLabel} Shift Alerts`}
+            description={`Notify ${staffLabel.toLowerCase()} of upcoming shifts and schedule changes`}
             checked={notifications.staffAlerts}
             onChange={() => toggleNotif('staffAlerts')}
           />
@@ -956,13 +969,13 @@ export default function Settings() {
           />
           <ToggleRow
             label="WhatsApp Growth Follow-ups"
-            description="Build monthly recall lists for due, inactive, and high-value patients"
+            description={`Build monthly ${recallLabel.toLowerCase()} lists for due, inactive, and high-value ${patientLabel}s`}
             checked={notifications.whatsappGrowth !== false}
             onChange={() => toggleNotif('whatsappGrowth')}
           />
           <div className="mt-3 flex items-center gap-2 rounded-xl bg-green-50 border border-green-100 px-3 py-2">
             <MessageCircle className="w-4 h-4 text-green-600" />
-            <p className="text-xs text-green-700 font-medium">WhatsApp sender: {localWhatsapp || 'Add clinic WhatsApp number'}</p>
+            <p className="text-xs text-green-700 font-medium">WhatsApp sender: {localWhatsapp || `Add ${clinicLabel.toLowerCase()} WhatsApp number`}</p>
           </div>
         </div>
       </div>
@@ -973,9 +986,9 @@ export default function Settings() {
         <div className="space-y-2">
           {[
             { role: 'Owner', access: 'Full access — all modules, settings, and financials', color: 'bg-indigo-50 text-indigo-700' },
-            { role: 'Manager', access: 'Staff, appointments, clients, and reports', color: 'bg-blue-50 text-blue-700' },
-            { role: 'Doctor / Specialist', access: 'Own appointments and client records', color: 'bg-purple-50 text-purple-700' },
-            { role: 'Receptionist', access: 'Appointments and client intake only', color: 'bg-gray-100 text-gray-600' },
+            { role: 'Manager', access: `${staffLabel}, ${appointmentsLabel}, clients, and reports`, color: 'bg-blue-50 text-blue-700' },
+            { role: `${doctorLabel} / Specialist`, access: `Own ${appointmentsLabel} and client records`, color: 'bg-purple-50 text-purple-700' },
+            { role: 'Receptionist', access: `${appointmentsLabel} and client intake only`, color: 'bg-gray-100 text-gray-600' },
             { role: 'Accountant', access: 'Financial module and reports only', color: 'bg-emerald-50 text-emerald-700' },
           ].map(r => (
             <div key={r.role} className="flex items-center justify-between p-3 bg-gray-50 rounded-xl hover:bg-gray-100 transition-colors cursor-pointer">
@@ -988,7 +1001,7 @@ export default function Settings() {
           ))}
         </div>
         <div className="mt-4 bg-amber-50 border border-amber-100 rounded-xl p-3">
-          <p className="text-xs text-amber-700 font-medium">All patient data is encrypted at rest. Automatic daily backups enabled.</p>
+          <p className="text-xs text-amber-700 font-medium">All {patientLabel} data is encrypted at rest. Automatic daily backups enabled.</p>
         </div>
       </div>
 

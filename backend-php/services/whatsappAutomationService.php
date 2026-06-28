@@ -2,9 +2,22 @@
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/metaWhatsAppService.php';
+require_once __DIR__ . '/tenantFeatureService.php';
+
+function whatsapp_quota_assert($db, $clinicId, $increment = 1) {
+    $features = tenant_features_get($db, $clinicId);
+    $limit = (int)($features['monthlyWhatsAppLimit'] ?? 0);
+    if ($limit <= 0) return;
+    $stmt = $db->prepare("SELECT COALESCE(COUNT(*), 0) FROM WhatsAppMessage WHERE clinicId = ? AND direction = 'outbound' AND createdAt >= ?");
+    $stmt->execute([$clinicId, date('Y-m-01 00:00:00')]);
+    if (((int)$stmt->fetchColumn() + max(1, (int)$increment)) > $limit) {
+        throw new Exception('Monthly WhatsApp message limit reached for this clinic.');
+    }
+}
 
 function whatsapp_automation_dispatch_flow($db, $settings, $flow, $client, $contextKey) {
     if (empty($client['phone']) || empty($flow['templateName'])) return false;
+    whatsapp_quota_assert($db, $flow['clinicId'], 1);
     $check = $db->prepare("SELECT COUNT(*) FROM WhatsAppAutomationLog WHERE automationId=? AND clientId=? AND contextKey=?");
     $check->execute([$flow['id'], $client['id'], $contextKey]);
     if ($check->fetchColumn()) return false;

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Loader2, PlayCircle, PauseCircle, CalendarPlus, Globe, ShieldCheck, Plus, Pencil, Trash2, LogIn, Search, Copy, Check, X, Users as UsersIcon, Building2, CreditCard, Clock, MessageCircle, Bot, KeyRound, Megaphone, Facebook, Database } from 'lucide-react';
+import { Archive, Loader2, PlayCircle, PauseCircle, CalendarPlus, Globe, ShieldCheck, Plus, Pencil, LogIn, Search, Copy, Check, X, Users as UsersIcon, Building2, CreditCard, Clock, MessageCircle, Bot, KeyRound, Megaphone, Facebook, Database } from 'lucide-react';
 import { fetchApi } from '../../config/api';
 import Modal from '../../components/ui/Modal';
 import ColorPicker from '../../components/ui/ColorPicker';
@@ -44,6 +44,7 @@ const STATUS_STYLES = {
   trial: 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300',
   grace: 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
   suspended: 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300',
+  archived: 'bg-zinc-100 text-zinc-600 dark:bg-white/10 dark:text-zinc-300',
   pending: 'bg-gray-100 text-gray-500 dark:bg-white/5 dark:text-gray-400',
 };
 
@@ -59,6 +60,7 @@ const FILTERS = [
   { key: 'grace', label: 'Grace' },
   { key: 'suspended', label: 'Suspended' },
   { key: 'pending', label: 'Pending' },
+  { key: 'archived', label: 'Archived' },
   { key: 'expiring', label: 'Expiring ≤30d' },
 ];
 
@@ -69,6 +71,11 @@ const GROWTH_MODULES = [
   { key: 'metaLeadsEnabled', label: 'Meta', icon: Facebook },
   { key: 'importsEnabled', label: 'Imports', icon: Database },
 ];
+
+const prettyTemplate = (key = 'healthcare') => String(key || 'healthcare')
+  .split('_')
+  .map((part) => part.charAt(0).toUpperCase() + part.slice(1))
+  .join(' ');
 
 export default function AdminTenants() {
   const [tenants, setTenants] = useState(null);
@@ -197,7 +204,7 @@ export default function AdminTenants() {
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-2xl font-black text-gray-950 dark:text-white">Clinics</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Create, edit, activate, deactivate, or remove any tenant on the platform.</p>
+          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">Create, edit, activate, deactivate, or archive tenants without deleting clinic data.</p>
         </div>
         <button
           onClick={() => setShowCreate(true)}
@@ -258,6 +265,7 @@ export default function AdminTenants() {
                     <p className="font-bold text-gray-900 dark:text-white group-hover:text-orange-600 group-hover:underline">{t.name}</p>
                   </button>
                   <p className="text-xs text-gray-400">{t.slug ? `${t.slug} · ` : ''}{t.clinicType}</p>
+                  <p className="mt-1 inline-flex rounded-md bg-gray-100 px-1.5 py-0.5 text-[10px] font-bold text-gray-500 dark:bg-white/10 dark:text-gray-300">{prettyTemplate(t.industryTemplate)}</p>
                   {t.customDomain && (
                     <p className="text-[11px] font-semibold mt-0.5 flex items-center gap-1">
                       <Globe className="w-3 h-3 text-gray-400" />
@@ -301,9 +309,11 @@ export default function AdminTenants() {
                       <Loader2 className="w-4 h-4 animate-spin text-gray-400" />
                     ) : (
                       <>
-                        <button onClick={() => manage(t)} title="Sign in to this clinic's portal as superadmin" className="inline-flex items-center gap-1.5 rounded-lg bg-orange-600 hover:bg-orange-700 px-2.5 py-1.5 text-xs font-bold text-white">
-                          <LogIn className="w-3.5 h-3.5" /> Manage
-                        </button>
+                        {t.status !== 'archived' && (
+                          <button onClick={() => manage(t)} title="Sign in to this clinic's portal as superadmin" className="inline-flex items-center gap-1.5 rounded-lg bg-orange-600 hover:bg-orange-700 px-2.5 py-1.5 text-xs font-bold text-white">
+                            <LogIn className="w-3.5 h-3.5" /> Manage
+                          </button>
+                        )}
                         {(() => {
                           const iconBtn = "p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 dark:hover:bg-white/10";
                           return (
@@ -325,7 +335,9 @@ export default function AdminTenants() {
                               {t.customDomain && t.domainStatus && !['none', 'connected'].includes(t.domainStatus) && (
                                 <button onClick={() => markConnected(t)} title="Mark domain connected (after DNS + SSL)" className={`${iconBtn} hover:text-emerald-600`}><ShieldCheck className="w-4 h-4" /></button>
                               )}
-                              <button onClick={() => setDeleteTenant(t)} title="Delete clinic permanently" className={`${iconBtn} hover:text-rose-600`}><Trash2 className="w-4 h-4" /></button>
+                              {t.status !== 'archived' && (
+                                <button onClick={() => setDeleteTenant(t)} title="Archive clinic access" className={`${iconBtn} hover:text-rose-600`}><Archive className="w-4 h-4" /></button>
+                              )}
                             </div>
                           );
                         })()}
@@ -570,6 +582,7 @@ function TenantAutomationControls({ tenantId }) {
       setData(res);
       setDraft({
         features: {
+          industryTemplate: res.features?.industryTemplate || 'healthcare',
           marketingEnabled: !!Number(res.features?.marketingEnabled),
           metaLeadsEnabled: !!Number(res.features?.metaLeadsEnabled),
           importsEnabled: !!Number(res.features?.importsEnabled),
@@ -633,6 +646,7 @@ function TenantAutomationControls({ tenantId }) {
         ...d,
         features: {
           ...d.features,
+          industryTemplate: res.features?.industryTemplate || d.features.industryTemplate || 'healthcare',
           marketingEnabled: !!Number(res.features?.marketingEnabled),
           metaLeadsEnabled: !!Number(res.features?.metaLeadsEnabled),
           importsEnabled: !!Number(res.features?.importsEnabled),
@@ -652,6 +666,9 @@ function TenantAutomationControls({ tenantId }) {
   if (!data || !draft) {
     return <section className="rounded-xl border border-gray-200/70 p-4 text-sm text-gray-400 dark:border-white/10"><Loader2 className="mr-2 inline h-4 w-4 animate-spin" /> Loading automation controls…</section>;
   }
+  const industryTemplates = data.industryTemplates?.length
+    ? data.industryTemplates
+    : [{ templateKey: 'healthcare', name: 'Healthcare' }];
 
   return (
     <section className="rounded-xl border border-gray-200/70 p-4 dark:border-white/10">
@@ -670,6 +687,20 @@ function TenantAutomationControls({ tenantId }) {
             </button>
           ))}
         </div>
+      </div>
+      <div className="mb-4 rounded-xl border border-gray-200 bg-gray-50/80 p-3 dark:border-white/10 dark:bg-white/5">
+        <p className="text-xs font-black uppercase tracking-wider text-gray-500 dark:text-gray-300">Industry Template</p>
+        <p className="mb-2 text-[11px] text-gray-500 dark:text-gray-400">Changes labels, terminology and dashboard wording only. It does not change stored clinic data or workflows.</p>
+        <select
+          className={field}
+          value={draft.features.industryTemplate || 'healthcare'}
+          onChange={(e) => setFeature('industryTemplate', e.target.value)}
+          disabled={saving}
+        >
+          {industryTemplates.map((tpl) => (
+            <option key={tpl.templateKey} value={tpl.templateKey}>{tpl.name}</option>
+          ))}
+        </select>
       </div>
       <div className="flex items-center justify-between gap-3">
         <div>
@@ -815,7 +846,7 @@ function CreateClinicModal({ onClose, onCreated }) {
             <div className="sm:col-span-2">
               <label className={labelCls}>Initial password</label>
               <input className={field} type="text" value={f.ownerPassword} onChange={(e) => set('ownerPassword', e.target.value)} placeholder="Leave blank to email a set-password invite" />
-              <p className="text-[11px] text-gray-400 mt-1">Set a password so the owner can log in immediately (min 8 chars), or leave blank to email them a secure set-password link.</p>
+              <p className="text-[11px] text-gray-400 mt-1">Set a password so the owner can log in immediately (min 10 chars), or leave blank to email them a secure set-password link.</p>
             </div>
           </div>
         </section>
@@ -919,11 +950,11 @@ function DeleteClinicModal({ tenant, onClose, onDeleted }) {
   };
 
   return (
-    <Modal isOpen onClose={onClose} title="Delete clinic permanently" size="md">
+    <Modal isOpen onClose={onClose} title="Archive clinic" size="md">
       <div className="space-y-4">
         {err && <div className="rounded-lg border border-red-200 bg-red-50 text-red-700 px-3 py-2 text-sm">{err}</div>}
-        <div className="rounded-lg border border-rose-200 bg-rose-50 text-rose-700 px-3 py-3 text-sm">
-          This permanently deletes <b>{tenant.name}</b> and <b>all</b> of its data — patients, appointments, invoices, staff, and users. This cannot be undone.
+        <div className="rounded-lg border border-amber-200 bg-amber-50 text-amber-800 px-3 py-3 text-sm">
+          This archives <b>{tenant.name}</b>, revokes active sessions, and deactivates clinic users. Patients, appointments, invoices, staff, and settings remain stored.
         </div>
         <div>
           <label className={labelCls}>Type the clinic name to confirm</label>
@@ -931,8 +962,8 @@ function DeleteClinicModal({ tenant, onClose, onDeleted }) {
         </div>
         <div className="flex justify-end gap-2">
           <button onClick={onClose} className="px-4 py-2 rounded-xl text-sm font-semibold text-gray-600 hover:bg-gray-100 dark:hover:bg-white/10">Cancel</button>
-          <button onClick={submit} disabled={saving || confirm !== tenant.name} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white text-sm font-bold">
-            {saving && <Loader2 className="w-4 h-4 animate-spin" />} Delete permanently
+          <button onClick={submit} disabled={saving || confirm !== tenant.name} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white text-sm font-bold">
+            {saving && <Loader2 className="w-4 h-4 animate-spin" />} Archive clinic
           </button>
         </div>
       </div>

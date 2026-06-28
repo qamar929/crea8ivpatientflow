@@ -1,4 +1,5 @@
 <?php
+require_once __DIR__ . '/industryTemplateService.php';
 
 function tenant_features_ensure($db) {
     $columns = [
@@ -7,10 +8,13 @@ function tenant_features_ensure($db) {
         'importsEnabled' => ['sqlite' => 'INTEGER DEFAULT 0', 'mysql' => 'TINYINT DEFAULT 0'],
         // Phase 4: AI Receptionist may auto-create appointments from chat (opt-in, default off).
         'aiAutoBookEnabled' => ['sqlite' => 'INTEGER DEFAULT 0', 'mysql' => 'TINYINT DEFAULT 0'],
+        'industryTemplate' => ['sqlite' => 'TEXT DEFAULT NULL', 'mysql' => 'VARCHAR(80) DEFAULT NULL'],
     ];
+    industry_templates_ensure($db);
     if (DB_DRIVER === 'sqlite') {
         $db->exec("CREATE TABLE IF NOT EXISTS ClinicFeatureSetting (
             clinicId TEXT PRIMARY KEY,
+            industryTemplate TEXT DEFAULT NULL,
             marketingEnabled INTEGER DEFAULT 0,
             metaLeadsEnabled INTEGER DEFAULT 0,
             importsEnabled INTEGER DEFAULT 0,
@@ -35,6 +39,7 @@ function tenant_features_ensure($db) {
     } else {
         $db->exec("CREATE TABLE IF NOT EXISTS ClinicFeatureSetting (
             clinicId VARCHAR(64) PRIMARY KEY,
+            industryTemplate VARCHAR(80) DEFAULT NULL,
             marketingEnabled TINYINT DEFAULT 0,
             metaLeadsEnabled TINYINT DEFAULT 0,
             importsEnabled TINYINT DEFAULT 0,
@@ -63,6 +68,7 @@ function tenant_features_ensure($db) {
 function tenant_features_defaults($clinicId) {
     return [
         'clinicId' => $clinicId,
+        'industryTemplate' => INDUSTRY_TEMPLATE_DEFAULT,
         'marketingEnabled' => 0,
         'metaLeadsEnabled' => 0,
         'importsEnabled' => 0,
@@ -84,7 +90,9 @@ function tenant_features_get($db, $clinicId) {
     $stmt->execute([$clinicId]);
     $row = $stmt->fetch();
     if (!$row) return tenant_features_defaults($clinicId);
-    return array_merge(tenant_features_defaults($clinicId), $row);
+    $merged = array_merge(tenant_features_defaults($clinicId), $row);
+    if (empty($merged['industryTemplate'])) $merged['industryTemplate'] = INDUSTRY_TEMPLATE_DEFAULT;
+    return $merged;
 }
 
 function tenant_features_save($db, $clinicId, $input) {
@@ -94,7 +102,16 @@ function tenant_features_save($db, $clinicId, $input) {
         if (array_key_exists($key, $input)) return !empty($input[$key]) ? 1 : 0;
         return !empty($current[$key] ?? $default) ? 1 : 0;
     };
+    $industryTemplate = $current['industryTemplate'] ?? INDUSTRY_TEMPLATE_DEFAULT;
+    if (array_key_exists('industryTemplate', $input)) {
+        $industryTemplate = industry_template_normalize($input['industryTemplate']);
+        if (!industry_template_exists($db, $industryTemplate)) {
+            throw new Exception('Invalid industry template');
+        }
+    }
+
     $data = array_merge($current, [
+        'industryTemplate' => $industryTemplate,
         'marketingEnabled' => $boolValue('marketingEnabled'),
         'metaLeadsEnabled' => $boolValue('metaLeadsEnabled'),
         'importsEnabled' => $boolValue('importsEnabled'),
@@ -110,16 +127,17 @@ function tenant_features_save($db, $clinicId, $input) {
     ]);
 
     if (DB_DRIVER === 'sqlite') {
-        $sql = "INSERT INTO ClinicFeatureSetting (clinicId, marketingEnabled, metaLeadsEnabled, importsEnabled, whatsappEnabled, whatsappMarketingEnabled, whatsappAutomationEnabled, aiEnabled, aiAutoReplyEnabled, aiAutoBookEnabled, aiHumanApprovalRequired, monthlyAiTokenLimit, monthlyWhatsAppLimit)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON CONFLICT(clinicId) DO UPDATE SET marketingEnabled=excluded.marketingEnabled, metaLeadsEnabled=excluded.metaLeadsEnabled, importsEnabled=excluded.importsEnabled, whatsappEnabled=excluded.whatsappEnabled, whatsappMarketingEnabled=excluded.whatsappMarketingEnabled, whatsappAutomationEnabled=excluded.whatsappAutomationEnabled, aiEnabled=excluded.aiEnabled, aiAutoReplyEnabled=excluded.aiAutoReplyEnabled, aiAutoBookEnabled=excluded.aiAutoBookEnabled, aiHumanApprovalRequired=excluded.aiHumanApprovalRequired, monthlyAiTokenLimit=excluded.monthlyAiTokenLimit, monthlyWhatsAppLimit=excluded.monthlyWhatsAppLimit, updatedAt=CURRENT_TIMESTAMP";
+        $sql = "INSERT INTO ClinicFeatureSetting (clinicId, industryTemplate, marketingEnabled, metaLeadsEnabled, importsEnabled, whatsappEnabled, whatsappMarketingEnabled, whatsappAutomationEnabled, aiEnabled, aiAutoReplyEnabled, aiAutoBookEnabled, aiHumanApprovalRequired, monthlyAiTokenLimit, monthlyWhatsAppLimit)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(clinicId) DO UPDATE SET industryTemplate=excluded.industryTemplate, marketingEnabled=excluded.marketingEnabled, metaLeadsEnabled=excluded.metaLeadsEnabled, importsEnabled=excluded.importsEnabled, whatsappEnabled=excluded.whatsappEnabled, whatsappMarketingEnabled=excluded.whatsappMarketingEnabled, whatsappAutomationEnabled=excluded.whatsappAutomationEnabled, aiEnabled=excluded.aiEnabled, aiAutoReplyEnabled=excluded.aiAutoReplyEnabled, aiAutoBookEnabled=excluded.aiAutoBookEnabled, aiHumanApprovalRequired=excluded.aiHumanApprovalRequired, monthlyAiTokenLimit=excluded.monthlyAiTokenLimit, monthlyWhatsAppLimit=excluded.monthlyWhatsAppLimit, updatedAt=CURRENT_TIMESTAMP";
     } else {
-        $sql = "INSERT INTO ClinicFeatureSetting (clinicId, marketingEnabled, metaLeadsEnabled, importsEnabled, whatsappEnabled, whatsappMarketingEnabled, whatsappAutomationEnabled, aiEnabled, aiAutoReplyEnabled, aiAutoBookEnabled, aiHumanApprovalRequired, monthlyAiTokenLimit, monthlyWhatsAppLimit)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-                ON DUPLICATE KEY UPDATE marketingEnabled=VALUES(marketingEnabled), metaLeadsEnabled=VALUES(metaLeadsEnabled), importsEnabled=VALUES(importsEnabled), whatsappEnabled=VALUES(whatsappEnabled), whatsappMarketingEnabled=VALUES(whatsappMarketingEnabled), whatsappAutomationEnabled=VALUES(whatsappAutomationEnabled), aiEnabled=VALUES(aiEnabled), aiAutoReplyEnabled=VALUES(aiAutoReplyEnabled), aiAutoBookEnabled=VALUES(aiAutoBookEnabled), aiHumanApprovalRequired=VALUES(aiHumanApprovalRequired), monthlyAiTokenLimit=VALUES(monthlyAiTokenLimit), monthlyWhatsAppLimit=VALUES(monthlyWhatsAppLimit), updatedAt=CURRENT_TIMESTAMP";
+        $sql = "INSERT INTO ClinicFeatureSetting (clinicId, industryTemplate, marketingEnabled, metaLeadsEnabled, importsEnabled, whatsappEnabled, whatsappMarketingEnabled, whatsappAutomationEnabled, aiEnabled, aiAutoReplyEnabled, aiAutoBookEnabled, aiHumanApprovalRequired, monthlyAiTokenLimit, monthlyWhatsAppLimit)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                ON DUPLICATE KEY UPDATE industryTemplate=VALUES(industryTemplate), marketingEnabled=VALUES(marketingEnabled), metaLeadsEnabled=VALUES(metaLeadsEnabled), importsEnabled=VALUES(importsEnabled), whatsappEnabled=VALUES(whatsappEnabled), whatsappMarketingEnabled=VALUES(whatsappMarketingEnabled), whatsappAutomationEnabled=VALUES(whatsappAutomationEnabled), aiEnabled=VALUES(aiEnabled), aiAutoReplyEnabled=VALUES(aiAutoReplyEnabled), aiAutoBookEnabled=VALUES(aiAutoBookEnabled), aiHumanApprovalRequired=VALUES(aiHumanApprovalRequired), monthlyAiTokenLimit=VALUES(monthlyAiTokenLimit), monthlyWhatsAppLimit=VALUES(monthlyWhatsAppLimit), updatedAt=CURRENT_TIMESTAMP";
     }
     $db->prepare($sql)->execute([
         $clinicId,
+        $data['industryTemplate'],
         $data['marketingEnabled'],
         $data['metaLeadsEnabled'],
         $data['importsEnabled'],
