@@ -24,6 +24,7 @@ import { useClinic } from '../../context/ClinicContext';
 import { useTheme } from '../../context/ThemeContext';
 import { getCurrentRole, getCurrentUser, ROLE_LABELS } from '../../config/roles';
 import { appPath, fetchApi } from '../../config/api';
+import WhatsNew from './WhatsNew';
 
 const pageTitles = {
   '/dashboard': 'Dashboard',
@@ -219,6 +220,9 @@ export default function Header() {
             {darkMode ? 'Light' : 'Dark'}
           </span>
         </button>
+
+        {/* What's New (feature updates for owners/managers) */}
+        <WhatsNew />
 
         {/* Notifications */}
         <div className="relative">
