@@ -149,10 +149,13 @@ class TreatmentController {
         }
         if (!$staffId && !empty($user['staffId'])) $staffId = $this->assertEntity($db, 'Staff', $user['staffId'], $user['clinicId']);
 
+        $statusAllowed = ['planned', 'in_progress', 'completed'];
+        $status = in_array($input['status'] ?? '', $statusAllowed, true) ? $input['status'] : 'completed';
+
         $id = generate_uuid();
         $stmt = $db->prepare("INSERT INTO TreatmentProcedureDetail
-            (id, clinicId, clientId, appointmentId, invoiceId, serviceId, staffId, procedureType, toothNumber, jaw, side, canalType, extractionType, crownMaterial, notes, followUpDate, performedAt, createdBy)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            (id, clinicId, clientId, appointmentId, invoiceId, serviceId, staffId, procedureType, toothNumber, jaw, side, canalType, extractionType, crownMaterial, notes, followUpDate, performedAt, status, createdBy)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute([
             $id, $user['clinicId'], $clientId, $appointmentId, $invoiceId, $serviceId, $staffId, $procedureType,
             trim((string)($input['toothNumber'] ?? $input['tooth'] ?? '')) ?: null,
@@ -164,6 +167,7 @@ class TreatmentController {
             trim((string)($input['notes'] ?? '')) ?: null,
             pf_valid_date($input['followUpDate'] ?? '') ? $input['followUpDate'] : null,
             $performedAt,
+            $status,
             $user['id'] ?? null
         ]);
         log_audit($user['clinicId'], $user['id'] ?? null, 'treatment_detail_created', 'TreatmentProcedureDetail', $id, null, ['procedureType' => $procedureType]);

@@ -64,6 +64,7 @@ function pf_dental_financials_ensure($db) {
         $db->exec("CREATE INDEX IF NOT EXISTS IX_TreatmentDetail_Clinic_Client_Date ON TreatmentProcedureDetail (clinicId, clientId, performedAt)");
         $db->exec("CREATE INDEX IF NOT EXISTS IX_TreatmentDetail_Clinic_Staff_Date ON TreatmentProcedureDetail (clinicId, staffId, performedAt)");
         try { $db->exec("ALTER TABLE Service ADD COLUMN defaultProcedureCost REAL DEFAULT NULL"); } catch (Exception $ignored) {}
+        try { $db->exec("ALTER TABLE TreatmentProcedureDetail ADD COLUMN status TEXT DEFAULT 'completed'"); } catch (Exception $ignored) {}
         return;
     }
 
@@ -113,6 +114,7 @@ function pf_dental_financials_ensure($db) {
         KEY `IX_TreatmentDetail_Clinic_Staff_Date` (`clinicId`, `staffId`, `performedAt`)
     ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci");
     try { $db->exec("ALTER TABLE `Service` ADD COLUMN `defaultProcedureCost` DOUBLE DEFAULT NULL"); } catch (Exception $ignored) {}
+    try { $db->exec("ALTER TABLE `TreatmentProcedureDetail` ADD COLUMN `status` VARCHAR(30) DEFAULT 'completed'"); } catch (Exception $ignored) {}
 }
 
 function pf_seed_expense_categories($db, $clinicId) {

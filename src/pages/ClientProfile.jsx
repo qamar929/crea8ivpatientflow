@@ -174,7 +174,14 @@ const emptyProcedure = {
   crownMaterial: '',
   notes: '',
   followUpDate: '',
+  status: 'completed',
   performedAt: todayDate(),
+};
+
+const procStatusBadge = {
+  completed: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
+  in_progress: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
+  planned: 'bg-gray-100 text-gray-600 dark:bg-white/10 dark:text-gray-300',
 };
 
 function todayDate() {
@@ -241,6 +248,11 @@ function DentalProcedureDetails({ clientId, appointments }) {
       <div className="mt-4 grid grid-cols-1 gap-3 md:grid-cols-4">
         <input value={form.procedureType} onChange={e => set('procedureType', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" placeholder={`${treatmentLabel} type`} />
         <input type="date" value={String(form.performedAt || '').slice(0, 10)} onChange={e => set('performedAt', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" title="Treatment date" />
+        <select value={form.status} onChange={e => set('status', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" title="Status">
+          <option value="completed">Completed</option>
+          <option value="in_progress">In progress</option>
+          <option value="planned">Planned</option>
+        </select>
         <select value={form.appointmentId || ''} onChange={e => set('appointmentId', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" title="Related appointment">
           <option value="">No linked appointment</option>
           {appointments.map(appt => <option key={appt.id} value={appt.id}>{appt.date} - {appt.service?.name || appt.serviceName || treatmentLabel}</option>)}
@@ -270,7 +282,10 @@ function DentalProcedureDetails({ clientId, appointments }) {
         ) : items.map(item => (
           <div key={item.id} className="flex flex-col gap-2 rounded-lg bg-gray-50 p-3 dark:bg-white/5 sm:flex-row sm:items-center sm:justify-between">
             <div>
-              <p className="text-sm font-bold text-gray-950 dark:text-white">{item.procedureType}{item.toothNumber ? <span className="font-normal text-gray-400"> - tooth {item.toothNumber}</span> : null}</p>
+              <p className="flex flex-wrap items-center gap-2 text-sm font-bold text-gray-950 dark:text-white">
+                <span>{item.procedureType}{item.toothNumber ? <span className="font-normal text-gray-400"> - tooth {item.toothNumber}</span> : null}</span>
+                {item.status && <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold capitalize ${procStatusBadge[item.status] || procStatusBadge.completed}`}>{String(item.status).replace('_', ' ')}</span>}
+              </p>
               <p className="text-xs text-gray-500">{String(item.performedAt || '').slice(0, 10)} - {item.staffName || doctorLabel}{item.followUpDate ? ` - follow-up ${item.followUpDate}` : ''}</p>
             </div>
             <button onClick={() => remove(item)} className="self-start rounded p-1 text-gray-400 hover:bg-rose-50 hover:text-rose-600 sm:self-center"><Trash2 className="h-3.5 w-3.5" /></button>

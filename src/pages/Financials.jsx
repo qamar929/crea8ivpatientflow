@@ -261,6 +261,16 @@ export default function Financials() {
                 {branches.map(branch => <option key={branch.id} value={branch.id}>{branch.name}</option>)}
               </select>
             </div>
+            {categories.length > 0 && (
+              <div className="flex flex-wrap gap-1.5">
+                {categories.map(cat => (
+                  <button type="button" key={cat.id} onClick={() => setExpenseForm({ ...expenseForm, categoryId: cat.id })}
+                    className={`rounded-full border px-3 py-1 text-xs font-bold transition-colors ${String(expenseForm.categoryId) === String(cat.id) ? 'border-transparent bg-[var(--primary)] text-white' : 'border-gray-200 text-gray-500 hover:border-[var(--primary)] hover:text-[var(--primary)] dark:border-white/10 dark:text-gray-400'}`}>
+                    {cat.name}
+                  </button>
+                ))}
+              </div>
+            )}
             <div className="flex gap-2">
               <input value={newCategory} onChange={e => setNewCategory(e.target.value)} className="min-w-0 flex-1 rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" placeholder="New category" />
               <Button variant="secondary" size="sm" onClick={addCategory} disabled={saving || !newCategory.trim()}><Plus className="h-4 w-4" /> Add</Button>
