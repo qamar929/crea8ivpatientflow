@@ -267,7 +267,10 @@ export default function Financials() {
             </div>
             <input value={expenseForm.description} onChange={e => setExpenseForm({ ...expenseForm, description: e.target.value })} className="w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" placeholder="Description, e.g. electricity bill" />
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-              <input type="number" min="0" value={expenseForm.amount} onChange={e => setExpenseForm({ ...expenseForm, amount: e.target.value })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" placeholder="Amount" />
+              <div className="relative">
+                <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-xs font-bold text-gray-400">PKR</span>
+                <input type="number" min="0" value={expenseForm.amount} onChange={e => setExpenseForm({ ...expenseForm, amount: e.target.value })} className="w-full rounded-lg border border-gray-200 pl-11 pr-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" placeholder="Amount" />
+              </div>
               <input type="date" value={expenseForm.expenseDate} onChange={e => setExpenseForm({ ...expenseForm, expenseDate: e.target.value })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" />
               <select value={expenseForm.paymentMethod} onChange={e => setExpenseForm({ ...expenseForm, paymentMethod: e.target.value })} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900">
                 {['Cash', 'Card', 'Bank Transfer', 'JazzCash', 'EasyPaisa', 'Other'].map(method => <option key={method}>{method}</option>)}
@@ -312,23 +315,44 @@ export default function Financials() {
           <select value={selectedInvoiceId} onChange={e => setSelectedInvoiceId(e.target.value)} className="mt-4 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900">
             {transactions.map(txn => <option key={txn.id} value={txn.id}>{txn.invoiceNo} - {txn.client?.name || patientLabel}</option>)}
           </select>
+          {procedureRows.length > 0 && (() => {
+            const tRev = procedureRows.reduce((s, r) => s + Number(r.patientCharge || 0), 0);
+            const tCost = procedureRows.reduce((s, r) => s + Number(r.procedureCost || 0), 0);
+            const tProfit = tRev - tCost;
+            const tMargin = tRev > 0 ? Math.round((tProfit / tRev) * 100) : 0;
+            return (
+              <div className="mt-4 grid grid-cols-3 gap-2 rounded-xl bg-gray-50 p-3 text-center dark:bg-white/5">
+                <div><p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Revenue</p><p className="mt-0.5 text-sm font-black text-gray-900 dark:text-white">{money(tRev)}</p></div>
+                <div><p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Cost</p><p className="mt-0.5 text-sm font-black text-rose-600">{money(tCost)}</p></div>
+                <div><p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Profit</p><p className={`mt-0.5 text-sm font-black ${tProfit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{money(tProfit)} <span className="text-[10px] font-semibold text-gray-400">({tMargin}%)</span></p></div>
+              </div>
+            );
+          })()}
           <div className="mt-4 space-y-3">
-            {procedureRows.map((row, index) => (
+            {procedureRows.map((row, index) => {
+              const charge = Number(row.patientCharge || 0);
+              const cost = Number(row.procedureCost || 0);
+              const profit = charge - cost;
+              const margin = charge > 0 ? Math.round((profit / charge) * 100) : 0;
+              const fieldCls = 'w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900';
+              const labelCls = 'mb-1 block text-[10px] font-bold uppercase tracking-wide text-gray-400';
+              return (
               <div key={row.invoiceItemIndex} className="rounded-lg border border-gray-100 p-3 dark:border-white/10">
                 <div className="mb-3 flex items-start justify-between gap-3">
                   <div>
                     <p className="text-sm font-bold text-gray-950 dark:text-white">{row.description}</p>
-                    <p className="text-xs text-gray-400">Net profit: {money(Number(row.patientCharge || 0) - Number(row.procedureCost || 0))}</p>
+                    <p className="text-xs"><span className="text-gray-400">Net profit: </span><span className={`font-bold ${profit >= 0 ? 'text-emerald-600' : 'text-rose-600'}`}>{money(profit)}</span> <span className="text-gray-400">· {margin}% margin</span></p>
                   </div>
                   <Button size="sm" variant="secondary" onClick={() => saveProcedureCost(row)} disabled={saving}><Save className="h-4 w-4" /> Save</Button>
                 </div>
                 <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                  <input type="number" min="0" value={row.patientCharge} onChange={e => setProcedureRows(rows => rows.map((r, i) => i === index ? { ...r, patientCharge: e.target.value } : r))} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" title="Patient charge" />
-                  <input type="number" min="0" value={row.procedureCost} onChange={e => setProcedureRows(rows => rows.map((r, i) => i === index ? { ...r, procedureCost: e.target.value } : r))} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" title="Internal procedure cost" />
-                  <input value={row.notes || ''} onChange={e => setProcedureRows(rows => rows.map((r, i) => i === index ? { ...r, notes: e.target.value } : r))} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" placeholder="Cost notes" />
+                  <label className="block"><span className={labelCls}>Patient charge (PKR)</span><input type="number" min="0" value={row.patientCharge} onChange={e => setProcedureRows(rows => rows.map((r, i) => i === index ? { ...r, patientCharge: e.target.value } : r))} className={fieldCls} placeholder="0" /></label>
+                  <label className="block"><span className={labelCls}>Internal cost (PKR)</span><input type="number" min="0" value={row.procedureCost} onChange={e => setProcedureRows(rows => rows.map((r, i) => i === index ? { ...r, procedureCost: e.target.value } : r))} className={fieldCls} placeholder="0" /></label>
+                  <label className="block"><span className={labelCls}>Cost notes</span><input value={row.notes || ''} onChange={e => setProcedureRows(rows => rows.map((r, i) => i === index ? { ...r, notes: e.target.value } : r))} className={fieldCls} placeholder="e.g. lab + materials" /></label>
                 </div>
               </div>
-            ))}
+              );
+            })}
             {procedureRows.length === 0 && <EmptyState icon={Receipt} title="No invoice selected" body="Create invoices first, then record internal costs here." />}
           </div>
         </div>
