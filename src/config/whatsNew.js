@@ -6,6 +6,22 @@
 // id MUST be unique & stable (changing it re-shows the item). Newest first.
 export const WHATS_NEW = [
   {
+    id: 'procedure-status-2026-06-29',
+    date: '2026-06-29',
+    tag: 'New',
+    title: 'Procedure status tracking',
+    body: 'Mark each dental procedure as Planned, In progress or Completed — shown as a colour-coded badge in the patient profile.',
+    href: '/clients',
+  },
+  {
+    id: 'financials-margins-2026-06-29',
+    date: '2026-06-29',
+    tag: 'Improved',
+    title: 'Procedure profit at a glance',
+    body: 'Procedure Cost Tracking now labels the Patient charge / Internal cost fields, shows profit margin % per item and a Revenue / Cost / Profit summary. Add Expense gained a PKR prefix and quick category chips.',
+    href: '/financials',
+  },
+  {
     id: 'financials-expenses-2026-06-28',
     date: '2026-06-28',
     tag: 'New',
