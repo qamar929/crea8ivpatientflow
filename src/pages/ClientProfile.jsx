@@ -74,6 +74,7 @@ function PatientDocuments({ clientId }) {
 }
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
+import ToothPicker from '../components/clinical/ToothPicker';
 
 const money = (value) => `PKR ${Number(value || 0).toLocaleString()}`;
 
@@ -260,8 +261,12 @@ function DentalProcedureDetails({ clientId, appointments }) {
         <input type="date" value={form.followUpDate} onChange={e => set('followUpDate', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" title="Follow-up date" />
       </div>
 
+      {visibleFields.includes('toothNumber') && (
+        <div className="mt-3"><ToothPicker value={form.toothNumber} onChange={v => set('toothNumber', v)} /></div>
+      )}
+
       <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-4">
-        {visibleFields.includes('toothNumber') && <input value={form.toothNumber} onChange={e => set('toothNumber', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" placeholder="Tooth number" />}
+        {visibleFields.includes('toothNumber') && <input value={form.toothNumber} onChange={e => set('toothNumber', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" placeholder="Tooth number (or pick above)" />}
         {visibleFields.includes('jaw') && <select value={form.jaw} onChange={e => set('jaw', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900"><option value="">Jaw</option><option>Upper</option><option>Lower</option></select>}
         {visibleFields.includes('side') && <select value={form.side} onChange={e => set('side', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900"><option value="">Side</option><option>Left</option><option>Right</option></select>}
         {visibleFields.includes('canalType') && <input value={form.canalType} onChange={e => set('canalType', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" placeholder="Canal type" />}

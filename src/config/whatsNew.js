@@ -6,6 +6,14 @@
 // id MUST be unique & stable (changing it re-shows the item). Newest first.
 export const WHATS_NEW = [
   {
+    id: 'tooth-picker-2026-06-29',
+    date: '2026-06-29',
+    tag: 'New',
+    title: 'Visual tooth chart (FDI)',
+    body: 'On the patient profile, pick the tooth from an interactive FDI dental chart instead of typing a number — the selected tooth highlights and fills the field automatically.',
+    href: '/clients',
+  },
+  {
     id: 'procedure-status-2026-06-29',
     date: '2026-06-29',
     tag: 'New',
