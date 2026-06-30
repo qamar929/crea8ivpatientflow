@@ -1,0 +1,34 @@
+Proprietary Software License
+
+Copyright (c) 2026 Crea8iv Media. All rights reserved.
+
+Crea8iv PatientFlow ("the Software") and all associated source code,
+documentation, designs, and assets in this repository are the proprietary and
+confidential property of Crea8iv Media.
+
+NO LICENSE IS GRANTED. Unless you have a separate, explicit, written agreement
+with Crea8iv Media, you may NOT:
+
+  - copy, reproduce, or distribute the Software or any portion of it;
+  - modify, adapt, translate, or create derivative works from it;
+  - use it for any commercial or non-commercial purpose;
+  - sublicense, sell, rent, lease, or otherwise transfer rights to it;
+  - reverse engineer, decompile, or disassemble it, except to the extent that
+    such restriction is expressly prohibited by applicable law.
+
+Authorized contributors and reviewers are granted access solely for the purpose
+of developing, maintaining, auditing, or evaluating the Software on behalf of
+Crea8iv Media, and remain bound by the confidentiality terms of their engagement.
+
+The Software handles clinic and patient data. Any access to such data is granted
+strictly for the purposes above and must comply with all applicable privacy and
+data-protection obligations.
+
+THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS
+FOR A PARTICULAR PURPOSE, AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR
+COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER LIABILITY, WHETHER
+IN AN ACTION OF CONTRACT, TORT, OR OTHERWISE, ARISING FROM, OUT OF, OR IN
+CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+
+For licensing inquiries, contact Crea8iv Media.
