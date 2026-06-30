@@ -1,5 +1,6 @@
 node_modules/
 dist/
+build/
 .env
 .env.*
 !.env.example
@@ -7,6 +8,17 @@ dist/
 .DS_Store
 .claude/
 *.zip
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*~
+
+# Logs & coverage
+*.log
+coverage/
+.nyc_output/
 
 # Runtime data, logs, local databases, and patient uploads must never be added
 # to source control. Existing tracked artifacts still need a deliberate
