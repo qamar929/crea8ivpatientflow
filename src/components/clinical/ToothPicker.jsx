@@ -5,18 +5,39 @@ import clsx from 'clsx';
 const UPPER = [18, 17, 16, 15, 14, 13, 12, 11, 21, 22, 23, 24, 25, 26, 27, 28];
 const LOWER = [48, 47, 46, 45, 44, 43, 42, 41, 31, 32, 33, 34, 35, 36, 37, 38];
 
-// Clickable dental chart. Sets the tooth number (FDI) for the selected procedure.
+// Parse the stored comma-separated value into an ordered list of tooth strings.
+const parse = (value) =>
+  String(value || '')
+    .split(',')
+    .map((t) => t.trim())
+    .filter(Boolean);
+
+// Clickable dental chart. Supports selecting multiple teeth (FDI), stored as a
+// comma-separated string so it stays compatible with the plain text field.
 export default function ToothPicker({ value, onChange }) {
+  const selected = parse(value);
+  const has = (n) => selected.includes(String(n));
+
+  const toggle = (n) => {
+    const key = String(n);
+    const next = has(n) ? selected.filter((t) => t !== key) : [...selected, key];
+    // Keep teeth ordered by their position across both arches for a tidy label.
+    const order = [...UPPER, ...LOWER].map(String);
+    next.sort((a, b) => order.indexOf(a) - order.indexOf(b));
+    onChange(next.join(', '));
+  };
+
   const Tooth = ({ n }) => {
-    const selected = String(value) === String(n);
+    const isOn = has(n);
     return (
       <button
         type="button"
         title={`Tooth ${n}`}
-        onClick={() => onChange(selected ? '' : String(n))}
+        aria-pressed={isOn}
+        onClick={() => toggle(n)}
         className={clsx(
           'h-7 w-7 shrink-0 rounded-md border text-[10px] font-bold transition-colors',
-          selected
+          isOn
             ? 'border-transparent bg-[var(--primary)] text-white shadow'
             : 'border-gray-200 bg-white text-gray-500 hover:border-[var(--primary)] hover:text-[var(--primary)] dark:border-white/10 dark:bg-slate-900 dark:text-gray-400'
         )}
@@ -36,9 +57,22 @@ export default function ToothPicker({ value, onChange }) {
 
   return (
     <div className="rounded-lg border border-gray-100 bg-gray-50 p-3 dark:border-white/10 dark:bg-white/5">
-      <div className="mb-2 flex items-center justify-between">
+      <div className="mb-2 flex items-center justify-between gap-2">
         <p className="text-[10px] font-bold uppercase tracking-wide text-gray-400">Select tooth (FDI chart)</p>
-        <p className="text-[11px] font-semibold text-gray-500 dark:text-gray-300">{value ? `Tooth ${value}` : 'None selected'}</p>
+        <div className="flex items-center gap-2">
+          <p className="text-[11px] font-semibold text-gray-500 dark:text-gray-300">
+            {selected.length ? `${selected.length} selected · ${selected.join(', ')}` : 'None selected'}
+          </p>
+          {selected.length > 0 && (
+            <button
+              type="button"
+              onClick={() => onChange('')}
+              className="text-[10px] font-bold uppercase tracking-wide text-gray-400 hover:text-[var(--primary)]"
+            >
+              Clear
+            </button>
+          )}
+        </div>
       </div>
       <div className="overflow-x-auto">
         <div className="mx-auto w-max space-y-1.5">

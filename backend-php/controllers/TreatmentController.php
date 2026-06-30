@@ -120,7 +120,13 @@ class TreatmentController {
             WHERE td.clinicId = ? AND td.clientId = ? AND td.archivedAt IS NULL
             ORDER BY td.performedAt DESC, td.createdAt DESC");
         $stmt->execute([$user['clinicId'], $clientId]);
-        send_json($stmt->fetchAll());
+        $rows = $stmt->fetchAll();
+        $canSeeCost = pf_can_manage_procedure_costs($user);
+        if (!$canSeeCost) {
+            foreach ($rows as &$row) { unset($row['cost']); }
+            unset($row);
+        }
+        send_json(['items' => $rows, 'canManageCost' => $canSeeCost]);
     }
 
     public function createDetail($input, $user, $clientId) {
@@ -152,10 +158,12 @@ class TreatmentController {
         $statusAllowed = ['planned', 'in_progress', 'completed'];
         $status = in_array($input['status'] ?? '', $statusAllowed, true) ? $input['status'] : 'completed';
 
+        $cost = pf_can_manage_procedure_costs($user) ? max(0, floatval($input['cost'] ?? 0)) : 0;
+
         $id = generate_uuid();
         $stmt = $db->prepare("INSERT INTO TreatmentProcedureDetail
-            (id, clinicId, clientId, appointmentId, invoiceId, serviceId, staffId, procedureType, toothNumber, jaw, side, canalType, extractionType, crownMaterial, notes, followUpDate, performedAt, status, createdBy)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
+            (id, clinicId, clientId, appointmentId, invoiceId, serviceId, staffId, procedureType, toothNumber, jaw, side, canalType, extractionType, crownMaterial, notes, followUpDate, performedAt, status, cost, createdBy)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)");
         $stmt->execute([
             $id, $user['clinicId'], $clientId, $appointmentId, $invoiceId, $serviceId, $staffId, $procedureType,
             trim((string)($input['toothNumber'] ?? $input['tooth'] ?? '')) ?: null,
@@ -168,6 +176,7 @@ class TreatmentController {
             pf_valid_date($input['followUpDate'] ?? '') ? $input['followUpDate'] : null,
             $performedAt,
             $status,
+            $cost,
             $user['id'] ?? null
         ]);
         log_audit($user['clinicId'], $user['id'] ?? null, 'treatment_detail_created', 'TreatmentProcedureDetail', $id, null, ['procedureType' => $procedureType]);
@@ -193,6 +202,10 @@ class TreatmentController {
                 $fields[] = "$key = ?";
                 $params[] = $value === '' ? null : $value;
             }
+        }
+        if (array_key_exists('cost', $input) && pf_can_manage_procedure_costs($user)) {
+            $fields[] = "cost = ?";
+            $params[] = max(0, floatval($input['cost']));
         }
         if (!$fields) send_error('No fields to update', 400);
         $params[] = $id; $params[] = $user['clinicId'];

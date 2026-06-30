@@ -173,6 +173,7 @@ const emptyProcedure = {
   canalType: '',
   extractionType: '',
   crownMaterial: '',
+  cost: '',
   notes: '',
   followUpDate: '',
   status: 'completed',
@@ -194,11 +195,15 @@ function DentalProcedureDetails({ clientId, appointments }) {
   const treatmentLabel = term('treatment', 'Treatment');
   const doctorLabel = term('doctor', 'Doctor');
   const [items, setItems] = useState(null);
+  const [canManageCost, setCanManageCost] = useState(false);
   const [form, setForm] = useState(emptyProcedure);
   const [err, setErr] = useState('');
   const [busy, setBusy] = useState(false);
 
-  const load = () => fetchApi(`/clients/${clientId}/treatment-details`).then(setItems).catch(e => setErr(e.message));
+  const load = () => fetchApi(`/clients/${clientId}/treatment-details`).then(res => {
+    setItems(res.items || []);
+    setCanManageCost(!!res.canManageCost);
+  }).catch(e => setErr(e.message));
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [clientId]);
 
   const visibleFields = procedurePresets[form.procedureType] || ['toothNumber', 'notes'];
@@ -266,12 +271,13 @@ function DentalProcedureDetails({ clientId, appointments }) {
       )}
 
       <div className="mt-3 grid grid-cols-1 gap-3 md:grid-cols-4">
-        {visibleFields.includes('toothNumber') && <input value={form.toothNumber} onChange={e => set('toothNumber', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" placeholder="Tooth number (or pick above)" />}
+        {visibleFields.includes('toothNumber') && <input value={form.toothNumber} onChange={e => set('toothNumber', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" placeholder="Tooth number(s) — comma separated (or pick above)" />}
         {visibleFields.includes('jaw') && <select value={form.jaw} onChange={e => set('jaw', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900"><option value="">Jaw</option><option>Upper</option><option>Lower</option></select>}
         {visibleFields.includes('side') && <select value={form.side} onChange={e => set('side', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900"><option value="">Side</option><option>Left</option><option>Right</option></select>}
         {visibleFields.includes('canalType') && <input value={form.canalType} onChange={e => set('canalType', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" placeholder="Canal type" />}
         {visibleFields.includes('extractionType') && <input value={form.extractionType} onChange={e => set('extractionType', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" placeholder="Extraction type" />}
         {visibleFields.includes('crownMaterial') && <input value={form.crownMaterial} onChange={e => set('crownMaterial', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" placeholder="Crown material" />}
+        {canManageCost && <input type="number" min="0" step="any" inputMode="decimal" value={form.cost} onChange={e => set('cost', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" placeholder="Cost (PKR)" title="Cost charged for this procedure" />}
         <input value={form.notes} onChange={e => set('notes', e.target.value)} className="rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900 md:col-span-2" placeholder="Clinical notes" />
       </div>
 
@@ -290,6 +296,7 @@ function DentalProcedureDetails({ clientId, appointments }) {
               <p className="flex flex-wrap items-center gap-2 text-sm font-bold text-gray-950 dark:text-white">
                 <span>{item.procedureType}{item.toothNumber ? <span className="font-normal text-gray-400"> - tooth {item.toothNumber}</span> : null}</span>
                 {item.status && <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold capitalize ${procStatusBadge[item.status] || procStatusBadge.completed}`}>{String(item.status).replace('_', ' ')}</span>}
+                {canManageCost && Number(item.cost) > 0 && <span className="rounded-full bg-[var(--primary)]/10 px-2 py-0.5 text-[10px] font-bold text-[var(--primary)]">{money(item.cost)}</span>}
               </p>
               <p className="text-xs text-gray-500">{String(item.performedAt || '').slice(0, 10)} - {item.staffName || doctorLabel}{item.followUpDate ? ` - follow-up ${item.followUpDate}` : ''}</p>
             </div>
