@@ -1,11 +1,29 @@
 <?php
+/**
+ * Crea8iv PatientFlow API — front controller.
+ *
+ * Every API request enters here. The pipeline is:
+ *   1. CORS          — cors_origin_allowed() sets Access-Control-* headers.
+ *   2. Auth resolve  — check_auth() decodes the Bearer JWT into $user (or null).
+ *   3. Route match   — the path is matched against the route table below; each
+ *                      row is [METHOD, PATTERN(regex), Controller, action, guard].
+ *   4. Guard         — false=public, 'auth'=any user, true=active tenant,
+ *                      'admin'=super-admin, 'client'=client portal,
+ *                      [roles...]=tenant + one of the listed roles. Tenant routes
+ *                      also pass through require_package_feature() for plan gating.
+ *   5. Dispatch      — the controller action runs and emits JSON.
+ *
+ * See PROJECT_DOCUMENTATION.md ("Request Flow") for the full description.
+ */
 require_once __DIR__ . '/config.php';
 require_once __DIR__ . '/db.php';
 require_once __DIR__ . '/helpers.php';
 require_once __DIR__ . '/services/packageService.php';
 
-// Handle CORS — allowlist: portal, marketing website, and any
-// tenant subdomain of crea8ivpatientflow.com (wildcard SaaS domains)
+// Handle CORS — allowlist: the configured portal/website origins, localhost dev,
+// the platform domain crea8ivmedia.com and its subdomains (legacy
+// crea8ivpatientflow.com kept during transition), plus any clinic's registered
+// custom domain (and its parent) for white-label portals and booking widgets.
 function cors_origin_allowed($origin) {
     if ($origin === '') return false;
     $allowed = array_filter([
