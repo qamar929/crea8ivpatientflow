@@ -6,7 +6,8 @@ import {
 import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
-import { fetchApi, API_URL } from '../config/api';
+import { fetchApi, API_URL, peekApiCacheByPrefix } from '../config/api';
+import { TableSkeleton, CardGridSkeleton } from '../components/ui/Skeleton';
 import { useClinic } from '../context/ClinicContext';
 
 const money = (value = 0) => `PKR ${Number(value || 0).toLocaleString()}`;
@@ -42,7 +43,7 @@ export default function Financials() {
   const { term } = useClinic();
   const serviceLabel = term('service', 'Service');
   const patientLabel = term('patient', 'Patient');
-  const [summary, setSummary] = useState(null);
+  const [summary, setSummary] = useState(() => peekApiCacheByPrefix('/financials/summary') ?? null);
   const [monthly, setMonthly] = useState([]);
   const [transactions, setTransactions] = useState([]);
   const [expenses, setExpenses] = useState([]);
@@ -180,7 +181,7 @@ export default function Financials() {
   };
 
   if (loading && !summary) {
-    return <div className="flex items-center justify-center gap-2 py-16 text-sm text-gray-500"><Loader2 className="h-4 w-4 animate-spin" /> Loading financials...</div>;
+    return <div className="space-y-4"><CardGridSkeleton count={4} /><TableSkeleton rows={6} cols={4} /></div>;
   }
 
   const chartData = monthly.length ? monthly.slice(-8) : [{ month: 'No data', revenue: 0, expenses: 0, grossProfit: 0, netProfit: 0 }];

@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Users, Search, Grid, List, Plus, Phone, Mail, BadgeDollarSign, Loader2, Pencil, Trash2, Save } from 'lucide-react';
-import { fetchApi } from '../config/api';
+import { fetchApi, peekApiCacheByPrefix } from '../config/api';
+import { TableSkeleton } from '../components/ui/Skeleton';
 import { useClinic } from '../context/ClinicContext';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
@@ -199,7 +200,12 @@ export default function Clients() {
   const [statusFilter, setStatusFilter] = useState('all');
   const [tierFilter, setTierFilter] = useState('all');
   const [viewMode, setViewMode] = useState('grid');
-  const [clients, setClients] = useState([]);
+  // Seed from the last-seen cached list so a revisit renders instantly while the
+  // fresh data loads in the background (stale-while-revalidate).
+  const [clients, setClients] = useState(() => {
+    const c = peekApiCacheByPrefix('/clients');
+    return Array.isArray(c) ? c : (c?.clients ?? c?.data ?? []);
+  });
   const [pagination, setPagination] = useState({ total: 0, page: 1, pages: 1, limit: 50 });
   const [loading, setLoading] = useState(true);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -281,12 +287,9 @@ export default function Clients() {
     setPagination(current => ({ ...current, page: Math.min(Math.max(1, nextPage), current.pages || 1) }));
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 text-indigo-500 animate-spin" />
-      </div>
-    );
+  // Only show the skeleton on a true cold load (no cached data to show yet).
+  if (loading && clients.length === 0) {
+    return <div className="space-y-4"><TableSkeleton rows={8} cols={6} /></div>;
   }
 
   return (

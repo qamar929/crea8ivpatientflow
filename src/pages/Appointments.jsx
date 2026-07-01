@@ -4,7 +4,8 @@ import { useNavigate } from 'react-router-dom';
 import { Calendar, momentLocalizer } from 'react-big-calendar';
 import moment from 'moment';
 import 'react-big-calendar/lib/css/react-big-calendar.css';
-import { fetchApi } from '../config/api';
+import { fetchApi, peekApiCacheByPrefix } from '../config/api';
+import { TableSkeleton } from '../components/ui/Skeleton';
 import { useClinic } from '../context/ClinicContext';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
@@ -344,7 +345,10 @@ function RescheduleModal({ appt, onClose, onDone, term }) {
 export default function Appointments() {
   const { term } = useClinic();
   const navigate = useNavigate();
-  const [appointments, setAppointments] = useState([]);
+  const [appointments, setAppointments] = useState(() => {
+    const c = peekApiCacheByPrefix('/appointments');
+    return Array.isArray(c) ? c : (c?.appointments ?? []);
+  });
   const [clients, setClients] = useState([]);
   const [staff, setStaff] = useState([]);
   const [services, setServices] = useState([]);
@@ -493,8 +497,8 @@ export default function Appointments() {
     },
   ];
 
-  if (loading) {
-    return <div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 text-indigo-500 animate-spin" /></div>;
+  if (loading && appointments.length === 0) {
+    return <div className="space-y-4"><TableSkeleton rows={8} cols={6} /></div>;
   }
 
   return (

@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CheckCircle, Download, Edit2, Eye, Loader2, MessageCircle, Plus, Receipt, RefreshCcw, Search, Trash2, Undo2, UserRound } from 'lucide-react';
-import { API_URL, fetchApi } from '../config/api';
+import { API_URL, fetchApi, peekApiCacheByPrefix } from '../config/api';
+import { TableSkeleton, CardGridSkeleton } from '../components/ui/Skeleton';
 import { useClinic } from '../context/ClinicContext';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
@@ -289,7 +290,10 @@ export default function Invoices() {
   const canAdminInvoice = canManageInvoiceAdmin();
   const { term } = useClinic();
   const patientLabel = term('patient', 'Patient');
-  const [invoices, setInvoices] = useState([]);
+  const [invoices, setInvoices] = useState(() => {
+    const c = peekApiCacheByPrefix('/invoices');
+    return Array.isArray(c) ? c : (c?.invoices ?? []);
+  });
   const [clients, setClients] = useState([]);
   const [services, setServices] = useState([]);
   const [appointments, setAppointments] = useState([]);
@@ -522,8 +526,8 @@ export default function Invoices() {
       </div>
 
       <div className="overflow-hidden rounded-xl border border-gray-100 bg-white shadow-sm dark:border-white/10 dark:bg-slate-900">
-        {loading ? (
-          <div className="flex items-center justify-center gap-2 py-16 text-sm text-gray-500"><Loader2 className="h-4 w-4 animate-spin" /> Loading invoices...</div>
+        {loading && filtered.length === 0 ? (
+          <div className="p-2"><TableSkeleton rows={8} cols={9} /></div>
         ) : filtered.length === 0 ? (
           <div className="py-16 text-center"><Receipt className="mx-auto mb-3 h-10 w-10 text-gray-300" /><p className="text-sm font-semibold text-gray-700 dark:text-gray-200">No invoices found</p><p className="mt-1 text-xs text-gray-400">Create a real invoice. Demo invoice mode has been removed.</p></div>
         ) : (

@@ -5,11 +5,31 @@ export function appPath(path) {
   return `${APP_BASE}${path.startsWith('/') ? path : `/${path}`}` || '/';
 }
 
+// ---------------------------------------------------------------------------
+// Stale-while-revalidate cache for GET responses.
+// Pages seed their initial state from peekApiCache(endpoint) so a revisited
+// screen renders INSTANTLY from the last-seen data, while fetchApi refreshes it
+// in the background. In-memory only (per tab) — cleared on logout.
+// ---------------------------------------------------------------------------
+const _apiCache = new Map();
+export function peekApiCache(endpoint) {
+  return _apiCache.has(endpoint) ? _apiCache.get(endpoint) : undefined;
+}
+// Most-recent cached response whose endpoint starts with `prefix` — lets a page
+// seed from its last-seen list even if the exact query (page/search/filter) differs.
+export function peekApiCacheByPrefix(prefix) {
+  let found;
+  for (const [key, value] of _apiCache) { if (key.startsWith(prefix)) found = value; }
+  return found;
+}
+export function clearApiCache() { _apiCache.clear(); }
+
 function clearSession() {
   localStorage.removeItem('clinic_auth');
   localStorage.removeItem('clinic_token');
   localStorage.removeItem('clinic_refresh');
   localStorage.removeItem('clinic_user');
+  clearApiCache();
 }
 
 // Single in-flight refresh shared by concurrent 401s
@@ -95,6 +115,10 @@ export async function fetchApi(endpoint, options = {}) {
     }
     throw new Error(data.message || data.error || 'API request failed');
   }
+
+  // Cache successful GET responses so the next visit can render instantly.
+  const method = (options.method || 'GET').toUpperCase();
+  if (method === 'GET') _apiCache.set(endpoint, data);
 
   return data;
 }

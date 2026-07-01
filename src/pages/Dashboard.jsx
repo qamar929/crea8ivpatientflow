@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Archive, Bot, Building2, Calendar, Database, DollarSign, Facebook, FileBarChart, FlaskConical, Image, LifeBuoy, Loader2, Megaphone, MessageCircle, MessageSquare, Package, Receipt, Settings, Shield, Stethoscope, Users, UserCheck, WalletCards } from 'lucide-react';
-import { fetchApi } from '../config/api';
+import { fetchApi, peekApiCacheByPrefix } from '../config/api';
+import { CardGridSkeleton, TableSkeleton } from '../components/ui/Skeleton';
 import { useClinic } from '../context/ClinicContext';
 import StatCard from '../components/ui/StatCard';
 import SetupAlert from '../components/dashboard/SetupAlert';
@@ -38,8 +39,20 @@ export default function Dashboard() {
   const { industryTemplate, term } = useClinic();
   const canSeeFinancials = canViewBusinessFinancials();
   const role = getCurrentRole();
-  const [data, setData] = useState({ appointments: [], clients: [], staff: [], services: [], invoices: [], financials: null });
+  // Seed from cached lists so returning to the dashboard renders instantly.
+  const [data, setData] = useState(() => {
+    const asArr = (v, key) => Array.isArray(v) ? v : (v?.[key] ?? []);
+    return {
+      appointments: asArr(peekApiCacheByPrefix('/appointments')),
+      clients: asArr(peekApiCacheByPrefix('/clients'), 'clients'),
+      staff: asArr(peekApiCacheByPrefix('/staff')),
+      services: asArr(peekApiCacheByPrefix('/services')),
+      invoices: asArr(peekApiCacheByPrefix('/invoices'), 'invoices'),
+      financials: peekApiCacheByPrefix('/financials/summary') ?? null,
+    };
+  });
   const [loading, setLoading] = useState(true);
+  const hasSeed = data.appointments.length > 0 || data.invoices.length > 0 || data.clients.length > 0;
 
   useEffect(() => {
     Promise.all([
@@ -67,8 +80,8 @@ export default function Dashboard() {
   const pendingInvoices = data.invoices.filter(inv => inv.status === 'pending' || inv.status === 'partial');
   const topStaff = useMemo(() => activeStaff.slice().sort((a, b) => Number(b.rating || 0) - Number(a.rating || 0)).slice(0, 5), [activeStaff]);
 
-  if (loading) {
-    return <div className="flex items-center justify-center gap-2 py-16 text-sm text-gray-500"><Loader2 className="h-4 w-4 animate-spin" /> Loading live dashboard...</div>;
+  if (loading && !hasSeed) {
+    return <div className="space-y-4"><CardGridSkeleton count={4} /><TableSkeleton rows={6} cols={4} /></div>;
   }
 
   return (

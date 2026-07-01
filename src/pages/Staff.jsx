@@ -1,6 +1,7 @@
 import { useState, useMemo, useEffect } from 'react';
 import { Star, Clock, Plus, Phone, Mail, Send, WalletCards, KeyRound, Pencil, Trash2, Save, Loader2 } from 'lucide-react';
-import { fetchApi } from '../config/api';
+import { fetchApi, peekApiCacheByPrefix } from '../config/api';
+import { TableSkeleton } from '../components/ui/Skeleton';
 import { useClinic } from '../context/ClinicContext';
 import Badge from '../components/ui/Badge';
 import Button from '../components/ui/Button';
@@ -404,7 +405,10 @@ function DeleteConfirmModal({ isOpen, onClose, onConfirm, name, deleting }) {
 export default function Staff() {
   const { clinicInfo, term } = useClinic();
   const staffLabel = term('staff', 'Staff');
-  const [staffList, setStaffList] = useState([]);
+  const [staffList, setStaffList] = useState(() => {
+    const c = peekApiCacheByPrefix('/staff');
+    return Array.isArray(c) ? c : [];
+  });
   const [loading, setLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('all');
   const [selectedStaff, setSelectedStaff] = useState(null);
@@ -478,8 +482,8 @@ export default function Staff() {
   const onDuty = staffList.filter(s => s.status === 'active').length;
   const payrollEstimate = staffList.reduce((sum, staff) => sum + (Number(staff.fixedSalary) || 0) + ((Number(staff.revenue) || 0) * (Number(staff.commissionRate) || 0)) / 100, 0);
 
-  if (loading) {
-    return <div className="flex items-center justify-center h-64"><Loader2 className="w-8 h-8 text-indigo-500 animate-spin" /></div>;
+  if (loading && staffList.length === 0) {
+    return <div className="space-y-4"><TableSkeleton rows={6} cols={4} /></div>;
   }
 
   return (
