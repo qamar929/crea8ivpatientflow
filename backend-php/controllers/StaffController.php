@@ -35,10 +35,33 @@ class StaffController {
             $params[] = $branchId;
         }
 
+        // Per-staff appointment counts + generated revenue, so the staff cards
+        // and profile show real numbers (previously these fields were never
+        // populated and always rendered 0). Correlated subqueries keyed on the
+        // indexed (clinicId, …, staffId) columns.
+        $firstOfMonth = date('Y-m-01');
         $whereSql = implode(" AND ", $where);
-        $stmt = $db->prepare("SELECT * FROM Staff WHERE $whereSql ORDER BY name ASC");
-        $stmt->execute($params);
+        $sql = "SELECT s.*,
+                    (SELECT COUNT(*) FROM Appointment a
+                       WHERE a.staffId = s.id AND a.clinicId = s.clinicId) AS appointmentsHandled,
+                    (SELECT COUNT(*) FROM Appointment a
+                       WHERE a.staffId = s.id AND a.clinicId = s.clinicId AND a.date >= ?) AS appointmentsThisMonth,
+                    (SELECT COALESCE(SUM(i.total), 0) FROM Invoice i
+                       JOIN Appointment a ON i.appointmentId = a.id
+                       WHERE a.staffId = s.id AND a.clinicId = s.clinicId) AS revenue
+                FROM Staff s WHERE $whereSql ORDER BY s.name ASC";
+        // The month subquery's placeholder comes before the WHERE params in SQL order.
+        $stmt = $db->prepare($sql);
+        $stmt->execute(array_merge([$firstOfMonth], $params));
         $staff = $stmt->fetchAll();
+
+        // Return proper JSON number types (PDO yields strings otherwise).
+        foreach ($staff as &$s) {
+            $s['appointmentsHandled'] = intval($s['appointmentsHandled']);
+            $s['appointmentsThisMonth'] = intval($s['appointmentsThisMonth']);
+            $s['revenue'] = floatval($s['revenue']);
+        }
+        unset($s);
 
         send_json($staff);
     }
