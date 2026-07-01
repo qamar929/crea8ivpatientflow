@@ -6,6 +6,8 @@
 // keys, swap in the clinic-owner session, and flag that we're impersonating.
 // Exiting restores the stashed superadmin session.
 
+import { clearApiCache } from './api';
+
 const SESSION_KEYS = ['clinic_auth', 'clinic_token', 'clinic_refresh', 'clinic_user'];
 const BACKUP_PREFIX = 'pf_admin_return__';
 const FLAG_KEY = 'pf_impersonating'; // holds the clinic name while active
@@ -32,6 +34,9 @@ export function enterImpersonation({ accessToken, refreshToken, user, clinicName
   localStorage.setItem('clinic_refresh', refreshToken);
   localStorage.setItem('clinic_user', JSON.stringify(user));
   localStorage.setItem(FLAG_KEY, clinicName || 'clinic');
+  // Identity changed — drop any cached tenant data so it can never be shown
+  // for the wrong clinic (defense-in-depth; callers also full-reload).
+  clearApiCache();
 }
 
 // Restore the superadmin session and drop the impersonation flag.
@@ -47,4 +52,5 @@ export function exitImpersonation() {
     }
   });
   localStorage.removeItem(FLAG_KEY);
+  clearApiCache();
 }
