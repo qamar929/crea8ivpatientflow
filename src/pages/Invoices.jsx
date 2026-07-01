@@ -16,8 +16,8 @@ const emptyInvoice = {
   clientId: '',
   appointmentId: '',
   items: [emptyItem],
-  discount: 0,
-  tax: 0,
+  discountMode: 'amount', // 'amount' (fixed PKR) or 'percentage'
+  discount: 0,            // interpreted per discountMode
   amountPaid: 0,
   paymentMethod: 'Cash',
   notes: '',
@@ -33,8 +33,12 @@ const normalizeItems = (items = []) => items.length ? items.map(item => ({
 
 const totalsFromForm = (form, selectedClient, editing = false) => {
   const subtotal = form.items.reduce((sum, item) => sum + Number(item.qty || 0) * Number(item.unitPrice || 0), 0);
-  const discountAmt = subtotal * Number(form.discount || 0) / 100;
-  const taxAmt = (subtotal - discountAmt) * Number(form.tax || 0) / 100;
+  const rawDiscount = Math.max(0, Number(form.discount || 0));
+  // Discount can be a fixed PKR amount or a percentage of subtotal. Never exceeds subtotal.
+  const discountAmt = form.discountMode === 'percentage'
+    ? subtotal * Math.min(100, rawDiscount) / 100
+    : Math.min(subtotal, rawDiscount);
+  const taxAmt = 0; // Tax removed from invoices.
   const total = subtotal - discountAmt + taxAmt;
   const previousBalance = editing ? Number(form.previousBalance || 0) : Number(selectedClient?.outstandingBalance || 0);
   const grandTotal = total + previousBalance;
@@ -55,15 +59,13 @@ function InvoiceFormModal({ isOpen, onClose, onSave, invoice, clients, services,
       setForm(emptyInvoice);
       return;
     }
-    const subtotal = Number(invoice.subtotal || 0);
-    const discountBase = subtotal || 1;
-    const taxBase = Math.max(1, subtotal - Number(invoice.discount || 0));
     setForm({
       clientId: invoice.clientId || '',
       appointmentId: invoice.appointmentId || '',
       items: normalizeItems(invoice.items),
-      discount: subtotal ? Number(((Number(invoice.discount || 0) / discountBase) * 100).toFixed(2)) : 0,
-      tax: subtotal ? Number(((Number(invoice.tax || 0) / taxBase) * 100).toFixed(2)) : 0,
+      // The stored discount is an amount — load it directly in amount mode.
+      discountMode: 'amount',
+      discount: Number(invoice.discount || 0),
       amountPaid: Number(invoice.amountPaid || 0),
       paymentMethod: invoice.paymentMethod || 'Cash',
       notes: invoice.notes || '',
@@ -93,12 +95,15 @@ function InvoiceFormModal({ isOpen, onClose, onSave, invoice, clients, services,
     if (!form.clientId) return alert(`${patientLabel} is required.`);
     const items = normalizeItems(form.items).filter(item => item.description && item.unitPrice >= 0);
     if (!items.length) return alert('At least one invoice item is required.');
+    // Backend expects a discount PERCENTAGE (0-100). Converting the resolved
+    // discount amount back to a percentage is exact: subtotal * (amt/subtotal*100)/100 === amt.
+    const discountPercent = totals.subtotal > 0 ? (totals.discountAmt / totals.subtotal) * 100 : 0;
     onSave({
       clientId: form.clientId,
       appointmentId: form.appointmentId || null,
       items,
-      discount: Number(form.discount || 0),
-      tax: Number(form.tax || 0),
+      discount: discountPercent,
+      tax: 0, // Tax removed.
       amountPaid: Number(form.amountPaid || 0),
       paymentMethod: form.paymentMethod,
       notes: form.notes,
@@ -166,8 +171,8 @@ function InvoiceFormModal({ isOpen, onClose, onSave, invoice, clients, services,
         </div>
 
         <div className="grid gap-4 sm:grid-cols-4">
-          <label className="text-xs font-semibold text-gray-700 dark:text-gray-200">Discount %<input type="number" min="0" className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" value={form.discount} onChange={e => set('discount', e.target.value)} /></label>
-          <label className="text-xs font-semibold text-gray-700 dark:text-gray-200">Tax %<input type="number" min="0" className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" value={form.tax} onChange={e => set('tax', e.target.value)} /></label>
+          <label className="text-xs font-semibold text-gray-700 dark:text-gray-200">Discount Type<select className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" value={form.discountMode} onChange={e => set('discountMode', e.target.value)}><option value="amount">Amount (PKR)</option><option value="percentage">Percentage (%)</option></select></label>
+          <label className="text-xs font-semibold text-gray-700 dark:text-gray-200">{form.discountMode === 'percentage' ? 'Discount %' : 'Discount (PKR)'}<input type="number" min="0" step={form.discountMode === 'percentage' ? '1' : '50'} className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" value={form.discount} onChange={e => set('discount', e.target.value)} placeholder={form.discountMode === 'percentage' ? 'e.g. 10' : 'e.g. 500'} /></label>
           <label className="text-xs font-semibold text-gray-700 dark:text-gray-200">Paid Now<input type="number" min="0" className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" value={form.amountPaid} onChange={e => set('amountPaid', e.target.value)} /></label>
           <label className="text-xs font-semibold text-gray-700 dark:text-gray-200">Method<select className="mt-1 w-full rounded-lg border border-gray-200 px-3 py-2 text-sm dark:border-white/10 dark:bg-slate-900" value={form.paymentMethod} onChange={e => set('paymentMethod', e.target.value)}><option>Cash</option><option>Card</option><option>Bank Transfer</option><option>JazzCash</option><option>EasyPaisa</option></select></label>
         </div>
@@ -178,8 +183,7 @@ function InvoiceFormModal({ isOpen, onClose, onSave, invoice, clients, services,
 
         <div className="rounded-xl bg-gray-50 p-4 text-sm dark:bg-white/5">
           <div className="flex justify-between text-gray-600"><span>Subtotal</span><span>{money(totals.subtotal)}</span></div>
-          <div className="flex justify-between text-green-600"><span>Discount</span><span>- {money(totals.discountAmt)}</span></div>
-          <div className="flex justify-between text-gray-600"><span>Tax</span><span>+ {money(totals.taxAmt)}</span></div>
+          <div className="flex justify-between text-green-600"><span>Discount{form.discountMode === 'percentage' && Number(form.discount) > 0 ? ` (${Number(form.discount)}%)` : ''}</span><span>- {money(totals.discountAmt)}</span></div>
           <div className="flex justify-between text-amber-700"><span>Previous due included</span><span>+ {money(totals.previousBalance)}</span></div>
           <div className="mt-2 flex justify-between border-t border-gray-200 pt-2 text-base font-black text-gray-900 dark:text-white"><span>Grand Total</span><span>{money(totals.grandTotal)}</span></div>
           <div className="flex justify-between text-red-600"><span>Balance Due</span><span>{money(totals.balanceDue)}</span></div>
@@ -237,7 +241,7 @@ function InvoiceDetailModal({ invoice, isOpen, onClose, onMarkPaid, onRefund, on
         <div className="space-y-2 border-t border-gray-100 pt-4 dark:border-white/10">
           <div className="flex justify-between text-sm text-gray-600"><span>Subtotal</span><span>{money(invoice.subtotal)}</span></div>
           <div className="flex justify-between text-sm text-green-600"><span>Discount</span><span>- {money(invoice.discount)}</span></div>
-          <div className="flex justify-between text-sm text-gray-600"><span>Tax</span><span>+ {money(invoice.tax)}</span></div>
+          {Number(invoice.tax) > 0 && <div className="flex justify-between text-sm text-gray-600"><span>Tax</span><span>+ {money(invoice.tax)}</span></div>}
           <div className="flex justify-between text-sm text-amber-700"><span>Previous due</span><span>+ {money(invoice.previousBalance)}</span></div>
           <div className="flex justify-between border-t border-gray-200 pt-2 text-lg font-black text-gray-950 dark:text-white"><span>Grand Total</span><span>{money(invoice.grandTotal)}</span></div>
           <div className="flex justify-between text-sm text-green-700"><span>Amount paid</span><span>{money(invoice.amountPaid)}</span></div>
