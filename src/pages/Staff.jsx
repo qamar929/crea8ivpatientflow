@@ -36,8 +36,24 @@ function StaffDetailModal({ staff, onClose }) {
   const staffLabel = term('staff', 'Staff');
   const appointmentsLabel = term('appointments', 'appointments');
   const patientLabel = term('patient', 'patient');
+
+  // Live performance stats (appointment counts + revenue) come from a dedicated
+  // endpoint — the /staff list doesn't carry them, so fetch on open.
+  const [perf, setPerf] = useState(null);
+  useEffect(() => {
+    if (!staff?.id) { setPerf(null); return; }
+    let alive = true;
+    fetchApi(`/staff/${staff.id}/performance`)
+      .then((d) => { if (alive) setPerf(d); })
+      .catch(() => { if (alive) setPerf(null); });
+    return () => { alive = false; };
+  }, [staff?.id]);
+
   if (!staff) return null;
   const commissionRates = parseCommissionRates(staff.treatmentCommissionRates);
+  const monthAppointments = perf?.monthAppointments ?? staff.appointmentsThisMonth ?? 0;
+  const allAppointments = perf?.allAppointments ?? staff.appointmentsHandled ?? 0;
+  const staffRevenue = perf?.revenue ?? staff.revenue ?? 0;
 
   return (
     <Modal isOpen={!!staff} onClose={onClose} title={`${staffLabel} Profile`} size="lg">
@@ -124,7 +140,7 @@ function StaffDetailModal({ staff, onClose }) {
               </div>
               <div>
                 <p className="text-emerald-700/70">Month estimate</p>
-                <p className="font-bold text-emerald-950 dark:text-emerald-100">{money((staff.fixedSalary || 0) + ((staff.revenue || 0) * (staff.commissionRate || 0)) / 100)}</p>
+                <p className="font-bold text-emerald-950 dark:text-emerald-100">{money((staff.fixedSalary || 0) + (staffRevenue * (staff.commissionRate || 0)) / 100)}</p>
               </div>
             </div>
             <div className="mt-3 flex flex-wrap gap-1.5">
@@ -149,9 +165,9 @@ function StaffDetailModal({ staff, onClose }) {
 
         <div className="grid grid-cols-3 gap-3">
           {[
-            { label: 'This Month', value: staff.appointmentsThisMonth || 0, sub: appointmentsLabel.toLowerCase(), color: 'text-indigo-600' },
-            { label: 'All Time', value: staff.appointmentsHandled || 0, sub: 'total handled', color: 'text-gray-900 dark:text-white' },
-            { label: 'Revenue', value: `PKR ${((staff.revenue || 0) / 1000000).toFixed(1)}M`, sub: 'generated', color: 'text-emerald-600' },
+            { label: 'This Month', value: monthAppointments, sub: appointmentsLabel.toLowerCase(), color: 'text-indigo-600' },
+            { label: 'All Time', value: allAppointments, sub: 'total handled', color: 'text-gray-900 dark:text-white' },
+            { label: 'Revenue', value: `PKR ${(staffRevenue / 1000000).toFixed(1)}M`, sub: 'generated', color: 'text-emerald-600' },
           ].map(s => (
             <div key={s.label} className="bg-gray-50 dark:bg-white/5 rounded-xl p-3 text-center">
               <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-1">{s.label}</p>
