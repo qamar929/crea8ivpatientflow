@@ -230,6 +230,7 @@ CREATE TABLE `Appointment` (
   PRIMARY KEY (`id`),
   KEY `IX_Appt_Clinic_Date_Status_Staff` (`clinicId`, `date`, `status`, `staffId`),
   KEY `IX_Appt_Clinic_Client_Date` (`clinicId`, `clientId`, `date`),
+  KEY `IX_Appt_Clinic_Staff` (`clinicId`, `staffId`),
   CONSTRAINT `FK_Appointment_Clinic` FOREIGN KEY (`clinicId`) REFERENCES `Clinic` (`id`) ON DELETE CASCADE,
   CONSTRAINT `FK_Appointment_Branch` FOREIGN KEY (`branchId`) REFERENCES `Branch` (`id`) ON DELETE SET NULL,
   CONSTRAINT `FK_Appointment_Client` FOREIGN KEY (`clientId`) REFERENCES `Client` (`id`) ON DELETE CASCADE,
