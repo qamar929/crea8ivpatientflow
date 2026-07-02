@@ -63,6 +63,11 @@ define('CLIENT_URL', getenv('CLIENT_URL') ?: 'https://portal.thesmilexperts.com'
 // (patient uploads are served through /api/v1/files, never directly).
 define('API_PUBLIC_URL', getenv('API_PUBLIC_URL') ?: 'https://crea8ivmedia.com/app/api/v1');
 
+// Public "Live Demo": read-only sessions are minted into this seeded demo clinic
+// so website visitors can explore the real portal with dummy data (no signup).
+define('DEMO_CLINIC_ID', getenv('DEMO_CLINIC_ID') ?: 'clinic-demo-001');
+define('DEMO_SESSION_TTL', (int)(getenv('DEMO_SESSION_TTL') ?: 3600)); // 1 hour
+
 // Wildcard subdomain every new clinic gets a default URL on:
 //   <slug>.crea8ivmedia.com → "smile-xperts.crea8ivmedia.com"
 // Override via env if rebranded. Needs wildcard DNS + SSL to actually resolve.

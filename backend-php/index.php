@@ -235,6 +235,9 @@ $routes = [
 
     // Signed file serving (patient uploads) — auth is the HMAC signature itself
     ['GET', '^api/v1/files/([^/]+)$', 'FileController', 'serve', false],
+
+    // Public "Live Demo" — mint a read-only session into the seeded demo clinic
+    ['POST', '^api/v1/public/demo-session$', 'PublicSiteController', 'demoSession', false],
     ['GET', '^api/v1/features$', 'StatusController', 'features', true],
 
     // Auth Routes
@@ -538,8 +541,15 @@ foreach ($routes as $route) {
                 require_package_feature($user, $path);
             }
             // 'auth' = any valid token, no further checks
+
+            // Public read-only demo: a demo session (demo:true claim) may READ
+            // everything but never mutate — keeps the public demo pristine.
+            if ($user && !empty($user['demo']) && !in_array($method, ['GET', 'OPTIONS'], true)
+                && strpos($path, 'api/v1/auth') !== 0) {
+                send_error('This is a read-only live demo. Sign up to create or change data.', 403, ['code' => 'demo_readonly']);
+            }
         }
-        
+
         $controllerFile = __DIR__ . '/controllers/' . $controllerName . '.php';
         if (file_exists($controllerFile)) {
             require_once $controllerFile;

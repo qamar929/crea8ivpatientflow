@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Live Demo — Explore PatientFlow with Sample Data</title>
+<meta name="description" content="Explore the real PatientFlow clinic software live in your browser — dashboard, appointments, patients, billing and AI automation, pre-loaded with sample data. No signup.">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://crea8ivmedia.com/patientflow/live-demo.html">
+<meta property="og:type" content="website">
+<meta property="og:title" content="Live Demo — PatientFlow">
+<meta property="og:description" content="Click into the real PatientFlow software with sample data. No signup, no install.">
+<meta property="og:image" content="https://crea8ivmedia.com/patientflow/og-image.png">
+<meta name="theme-color" content="#FE6A09">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/pf-pages.css">
+<style>
+  .demo-wrap { max-width: 1180px; }
+  .demo-frame { position: relative; border-radius: 16px; overflow: hidden; border: 1px solid rgba(255,255,255,.14); box-shadow: var(--shadow-lg); background: #0f1115; margin-top: 26px; }
+  .demo-frame__bar { display: flex; align-items: center; gap: 8px; padding: 11px 14px; background: #1a1d23; border-bottom: 1px solid rgba(255,255,255,.06); }
+  .demo-dot { width: 11px; height: 11px; border-radius: 50%; }
+  .demo-dot:nth-child(1){background:#ff5f57}.demo-dot:nth-child(2){background:#febc2e}.demo-dot:nth-child(3){background:#28c840}
+  .demo-url { margin-left: 10px; flex: 1; font-size: 12px; color: #8b93a7; background: #0f1115; border-radius: 6px; padding: 5px 12px; font-family: ui-monospace, monospace; }
+  .demo-actions { display: flex; gap: 8px; }
+  .demo-mini { font-size: 12px; font-weight: 700; padding: 6px 12px; border-radius: 7px; border: 1px solid rgba(255,255,255,.14); color: #cfd6e2; background: transparent; cursor: pointer; }
+  .demo-mini.p { background: var(--grad); color: #fff; border-color: transparent; }
+  .demo-stage { position: relative; aspect-ratio: 16 / 10; background: #0b0d10; }
+  @media (max-width: 700px){ .demo-stage { aspect-ratio: 3 / 4; } .demo-url { display:none } }
+  .demo-stage iframe { width: 100%; height: 100%; border: 0; display: block; }
+  .demo-load { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; gap: 6px; color: var(--muted); }
+  .demo-spin { width: 34px; height: 34px; border-radius: 50%; border: 3px solid rgba(255,255,255,.15); border-top-color: var(--primary); animation: dspin .8s linear infinite; margin: 0 auto 12px; }
+  @keyframes dspin { to { transform: rotate(360deg); } }
+  .demo-ribbon { position: absolute; top: 14px; right: 14px; z-index: 3; font-size: 11.5px; font-weight: 800; letter-spacing: .04em; text-transform: uppercase; color: #fff; background: rgba(15,17,21,.72); backdrop-filter: blur(8px); border: 1px solid var(--glass-line); padding: 7px 13px; border-radius: 999px; }
+  .demo-ribbon b { color: var(--gold); }
+  .demo-legend { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-top: 20px; }
+  .demo-legend span { font-size: 12.5px; color: var(--muted); background: var(--glass); border: 1px solid var(--line); border-radius: 999px; padding: 6px 13px; }
+  .demo-err { color: var(--muted); font-size: 14px; }
+</style>
+</head>
+<body>
+<header class="site-header">
+  <div class="container nav">
+    <a class="brand" href="index.html"><img class="brand-logo" src="logo.png" alt="PatientFlow — by Crea8iv Media"></a>
+    <button class="nav-toggle" aria-label="Toggle menu">☰</button>
+    <nav class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="features.html">Features</a>
+      <a href="pricing.html">Pricing</a>
+      <a href="live-demo.html" class="active">Live Demo</a>
+      <a href="roadmap.html">Roadmap</a>
+      <a href="contact.html">Contact</a>
+    </nav>
+    <a class="nav-cta" href="register.html">Get Started</a>
+  </div>
+</header>
+
+<main>
+  <section class="pkg-hero" style="padding-bottom:0">
+    <div class="container demo-wrap reveal">
+      <span class="pf-eyebrow">Live Interactive Demo</span>
+      <h1 class="pf-h2" style="margin-top:16px">Explore the <span class="pf-grad-text">real software</span> — right now</h1>
+      <p class="pf-sub">This is the actual PatientFlow clinic portal, pre-loaded with sample data. Click through the dashboard, appointments, patients, billing and AI automation. No signup, no install — it's read-only, so explore freely.</p>
+    </div>
+  </section>
+
+  <section class="pf-section" style="padding-top:22px">
+    <div class="container demo-wrap">
+      <div class="demo-frame reveal">
+        <div class="demo-frame__bar">
+          <span class="demo-dot"></span><span class="demo-dot"></span><span class="demo-dot"></span>
+          <span class="demo-url">app.demo-dental.patientflow.com</span>
+          <div class="demo-actions">
+            <button class="demo-mini" id="demo-restart">↻ Restart</button>
+            <button class="demo-mini p" id="demo-full">Open full screen ↗</button>
+          </div>
+        </div>
+        <div class="demo-stage">
+          <div class="demo-ribbon">Live demo · <b>read-only</b></div>
+          <div class="demo-load" id="demo-load"><div><div class="demo-spin"></div>Loading the live software…</div></div>
+          <iframe id="demo-iframe" title="PatientFlow live demo" referrerpolicy="no-referrer" loading="lazy"></iframe>
+        </div>
+      </div>
+      <div class="demo-legend">
+        <span>📊 Dashboard</span><span>📅 Appointments</span><span>👥 Patients</span><span>🧾 Billing</span><span>🤖 AI &amp; WhatsApp</span><span>📈 Financials</span><span>⚙️ Settings</span>
+      </div>
+    </div>
+  </section>
+
+  <section class="pf-section" style="padding-top:20px">
+    <div class="container">
+      <div class="pf-panel reveal" style="text-align:center">
+        <h2 class="pf-h2">Ready to make it yours?</h2>
+        <p class="pf-sub" style="margin:12px auto 24px">Get your own branded portal with your real patients — live in minutes.</p>
+        <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+          <a class="btn btn-primary" href="register.html">Get Started</a>
+          <a class="btn btn-ghost" href="pricing.html">See Pricing</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div>
+      <a class="brand" href="index.html"><img class="brand-logo" src="logo.png" alt="PatientFlow — by Crea8iv Media"></a>
+      <p class="blurb">Patient retention software that turns your existing database into predictable monthly revenue.</p>
+    </div>
+    <div><h4>Product</h4><a href="features.html">Features</a><a href="pricing.html">Pricing</a><a href="use-cases.html">Use Cases</a><a href="ai-showcase.html">AI &amp; Automation</a><a href="roadmap.html">Roadmap</a><a href="whats-new.html">What's New</a></div>
+    <div><h4>Get Started</h4><a href="live-demo.html">Live Demo</a><a href="demo.html">Book a Demo</a><a href="register.html">Register Clinic</a></div>
+    <div><h4>Company</h4><a href="https://crea8ivmedia.com" target="_blank" rel="noopener">Crea8iv Media</a><a href="security.html">Security</a><a href="status.html">Status</a><a href="contact.html">Support</a></div>
+  </div>
+  <div class="container footer-bottom">
+    <span>© 2026 PatientFlow by Crea8iv Media. All rights reserved.</span>
+    <span>Built with ❤️ in Pakistan</span>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var API = 'https://crea8ivmedia.com/app/api/v1';
+  var PORTAL = 'https://crea8ivmedia.com/clinic/demo-dental/dashboard';
+  var iframe = document.getElementById('demo-iframe');
+  var loader = document.getElementById('demo-load');
+  var sameOrigin = location.hostname === 'crea8ivmedia.com';
+
+  function fail(msg) {
+    loader.innerHTML = '<div><p class="demo-err">' + (msg || 'The live demo is temporarily unavailable.') +
+      '</p><a class="btn btn-primary" href="demo.html" style="margin-top:14px">Book a guided demo instead</a></div>';
+  }
+
+  // Mint a read-only demo session and store it on the crea8ivmedia.com origin,
+  // which the portal iframe (same origin) reads on load.
+  function startDemo() {
+    loader.style.display = 'grid';
+    return fetch(API + '/public/demo-session', { method: 'POST' })
+      .then(function (r) { return r.ok ? r.json() : Promise.reject(r.status); })
+      .then(function (d) {
+        if (!d.accessToken) throw new Error('no token');
+        try {
+          localStorage.setItem('clinic_auth', 'true');
+          localStorage.setItem('clinic_token', d.accessToken);
+          localStorage.setItem('clinic_user', JSON.stringify(d.user));
+          localStorage.removeItem('clinic_refresh');
+        } catch (e) {}
+        // Cache-bust so the iframe re-reads the fresh session.
+        iframe.src = PORTAL + '?demo=' + Date.now();
+        iframe.addEventListener('load', function () { loader.style.display = 'none'; }, { once: true });
+        // Safety: hide loader after a few seconds regardless.
+        setTimeout(function () { loader.style.display = 'none'; }, 6000);
+      })
+      .catch(function () { fail(); });
+  }
+
+  document.getElementById('demo-restart').addEventListener('click', startDemo);
+  document.getElementById('demo-full').addEventListener('click', function () {
+    // Session already stored on this origin — open the portal full-screen.
+    window.open(PORTAL + '?demo=' + Date.now(), '_blank', 'noopener');
+  });
+
+  if (!sameOrigin) {
+    // Local/preview: cross-origin storage isn't shared with the prod portal.
+    loader.innerHTML = '<div><p class="demo-err">The live demo runs on the production site.</p>' +
+      '<a class="btn btn-primary" href="https://crea8ivmedia.com/patientflow/live-demo.html" style="margin-top:14px">Open the live demo →</a></div>';
+  } else {
+    startDemo();
+  }
+})();
+</script>
+<script src="js/site.js"></script>
+</body>
+</html>

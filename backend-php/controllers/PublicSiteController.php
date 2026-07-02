@@ -152,6 +152,60 @@ class PublicSiteController {
     // Lightweight branding for the portal login screen — keyed to the domain.
     // Returns matched=false when no clinic owns the host so the app keeps its
     // neutral default (e.g. on clinic.crea8ivmedia.com or localhost).
+    // Public "Live Demo": mint a SHORT-LIVED, READ-ONLY session into the seeded
+    // demo clinic so website visitors explore the real portal with dummy data.
+    // No password. The token carries demo:true — index.php blocks all writes for
+    // it, and no refresh token is issued (session simply expires after the TTL).
+    public function demoSession($input, $user = null) {
+        $db = DB::getConnection();
+
+        // Light per-IP throttle to stop token farming (reuses LoginAttempt window).
+        $ip = $_SERVER['HTTP_CF_CONNECTING_IP'] ?? ($_SERVER['HTTP_X_FORWARDED_FOR'] ?? ($_SERVER['REMOTE_ADDR'] ?? 'unknown'));
+        $ip = substr(trim(explode(',', $ip)[0]), 0, 45);
+        $window = date('Y-m-d H:i:s', time() - 3600);
+        try {
+            $stmt = $db->prepare("SELECT COUNT(*) FROM LoginAttempt WHERE ip = ? AND email = 'demo-session' AND createdAt > ?");
+            $stmt->execute([$ip, $window]);
+            if ((int)$stmt->fetchColumn() >= 30) send_error('Too many demo launches. Please try again shortly.', 429);
+            $db->prepare("INSERT INTO LoginAttempt (email, ip, success, createdAt) VALUES ('demo-session', ?, 1, ?)")->execute([$ip, date('Y-m-d H:i:s')]);
+        } catch (Exception $e) { /* throttle table optional — don't block the demo */ }
+
+        // Verify the demo clinic exists and is active.
+        $stmt = $db->prepare("SELECT id, name, slug FROM Clinic WHERE id = ? AND status = 'active'");
+        $stmt->execute([DEMO_CLINIC_ID]);
+        $clinic = $stmt->fetch();
+        if (!$clinic) send_error('The live demo is temporarily unavailable.', 503);
+
+        // Prefer the demo owner so every module is visible.
+        $stmt = $db->prepare("SELECT * FROM User WHERE clinicId = ? AND isActive = 1 ORDER BY (role = 'owner') DESC, createdAt ASC LIMIT 1");
+        $stmt->execute([DEMO_CLINIC_ID]);
+        $demoUser = $stmt->fetch();
+        if (!$demoUser) send_error('The live demo is temporarily unavailable.', 503);
+
+        // Read-only access token (demo:true). No refresh token → dies after TTL.
+        $accessToken = jwt_sign([
+            'id' => $demoUser['id'],
+            'clinicId' => $demoUser['clinicId'],
+            'role' => $demoUser['role'],
+            'name' => $demoUser['name'],
+            'demo' => true,
+        ], JWT_SECRET, DEMO_SESSION_TTL);
+
+        send_json([
+            'accessToken' => $accessToken,
+            'user' => [
+                'id' => $demoUser['id'],
+                'name' => $demoUser['name'],
+                'email' => $demoUser['email'],
+                'role' => $demoUser['role'],
+                'clinicId' => $demoUser['clinicId'],
+                'demo' => true,
+            ],
+            'clinic' => ['id' => $clinic['id'], 'name' => $clinic['name'], 'slug' => $clinic['slug']],
+            'expiresIn' => DEMO_SESSION_TTL,
+        ]);
+    }
+
     public function branding($input, $user = null) {
         $db = DB::getConnection();
         // Path-based portal links (crea8ivmedia.com/clinic/<slug>) pass ?slug=.
