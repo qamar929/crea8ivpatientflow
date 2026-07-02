@@ -1,0 +1,102 @@
+name: Test & Deploy
+
+# Every push to main: run the backend test suite, then build both portal
+# bundles and deploy frontend + backend to Hostinger, then verify the live
+# sites actually serve the new build (hash check).
+#
+# Required repo secrets:
+#   SSH_HOST, SSH_PORT, SSH_USER  — Hostinger SSH endpoint
+#   DEPLOY_SSH_KEY                — private key whose pubkey is in authorized_keys
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  VITE_API_URL: https://crea8ivmedia.com/app/api/v1
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+      - name: Backend test suite (gates the deploy)
+        run: php backend-php/tests/run-tests.php
+
+  deploy:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build clinic bundle (path portals)
+        run: npm run build -- --base=/clinic/ && mv dist dist-clinic
+
+      - name: Build custom-domain bundle
+        run: npm run build -- --base=/ && mv dist dist-root
+
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p "${{ secrets.SSH_PORT }}" "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Deploy clinic portal
+        run: |
+          rsync -az --delete --exclude='.htaccess' \
+            -e "ssh -i ~/.ssh/deploy_key -p ${{ secrets.SSH_PORT }}" \
+            dist-clinic/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/${{ secrets.SSH_USER }}/domains/crea8ivmedia.com/public_html/clinic/
+
+      - name: Deploy custom-domain portal (thesmilexperts)
+        run: |
+          rsync -az --delete --exclude='.htaccess' \
+            -e "ssh -i ~/.ssh/deploy_key -p ${{ secrets.SSH_PORT }}" \
+            dist-root/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/${{ secrets.SSH_USER }}/domains/thesmilexperts.com/public_html/portal/
+
+      # Additive on purpose (no --delete): server holds runtime files
+      # (.env, uploads/, logs/, backups/) that must never be touched.
+      - name: Deploy backend API
+        run: |
+          rsync -az \
+            --exclude='.env' --exclude='uploads/' --exclude='logs/' \
+            --exclude='backups/' --exclude='error_log' --exclude='tests/' \
+            -e "ssh -i ~/.ssh/deploy_key -p ${{ secrets.SSH_PORT }}" \
+            backend-php/ ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }}:/home/${{ secrets.SSH_USER }}/domains/crea8ivmedia.com/public_html/app/
+
+      - name: Refresh pf-safe self-heal copy
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} \
+            "P=/home/${{ secrets.SSH_USER }}/domains/crea8ivmedia.com/public_html; S=/home/${{ secrets.SSH_USER }}/pf-safe; \
+             rsync -a --delete \$P/clinic/ \$S/clinic/; rsync -a --delete --exclude=uploads --exclude=logs --exclude=backups \$P/app/ \$S/app/"
+
+      - name: Verify live build hashes match
+        run: |
+          BUILT_CLINIC=$(grep -oE 'index-[A-Za-z0-9_-]+\.js' dist-clinic/index.html | head -1)
+          LIVE_CLINIC=$(curl -s "https://crea8ivmedia.com/clinic/index.html?cb=$(date +%s)" | grep -oE 'index-[A-Za-z0-9_-]+\.js' | head -1)
+          BUILT_ROOT=$(grep -oE 'index-[A-Za-z0-9_-]+\.js' dist-root/index.html | head -1)
+          LIVE_ROOT=$(curl -s "https://portal.thesmilexperts.com/index.html?cb=$(date +%s)" | grep -oE 'index-[A-Za-z0-9_-]+\.js' | head -1)
+          echo "clinic:      built=$BUILT_CLINIC live=$LIVE_CLINIC"
+          echo "smilexperts: built=$BUILT_ROOT live=$LIVE_ROOT"
+          test "$BUILT_CLINIC" = "$LIVE_CLINIC" && test "$BUILT_ROOT" = "$LIVE_ROOT"
+
+      - name: Verify API health
+        run: |
+          curl -sf "https://crea8ivmedia.com/app/api/v1/health" | grep -q '"status":"ok"'
+          echo "API healthy"

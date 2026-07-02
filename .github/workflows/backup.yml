@@ -1,0 +1,57 @@
+name: Offsite DB Backup
+
+# Nightly encrypted offsite backup: dumps the production MySQL DB over SSH,
+# encrypts it on the runner, and stores it as a GitHub Actions artifact
+# (30-day retention). DB credentials never leave the server — the dump command
+# reads them from the deployed app/.env.
+#
+# Restore:
+#   1. Download the artifact, unzip -> db.sql.gz.enc
+#   2. openssl enc -d -aes-256-cbc -pbkdf2 -in db.sql.gz.enc -out db.sql.gz \
+#        -pass pass:<BACKUP_PASSPHRASE>
+#   3. gunzip db.sql.gz && mysql -u <user> -p <dbname> < db.sql
+#
+# Required repo secrets: SSH_HOST, SSH_PORT, SSH_USER, DEPLOY_SSH_KEY,
+#                        BACKUP_PASSPHRASE
+
+on:
+  schedule:
+    - cron: '30 22 * * *'   # 03:30 Pakistan time, daily
+  workflow_dispatch:
+
+jobs:
+  backup:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Set up SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -p "${{ secrets.SSH_PORT }}" "${{ secrets.SSH_HOST }}" >> ~/.ssh/known_hosts 2>/dev/null
+
+      - name: Dump database over SSH
+        run: |
+          ssh -i ~/.ssh/deploy_key -p ${{ secrets.SSH_PORT }} ${{ secrets.SSH_USER }}@${{ secrets.SSH_HOST }} '
+            APP=/home/'"${{ secrets.SSH_USER }}"'/domains/crea8ivmedia.com/public_html/app
+            DB_NAME=$(grep -E "^DB_NAME=" "$APP/.env" | cut -d= -f2-)
+            DB_USER=$(grep -E "^DB_USER=" "$APP/.env" | cut -d= -f2-)
+            DB_PASS=$(grep -E "^DB_PASS=" "$APP/.env" | cut -d= -f2-)
+            mysqldump -u "$DB_USER" -p"$DB_PASS" --single-transaction --quick "$DB_NAME" | gzip
+          ' > db.sql.gz
+          # sanity: a real dump is > 10KB
+          test "$(stat -c%s db.sql.gz)" -gt 10240
+
+      - name: Encrypt
+        env:
+          PASSPHRASE: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          openssl enc -aes-256-cbc -pbkdf2 -salt -in db.sql.gz -out db.sql.gz.enc -pass env:PASSPHRASE
+          rm db.sql.gz
+
+      - name: Store as artifact (30-day retention)
+        uses: actions/upload-artifact@v4
+        with:
+          name: db-backup-${{ github.run_id }}
+          path: db.sql.gz.enc
+          retention-days: 30
