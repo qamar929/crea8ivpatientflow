@@ -1,0 +1,213 @@
+/* ===========================================================================
+   PatientFlow — SINGLE SOURCE OF TRUTH
+   ---------------------------------------------------------------------------
+   Every feature, plan, changelog entry and roadmap item is defined ONCE here.
+   All marketing pages (home, pricing, package pages, comparison, What's New,
+   roadmap, search) render from this object via js/render.js. Add a feature or
+   ship a release by editing this file — the whole site updates automatically.
+   =========================================================================== */
+window.PF = (function () {
+  // ---- Plans -------------------------------------------------------------
+  const PLANS = {
+    starter: {
+      id: 'starter',
+      name: 'Starter',
+      tagline: 'Everything to run the clinic, end to end.',
+      pricePKR: 25000,
+      period: 'month',
+      blurb: 'The complete operating system for a modern clinic — appointments, patient records, billing, clinical charting, inventory, staff and your own booking site.',
+      bestFor: 'Single-location clinics that want to replace registers, spreadsheets and WhatsApp chaos with one clean system.',
+      accent: '#FE6A09',
+      highlight: false,
+      ctaLabel: 'Get Started',
+    },
+    ai: {
+      id: 'ai',
+      name: 'AppointmentFlow AI',
+      tagline: 'Starter + automation that fills your calendar for you.',
+      pricePKR: 40000,
+      period: 'month',
+      blurb: 'Everything in Starter, plus WhatsApp automation, an AI receptionist, review generation and reactivation campaigns that turn your existing patient list into predictable monthly revenue.',
+      bestFor: 'Growth-minded clinics that want appointments booked automatically — recalls, reminders, reviews and reactivation running 24/7.',
+      accent: '#FF8A2A',
+      highlight: true,
+      ctaLabel: 'Book a Demo',
+    },
+  };
+
+  // ---- Feature categories (order = display order) ------------------------
+  const CATEGORIES = [
+    { id: 'operations', name: 'Clinic Operations', icon: 'calendar' },
+    { id: 'patients', name: 'Patients & Clinical', icon: 'users' },
+    { id: 'billing', name: 'Billing & Finance', icon: 'receipt' },
+    { id: 'growth', name: 'Growth & Marketing', icon: 'trending' },
+    { id: 'ai', name: 'AI & Automation', icon: 'sparkles' },
+    { id: 'platform', name: 'Platform & Security', icon: 'shield' },
+  ];
+
+  // ---- Features (the registry) ------------------------------------------
+  // plans: which plans include it. outcome: the business result (for ROI/cards).
+  const FEATURES = [
+    // Operations
+    { id: 'appointments', name: 'Smart Appointments', category: 'operations', icon: 'calendar', plans: ['starter', 'ai'], desc: 'Chairside scheduling with conflict detection, drag-to-reschedule, colour-coded calendars and per-doctor availability.', outcome: 'No double-bookings, fewer gaps.' },
+    { id: 'reception', name: 'Reception Desk', category: 'operations', icon: 'monitor', plans: ['starter', 'ai'], desc: 'A live front-desk board — today\'s patients, check-ins, waiting list and quick actions in one screen.', outcome: 'Faster front desk, calmer mornings.' },
+    { id: 'multibranch', name: 'Multi-Branch', category: 'operations', icon: 'building', plans: ['starter', 'ai'], desc: 'Run multiple locations under one login with per-branch staff, calendars and reporting.', outcome: 'Scale to new locations cleanly.' },
+    { id: 'inventory', name: 'Inventory & Stock', category: 'operations', icon: 'box', plans: ['starter', 'ai'], desc: 'Track consumables and materials, low-stock alerts and per-transaction movement.', outcome: 'Never run out mid-procedure.' },
+    { id: 'staff', name: 'Staff & Roles', category: 'operations', icon: 'idcard', plans: ['starter', 'ai'], desc: 'Role-based access for owners, managers, doctors, reception and accountants — everyone sees exactly what they should.', outcome: 'Security + accountability.' },
+
+    // Patients & clinical
+    { id: 'records', name: 'Patient Records', category: 'patients', icon: 'folder', plans: ['starter', 'ai'], desc: 'Complete profiles, history, documents and searchable typeahead by name, phone, email or patient number.', outcome: 'Find any patient in seconds.' },
+    { id: 'clinical', name: 'Clinical Charting', category: 'patients', icon: 'tooth', plans: ['starter', 'ai'], desc: 'Dental charting with an FDI tooth picker, treatment plans and per-procedure clinical notes.', outcome: 'Structured, defensible records.' },
+    { id: 'documents', name: 'Documents & Gallery', category: 'patients', icon: 'image', plans: ['starter', 'ai'], desc: 'Before/after images and patient documents (consent forms, lab reports, prescriptions) — served over secure signed links.', outcome: 'Everything in one secure place.' },
+    { id: 'feedback', name: 'Patient Feedback', category: 'patients', icon: 'star', plans: ['starter', 'ai'], desc: 'Capture visit feedback and satisfaction so you act on issues before they become bad reviews.', outcome: 'Protect your reputation.' },
+
+    // Billing & finance
+    { id: 'billing', name: 'Invoicing & Billing', category: 'billing', icon: 'receipt', plans: ['starter', 'ai'], desc: 'Professional invoices with your bank details, flexible discounts (amount or %), partial payments and one-click PDF/print.', outcome: 'Get paid faster, look professional.' },
+    { id: 'packages', name: 'Treatment Packages', category: 'billing', icon: 'gift', plans: ['starter', 'ai'], desc: 'Sell and track multi-session treatment packages against a patient with remaining-balance tracking.', outcome: 'Upfront revenue, clear balances.' },
+    { id: 'financials', name: 'Financials & P&L', category: 'billing', icon: 'chart', plans: ['starter', 'ai'], desc: 'Expenses, procedure costs, revenue trends and profit/margin reporting — the real health of the business.', outcome: 'Know your true profit.' },
+    { id: 'dues', name: 'Dues & Balances', category: 'billing', icon: 'wallet', plans: ['starter', 'ai'], desc: 'Automatic patient balance tracking so pending payments never slip through.', outcome: 'Recover every rupee owed.' },
+
+    // Growth & marketing
+    { id: 'bookingsite', name: 'Public Booking Site', category: 'growth', icon: 'globe', plans: ['starter', 'ai'], desc: 'Your own branded booking website and embeddable widget so patients book themselves, 24/7.', outcome: 'Bookings while you sleep.' },
+    { id: 'whatsapp', name: 'WhatsApp Center', category: 'growth', icon: 'whatsapp', plans: ['ai'], desc: 'A shared clinic WhatsApp inbox with templates, broadcasts and reply suggestions.', outcome: 'One number, whole team.' },
+    { id: 'campaigns', name: 'Broadcast Campaigns', category: 'growth', icon: 'megaphone', plans: ['ai'], desc: 'Segment your patient list and send targeted WhatsApp campaigns — offers, recalls, announcements.', outcome: 'Turn your list into revenue.' },
+    { id: 'reactivation', name: 'Patient Reactivation', category: 'growth', icon: 'refresh', plans: ['ai'], desc: 'Automatically win back patients who haven\'t visited in months with timed WhatsApp sequences.', outcome: 'Revenue from patients you already have.' },
+    { id: 'reviews', name: 'Review Automation', category: 'growth', icon: 'stars', plans: ['ai'], desc: 'Request Google reviews from happy patients automatically after their visit.', outcome: 'More 5-star reviews, on autopilot.' },
+    { id: 'metaleads', name: 'Meta Lead Capture', category: 'growth', icon: 'target', plans: ['ai'], desc: 'Pull Facebook/Instagram lead-form submissions straight into your pipeline.', outcome: 'No lead left cold.' },
+
+    // AI & automation
+    { id: 'ai-receptionist', name: 'AI Receptionist', category: 'ai', icon: 'robot', plans: ['ai'], desc: 'A per-clinic AI that answers patient questions, with its own persona, knowledge base and memory.', outcome: 'Answer patients 24/7.' },
+    { id: 'ai-reminders', name: 'Automated Reminders', category: 'ai', icon: 'bell', plans: ['ai'], desc: 'Precise 24-hour and 2-hour appointment reminders over WhatsApp — no manual chasing.', outcome: 'Cut no-shows dramatically.' },
+    { id: 'ai-recalls', name: 'Recall Campaigns', category: 'ai', icon: 'clock', plans: ['ai'], desc: 'Automatic recalls for cleanings, follow-ups and check-ups based on last visit.', outcome: 'Fill next month\'s calendar today.' },
+    { id: 'ai-followups', name: 'AI Follow-ups', category: 'ai', icon: 'chat', plans: ['ai'], desc: 'Smart post-visit follow-ups and reply suggestions drafted for your team.', outcome: 'Personal touch, zero effort.' },
+
+    // Platform & security
+    { id: 'branding', name: 'White-Label Branding', category: 'platform', icon: 'palette', plans: ['starter', 'ai'], desc: 'Your logo, colours, domain and invoice identity across the whole portal.', outcome: 'It\'s your brand, not ours.' },
+    { id: 'reports', name: 'Reports & Dashboards', category: 'platform', icon: 'gauge', plans: ['starter', 'ai'], desc: 'Live dashboards and reports across appointments, revenue, staff and patients.', outcome: 'Decisions from real data.' },
+    { id: 'security', name: 'Security & Audit', category: 'platform', icon: 'lock', plans: ['starter', 'ai'], desc: 'Encrypted secrets, signed file access, tenant isolation and an audit trail on sensitive actions.', outcome: 'Patient data stays safe.' },
+    { id: 'backups', name: 'Automated Backups', category: 'platform', icon: 'database', plans: ['starter', 'ai'], desc: 'Nightly database backups with offsite copies and self-heal recovery.', outcome: 'Your data is never lost.' },
+  ];
+
+  // ---- Success metrics ---------------------------------------------------
+  const STATS = [
+    { value: 159, suffix: '+', label: 'Patients managed live' },
+    { value: 24, suffix: '/7', label: 'Automated reminders' },
+    { value: 90, suffix: '%', label: 'Fewer missed follow-ups' },
+    { value: 3, suffix: '×', label: 'Faster front desk' },
+  ];
+
+  // ---- Changelog (real releases) ----------------------------------------
+  // types: feature | improvement | fix | performance | security | ai
+  const CHANGELOG = [
+    {
+      version: '1.6.0', date: '2026-07-02', title: 'Enterprise hardening',
+      impact: 'Bank-grade file security + automated backups & deploys.',
+      entries: [
+        { type: 'security', text: 'Patient files now served only through short-lived signed URLs — direct access blocked.' },
+        { type: 'security', text: 'Automated test suite (41 checks) gating every release.' },
+        { type: 'performance', text: 'Nightly encrypted offsite backups + one-click CI/CD deploys.' },
+      ],
+    },
+    {
+      version: '1.5.0', date: '2026-07-01', title: 'Speed & billing',
+      impact: 'Instant page loads and flexible discounts.',
+      entries: [
+        { type: 'performance', text: 'Instant page loads with background refresh + skeleton loaders.' },
+        { type: 'feature', text: 'Invoices: discount as a fixed amount or a percentage (your choice).' },
+        { type: 'fix', text: 'Staff profiles now show real appointment counts and revenue.' },
+      ],
+    },
+    {
+      version: '1.4.0', date: '2026-06-30', title: 'Payments on invoices',
+      impact: 'Patients know exactly where to pay.',
+      entries: [
+        { type: 'feature', text: 'Clinic bank & payment details on every invoice (PDF + on-screen), editable by the owner.' },
+        { type: 'feature', text: 'Stamp / signature upload for a professional invoice.' },
+      ],
+    },
+    {
+      version: '1.3.0', date: '2026-06-27', title: 'Instant clinic portals',
+      impact: 'Every clinic gets its own branded URL, zero setup.',
+      entries: [
+        { type: 'feature', text: 'Path-based clinic portals — every clinic reachable at its own branded URL with valid SSL.' },
+        { type: 'improvement', text: 'Custom-domain support retained for clinics that own a domain.' },
+      ],
+    },
+    {
+      version: '1.2.0', date: '2026-06-22', title: 'Plans & AI receptionist',
+      impact: 'Clear packages and a 24/7 AI front desk.',
+      entries: [
+        { type: 'ai', text: 'AI Receptionist foundation — per-clinic persona, knowledge base and memory.' },
+        { type: 'feature', text: 'Starter and AppointmentFlow AI packages with centralized feature gating.' },
+      ],
+    },
+    {
+      version: '1.1.0', date: '2026-06-19', title: 'Financials & lab',
+      impact: 'See true profit; track lab cases.',
+      entries: [
+        { type: 'feature', text: 'Financials: expenses, procedure costs and profit / margin reporting.' },
+        { type: 'feature', text: 'Lab case management.' },
+        { type: 'improvement', text: 'Industry templates — terminology adapts to your vertical.' },
+      ],
+    },
+  ];
+
+  // ---- Roadmap -----------------------------------------------------------
+  // status: completed | progress | planned | research | community
+  const ROADMAP = [
+    { title: 'Online payments (JazzCash / Easypaisa)', status: 'progress', quarter: 'Q3 2026', desc: 'Let patients pay invoices online; auto-reconcile balances.', progress: 40, votes: 128 },
+    { title: 'Patient mobile app', status: 'planned', quarter: 'Q4 2026', desc: 'Patients view appointments, invoices and documents on their phone.', progress: 0, votes: 96 },
+    { title: 'Advanced analytics & cohorts', status: 'planned', quarter: 'Q4 2026', desc: 'Retention cohorts, revenue forecasting and per-doctor performance.', progress: 0, votes: 74 },
+    { title: 'Two-factor authentication & SSO', status: 'progress', quarter: 'Q3 2026', desc: 'TOTP 2FA and Google Workspace sign-in for clinic staff.', progress: 25, votes: 61 },
+    { title: 'AI Receptionist — live deployment', status: 'progress', quarter: 'Q3 2026', desc: 'Roll the AI front desk out to production clinics.', progress: 55, votes: 143 },
+    { title: 'Urdu language (i18n)', status: 'research', quarter: 'Exploring', desc: 'Full Urdu interface for staff and patients.', progress: 0, votes: 52 },
+    { title: 'Insurance & claims module', status: 'community', quarter: 'Requested', desc: 'Track insurance claims and approvals.', progress: 0, votes: 38 },
+    { title: 'Signed file access & offsite backups', status: 'completed', quarter: 'Shipped', desc: 'Bank-grade file security and automated backups.', progress: 100, votes: 0 },
+    { title: 'Instant page loads', status: 'completed', quarter: 'Shipped', desc: 'Stale-while-revalidate caching + skeletons.', progress: 100, votes: 0 },
+    { title: 'Path-based clinic portals', status: 'completed', quarter: 'Shipped', desc: 'Every clinic on its own branded URL.', progress: 100, votes: 0 },
+  ];
+
+  const ROADMAP_STATUSES = [
+    { id: 'completed', name: 'Completed', color: '#25D366' },
+    { id: 'progress', name: 'In Progress', color: '#FE6A09' },
+    { id: 'planned', name: 'Planned', color: '#FF8A2A' },
+    { id: 'research', name: 'Research', color: '#FFB347' },
+    { id: 'community', name: 'Community Requests', color: '#8B93A7' },
+  ];
+
+  // ---- FAQs --------------------------------------------------------------
+  const FAQS = [
+    { q: 'Is my patient data secure?', a: 'Yes. Data is encrypted, files are served only through signed links, every clinic is fully isolated from every other, sensitive actions are audit-logged, and the database is backed up nightly with offsite copies.' },
+    { q: 'Do I need to install anything?', a: 'No. PatientFlow runs in any browser on desktop, tablet and mobile. Your clinic gets its own branded URL instantly — no setup, no servers.' },
+    { q: 'Can I use my own clinic domain?', a: 'Yes. You can run on your own domain (e.g. portal.yourclinic.com) with valid SSL, or use the free branded URL we provide.' },
+    { q: 'What\'s the difference between the two plans?', a: 'Starter runs your whole clinic — appointments, records, billing, clinical, staff and your booking site. AppointmentFlow AI adds WhatsApp automation, an AI receptionist, review generation and reactivation campaigns that fill your calendar automatically.' },
+    { q: 'Can I switch or upgrade later?', a: 'Absolutely. You can upgrade from Starter to AppointmentFlow AI at any time and every feature turns on instantly — your data stays exactly where it is.' },
+    { q: 'Is there a contract?', a: 'Plans are monthly. Your data is always yours and always exportable.' },
+  ];
+
+  // ---- Use cases ---------------------------------------------------------
+  const USE_CASES = [
+    { id: 'dental', name: 'Dental Clinics', icon: 'tooth', desc: 'Charting, recalls for cleanings, treatment packages and before/after galleries.' },
+    { id: 'aesthetic', name: 'Aesthetic & Skin', icon: 'sparkles', desc: 'Package sessions, consent documents, reactivation and review generation.' },
+    { id: 'medical', name: 'Medical & GP', icon: 'stethoscope', desc: 'Patient records, appointments, billing and automated reminders.' },
+    { id: 'physio', name: 'Physiotherapy', icon: 'activity', desc: 'Session packages, recall campaigns and progress tracking.' },
+    { id: 'multi', name: 'Multi-Branch Groups', icon: 'building', desc: 'One login across locations with per-branch staff, calendars and reporting.' },
+  ];
+
+  // ---- Derived helpers ---------------------------------------------------
+  function featuresForPlan(planId) { return FEATURES.filter(f => f.plans.includes(planId)); }
+  function featuresByCategory(planId) {
+    return CATEGORIES.map(cat => ({
+      ...cat,
+      features: FEATURES.filter(f => f.category === cat.id && (!planId || f.plans.includes(planId))),
+    })).filter(cat => cat.features.length);
+  }
+  function fmtPrice(n) { return 'PKR ' + n.toLocaleString('en-US'); }
+
+  return {
+    PLANS, CATEGORIES, FEATURES, STATS, CHANGELOG, ROADMAP, ROADMAP_STATUSES,
+    FAQS, USE_CASES,
+    featuresForPlan, featuresByCategory, fmtPrice,
+    planList: Object.values(PLANS),
+  };
+})();

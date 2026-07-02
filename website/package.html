@@ -1,0 +1,256 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Plan Details — PatientFlow</title>
+<meta name="description" content="Complete feature breakdown, business outcomes, ROI and real clinic use cases for PatientFlow plans.">
+<meta name="robots" content="index, follow, max-image-preview:large">
+<link rel="canonical" href="https://crea8ivmedia.com/patientflow/package.html">
+<meta property="og:type" content="website">
+<meta property="og:title" content="PatientFlow — Plan Details">
+<meta property="og:description" content="A complete breakdown of what each PatientFlow plan does for your clinic.">
+<meta property="og:image" content="https://crea8ivmedia.com/patientflow/og-image.png">
+<meta name="theme-color" content="#FE6A09">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/pf-pages.css">
+</head>
+<body>
+<header class="site-header">
+  <div class="container nav">
+    <a class="brand" href="index.html"><img class="brand-logo" src="logo.png" alt="PatientFlow — by Crea8iv Media"></a>
+    <button class="nav-toggle" aria-label="Toggle menu">☰</button>
+    <nav class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="features.html">Features</a>
+      <a href="pricing.html">Pricing</a>
+      <a href="roadmap.html">Roadmap</a>
+      <a href="whats-new.html">What's New</a>
+      <a href="contact.html">Contact</a>
+    </nav>
+    <a class="nav-cta" href="demo.html">Book Demo</a>
+  </div>
+</header>
+
+<main>
+  <!-- HERO -->
+  <section class="pkg-hero">
+    <div class="container">
+      <a href="pricing.html" style="color:var(--muted);font-size:13.5px;font-weight:600;">← All plans</a>
+      <div class="reveal" style="margin-top:18px">
+        <span class="pf-eyebrow" id="pkg-eyebrow">Plan</span>
+        <h1 class="pf-h2" id="pkg-name" style="margin-top:16px">—</h1>
+        <p class="pf-sub" id="pkg-blurb"></p>
+        <div class="pkg-hero__price"><span id="pkg-price">—</span></div>
+        <div class="pkg-hero__who" id="pkg-who"></div>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:26px">
+          <a class="btn btn-primary" href="register.html" id="pkg-cta">Get Started</a>
+          <a class="btn btn-ghost" href="demo.html">Book a Demo</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- BEFORE / AFTER -->
+  <section class="pf-section" style="padding-top:20px">
+    <div class="container reveal">
+      <span class="pf-eyebrow">Before vs After</span>
+      <h2 class="pf-h2">From clinic <span class="pf-grad-text">chaos</span> to clinic <span class="pf-grad-text">clarity</span></h2>
+      <div class="pf-ba" id="pkg-ba"></div>
+    </div>
+  </section>
+
+  <!-- FEATURE BREAKDOWN (by category, from registry) -->
+  <section class="pf-section" style="padding-top:20px">
+    <div class="container reveal">
+      <span class="pf-eyebrow">Everything included</span>
+      <h2 class="pf-h2">A complete, module-by-module breakdown</h2>
+      <p class="pf-sub">Every capability in this plan, organised by what it does for your clinic. Defined once in our feature registry — always current.</p>
+      <div data-pf="featuresByCat" id="pkg-feats"></div>
+    </div>
+  </section>
+
+  <!-- ROI CALCULATOR -->
+  <section class="pf-section" style="padding-top:20px">
+    <div class="container reveal">
+      <span class="pf-eyebrow">Business outcomes</span>
+      <h2 class="pf-h2">See your return in <span class="pf-grad-text">30 seconds</span></h2>
+      <p class="pf-sub">Estimate the revenue PatientFlow recovers from your existing patients — reduced no-shows plus reactivation.</p>
+      <div class="pf-roi">
+        <div>
+          <div class="pf-roi__field">
+            <label>Patients you see / month <b id="roi-pv">300</b></label>
+            <input type="range" id="roi-patients" min="50" max="2000" step="10" value="300">
+          </div>
+          <div class="pf-roi__field">
+            <label>Average treatment value <b id="roi-tv">PKR 4,000</b></label>
+            <input type="range" id="roi-ticket" min="1000" max="50000" step="500" value="4000">
+          </div>
+          <div class="pf-roi__field">
+            <label>Patients who don't return <b id="roi-lv">40%</b></label>
+            <input type="range" id="roi-lapse" min="10" max="70" step="5" value="40">
+          </div>
+          <p class="pf-roi__note">Model: automated reminders recover ~8% of no-shows and reactivation wins back ~12% of lapsed patients. Conservative, illustrative estimates.</p>
+        </div>
+        <div class="pf-roi__out">
+          <div>
+            <div class="pf-roi__big" id="roi-total">PKR 0</div>
+            <div style="color:var(--muted);font-size:13px;margin-top:4px">estimated recovered revenue / month</div>
+          </div>
+          <div class="pf-roi__row"><span>Recovered from reminders</span><b id="roi-rem">PKR 0</b></div>
+          <div class="pf-roi__row"><span>Recovered from reactivation</span><b id="roi-react">PKR 0</b></div>
+          <div class="pf-roi__row" style="border:0"><span>Return on plan cost</span><b id="roi-x" style="color:var(--primary)">—</b></div>
+          <a class="btn btn-primary" href="demo.html" style="text-align:center">Book a demo →</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- COMPARE WITH MANUAL -->
+  <section class="pf-section" style="padding-top:20px">
+    <div class="container reveal">
+      <span class="pf-eyebrow">vs Manual workflows</span>
+      <h2 class="pf-h2">What this replaces</h2>
+      <div class="pf-ba" id="pkg-manual"></div>
+    </div>
+  </section>
+
+  <!-- USE CASES -->
+  <section class="pf-section" style="padding-top:20px">
+    <div class="container reveal">
+      <span class="pf-eyebrow">Real clinic use cases</span>
+      <h2 class="pf-h2">Built for how clinics actually work</h2>
+      <div class="pf-ucs" data-pf="usecases"></div>
+    </div>
+  </section>
+
+  <!-- FULL COMPARISON -->
+  <section class="pf-section" style="padding-top:20px">
+    <div class="container reveal">
+      <span class="pf-eyebrow">Compare plans</span>
+      <h2 class="pf-h2">Starter vs AppointmentFlow AI</h2>
+      <div class="pf-compare-wrap" data-pf="compare"></div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section class="pf-section" style="padding-top:20px">
+    <div class="container reveal">
+      <span class="pf-eyebrow">FAQ</span>
+      <h2 class="pf-h2">Questions, answered</h2>
+      <div class="pf-faqs" data-pf="faqs"></div>
+    </div>
+  </section>
+
+  <!-- PRICING SUMMARY / CTA -->
+  <section class="pf-section" style="padding-top:20px">
+    <div class="container">
+      <div class="pf-panel reveal" style="text-align:center">
+        <h2 class="pf-h2" id="pkg-sum-name">Ready to grow?</h2>
+        <div class="pkg-hero__price" style="justify-content:center"><span id="pkg-sum-price">—</span></div>
+        <p class="pf-sub" style="margin:14px auto 26px">No installation. Your own branded portal, live in minutes.</p>
+        <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
+          <a class="btn btn-primary" href="register.html">Get Started</a>
+          <a class="btn btn-ghost" href="demo.html">Book a Demo</a>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<!-- Sticky CTA -->
+<div class="pf-sticky" id="pkg-sticky">
+  <div class="container pf-sticky__in">
+    <div class="pf-sticky__txt" id="pkg-sticky-txt">Plan <span>— everything your clinic needs.</span></div>
+    <a class="btn btn-primary" href="demo.html">Book Demo</a>
+  </div>
+</div>
+
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div>
+      <a class="brand" href="index.html"><img class="brand-logo" src="logo.png" alt="PatientFlow — by Crea8iv Media"></a>
+      <p class="blurb">Patient retention software that turns your existing database into predictable monthly revenue.</p>
+    </div>
+    <div><h4>Product</h4><a href="features.html">Features</a><a href="pricing.html">Pricing</a><a href="roadmap.html">Roadmap</a><a href="whats-new.html">What's New</a></div>
+    <div><h4>Get Started</h4><a href="demo.html">Book a Demo</a><a href="register.html">Register Clinic</a><a href="contact.html">Contact Us</a></div>
+    <div><h4>Company</h4><a href="https://crea8ivmedia.com" target="_blank" rel="noopener">Crea8iv Media</a><a href="contact.html">Support</a></div>
+  </div>
+  <div class="container footer-bottom">
+    <span>© 2026 PatientFlow by Crea8iv Media. All rights reserved.</span>
+    <span>Built with ❤️ in Pakistan</span>
+  </div>
+</footer>
+
+<script src="data/registry.js"></script>
+<script>
+/* Populate plan-specific content BEFORE render.js mounts the [data-pf] blocks. */
+(function () {
+  var plan = new URLSearchParams(location.search).get('plan');
+  if (!PF.PLANS[plan]) plan = 'ai';
+  var p = PF.PLANS[plan];
+
+  document.title = p.name + ' — PatientFlow';
+  document.getElementById('pkg-eyebrow').textContent = plan === 'ai' ? 'AI Plan' : 'Core Plan';
+  document.getElementById('pkg-name').textContent = p.name;
+  document.getElementById('pkg-blurb').textContent = p.blurb;
+  document.getElementById('pkg-price').innerHTML = PF.fmtPrice(p.pricePKR) + '<span>/' + p.period + '</span>';
+  document.getElementById('pkg-who').innerHTML = '<strong>Best for:</strong> ' + p.bestFor;
+  document.getElementById('pkg-sum-name').textContent = 'Get ' + p.name;
+  document.getElementById('pkg-sum-price').innerHTML = PF.fmtPrice(p.pricePKR) + '<span>/' + p.period + '</span>';
+  document.getElementById('pkg-sticky-txt').innerHTML = p.name + ' <span>— ' + p.tagline + '</span>';
+
+  // Tell the category renderer which plan to scope to.
+  document.getElementById('pkg-feats').dataset.plan = plan;
+
+  // Before / After
+  var ba = plan === 'ai' ? {
+    before: ['No-shows quietly eat your calendar', 'Lapsed patients never come back', 'Reviews depend on remembering to ask', 'Reminders sent by hand, if at all', 'Marketing is guesswork'],
+    after: ['Automated 24h + 2h reminders cut no-shows', 'Reactivation wins back lapsed patients', 'Google reviews requested automatically', 'AI receptionist answers patients 24/7', 'Targeted WhatsApp campaigns to your list'],
+  } : {
+    before: ['Appointments tracked in a register', 'Patient files in cabinets and WhatsApp', 'Invoices handwritten or in Excel', 'No visibility into revenue or dues', 'Patients call to book, or don\'t'],
+    after: ['One clean scheduling calendar', 'Complete digital patient records + charting', 'Professional invoices with your bank details', 'Live dashboards for revenue, dues and staff', 'Your own 24/7 booking website'],
+  };
+  document.getElementById('pkg-ba').innerHTML =
+    '<div class="pf-ba__col pf-ba__col--before"><span class="pf-ba__tag">Before PatientFlow</span><ul>' + ba.before.map(function (x) { return '<li>' + x + '</li>'; }).join('') + '</ul></div>' +
+    '<div class="pf-ba__col pf-ba__col--after"><span class="pf-ba__tag">With ' + p.name + '</span><ul>' + ba.after.map(function (x) { return '<li>' + x + '</li>'; }).join('') + '</ul></div>';
+
+  // vs Manual
+  document.getElementById('pkg-manual').innerHTML =
+    '<div class="pf-ba__col pf-ba__col--before"><span class="pf-ba__tag">The manual way</span><ul>' +
+      ['Hours of admin every day', 'Data spread across registers, Excel & chats', 'Missed follow-ups = lost revenue', 'No audit trail, no backups', 'Errors, double-bookings, lost files'].map(function (x) { return '<li>' + x + '</li>'; }).join('') +
+    '</ul></div>' +
+    '<div class="pf-ba__col pf-ba__col--after"><span class="pf-ba__tag">With PatientFlow</span><ul>' +
+      ['Admin on autopilot', 'One secure source of truth', 'Every follow-up handled automatically', 'Audit log + nightly offsite backups', 'Clean, reliable, error-proof workflows'].map(function (x) { return '<li>' + x + '</li>'; }).join('') +
+    '</ul></div>';
+
+  // ROI calculator
+  var planCost = p.pricePKR;
+  var $ = function (id) { return document.getElementById(id); };
+  function money(n) { return 'PKR ' + Math.round(n).toLocaleString('en-US'); }
+  function roi() {
+    var patients = +$('roi-patients').value, ticket = +$('roi-ticket').value, lapse = +$('roi-lapse').value / 100;
+    $('roi-pv').textContent = patients; $('roi-tv').textContent = money(ticket); $('roi-lv').textContent = Math.round(lapse * 100) + '%';
+    var reminders = patients * 0.08 * ticket;                 // ~8% of appts recovered from no-shows
+    var react = patients * lapse * 0.12 * ticket;              // win back ~12% of lapsed
+    var total = reminders + react;
+    $('roi-rem').textContent = money(reminders);
+    $('roi-react').textContent = money(react);
+    $('roi-total').textContent = money(total);
+    $('roi-x').textContent = (total / planCost).toFixed(1) + '× the plan cost';
+  }
+  ['roi-patients', 'roi-ticket', 'roi-lapse'].forEach(function (id) { $(id).addEventListener('input', roi); });
+  roi();
+
+  // Sticky CTA on scroll
+  var sticky = document.getElementById('pkg-sticky');
+  window.addEventListener('scroll', function () { sticky.classList.toggle('show', window.scrollY > 700); }, { passive: true });
+})();
+</script>
+<script src="js/render.js"></script>
+<script src="js/site.js"></script>
+</body>
+</html>
