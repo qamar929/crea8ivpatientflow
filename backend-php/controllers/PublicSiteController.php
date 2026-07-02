@@ -230,6 +230,10 @@ class PublicSiteController {
         $stmt = $db->prepare("SELECT g.id, g.type, g.imageUrl, g.service, g.notes FROM GalleryItem g JOIN Client c ON g.clientId = c.id WHERE c.clinicId = ? AND g.isPrivate = 0 ORDER BY g.createdAt DESC LIMIT 12");
         $stmt->execute([$clinic['id']]);
         $gallery = $stmt->fetchAll();
+        // Uploads are no longer web-served directly; public-site images use
+        // signed links too (24h TTL — the page refetches this payload per visit).
+        foreach ($gallery as &$g) { $g['imageUrl'] = pf_uploads_url_to_signed($g['imageUrl'], 86400); }
+        unset($g);
 
         send_json([
             'clinic' => $this->cleanClinic($clinic),

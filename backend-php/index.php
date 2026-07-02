@@ -232,6 +232,9 @@ function require_client_portal($user) {
 $routes = [
     // Health Check
     ['GET', '^api/v1/health$', 'StatusController', 'health', false],
+
+    // Signed file serving (patient uploads) — auth is the HMAC signature itself
+    ['GET', '^api/v1/files/([^/]+)$', 'FileController', 'serve', false],
     ['GET', '^api/v1/features$', 'StatusController', 'features', true],
 
     // Auth Routes

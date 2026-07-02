@@ -308,7 +308,7 @@ export default function Financials() {
                     <td className="py-3 font-semibold text-gray-900 dark:text-white">{expense.description}</td>
                     <td className="py-3 text-xs text-gray-500">{expense.branchName || 'All'}</td>
                     <td className="py-3 font-bold text-rose-600">{money(expense.amount)}</td>
-                    <td className="py-3">{expense.receiptUrl ? <a href={`${fileBase}${expense.receiptUrl}`} target="_blank" rel="noreferrer" className="text-xs font-bold text-[var(--primary)]">Open</a> : <span className="text-xs text-gray-300">None</span>}</td>
+                    <td className="py-3">{expense.receiptUrl ? <a href={expense.receiptUrl.startsWith('http') ? expense.receiptUrl : `${fileBase}${expense.receiptUrl}`} target="_blank" rel="noreferrer" className="text-xs font-bold text-[var(--primary)]">Open</a> : <span className="text-xs text-gray-300">None</span>}</td>
                     <td className="py-3 text-right"><button onClick={() => archiveExpense(expense)} className="text-xs font-bold text-gray-400 hover:text-rose-600">Archive</button></td>
                   </tr>
                 ))}

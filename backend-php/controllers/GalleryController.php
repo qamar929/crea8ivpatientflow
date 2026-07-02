@@ -31,6 +31,8 @@ class GalleryController {
 
         foreach ($items as &$item) {
             $item['isPrivate'] = !empty($item['isPrivate']);
+            // Never expose raw /uploads paths — sign every file link (30 min TTL).
+            $item['imageUrl'] = pf_uploads_url_to_signed($item['imageUrl']);
         }
         send_json($items);
     }
@@ -105,6 +107,7 @@ class GalleryController {
         $stmt->execute([$id, $user['clinicId']]);
         $item = $stmt->fetch();
         $item['isPrivate'] = !empty($item['isPrivate']);
+        $item['imageUrl'] = pf_uploads_url_to_signed($item['imageUrl']);
 
         send_json($item, 201);
     }

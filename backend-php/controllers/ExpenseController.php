@@ -110,6 +110,7 @@ class ExpenseController {
         $total = 0;
         foreach ($rows as &$row) {
             $row['amount'] = floatval($row['amount'] ?? 0);
+            $row['receiptUrl'] = pf_uploads_url_to_signed($row['receiptUrl'] ?? null);
             $total += $row['amount'];
         }
         send_json(['expenses' => $rows, 'total' => $total]);
@@ -179,6 +180,7 @@ class ExpenseController {
         $row = $stmt->fetch();
         if (!$row) send_error('Expense not found', 404);
         $row['amount'] = floatval($row['amount'] ?? 0);
+        $row['receiptUrl'] = pf_uploads_url_to_signed($row['receiptUrl'] ?? null);
         send_json($row);
     }
 

@@ -59,6 +59,10 @@ define('JWT_REFRESH_EXPIRES_IN', (int)(getenv('JWT_REFRESH_EXPIRES_IN') ?: 60480
 // CORS / Allowed Client origin
 define('CLIENT_URL', getenv('CLIENT_URL') ?: 'https://portal.thesmilexperts.com');
 
+// Public base URL of this API — used to build absolute signed file URLs
+// (patient uploads are served through /api/v1/files, never directly).
+define('API_PUBLIC_URL', getenv('API_PUBLIC_URL') ?: 'https://crea8ivmedia.com/app/api/v1');
+
 // Wildcard subdomain every new clinic gets a default URL on:
 //   <slug>.crea8ivmedia.com → "smile-xperts.crea8ivmedia.com"
 // Override via env if rebranded. Needs wildcard DNS + SSL to actually resolve.

@@ -271,3 +271,33 @@ function send_whatsapp_message($to, $body) {
     $result = @file_get_contents($url, false, $context);
     return $result !== false;
 }
+
+// ---------------------------------------------------------------------------
+// Signed file URLs — patient uploads must NOT be directly web-accessible.
+// Files under uploads/ are denied by .htaccess; the API serves them through
+// GET /api/v1/files/{token}?exp=..&sig=.. where sig = HMAC(relPath|exp).
+// Response-time conversion: stored DB values stay "/uploads/<clinic>/<file>".
+// ---------------------------------------------------------------------------
+function pf_b64url_encode($s) { return rtrim(strtr(base64_encode($s), '+/', '-_'), '='); }
+function pf_b64url_decode($s) {
+    $pad = strlen($s) % 4;
+    if ($pad) $s .= str_repeat('=', 4 - $pad);
+    return base64_decode(strtr($s, '-_', '+/'), true);
+}
+
+function pf_file_sig($relPath, $exp) {
+    return hash_hmac('sha256', $relPath . '|' . $exp, JWT_SECRET);
+}
+
+// Absolute signed URL for a path relative to UPLOAD_DIR (e.g. "clinic-x/img.png").
+function pf_file_signed_url($relPath, $ttlSeconds = 1800) {
+    $exp = time() + max(60, (int)$ttlSeconds);
+    $token = pf_b64url_encode($relPath);
+    return API_PUBLIC_URL . '/files/' . rawurlencode($token) . '?exp=' . $exp . '&sig=' . pf_file_sig($relPath, $exp);
+}
+
+// Convert a stored "/uploads/<rel>" URL to a signed URL; anything else passes through.
+function pf_uploads_url_to_signed($url, $ttlSeconds = 1800) {
+    if (!is_string($url) || strpos($url, '/uploads/') !== 0) return $url;
+    return pf_file_signed_url(substr($url, strlen('/uploads/')), $ttlSeconds);
+}
