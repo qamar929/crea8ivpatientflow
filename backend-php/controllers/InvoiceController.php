@@ -2,6 +2,7 @@
 require_once __DIR__ . '/../db.php';
 require_once __DIR__ . '/../helpers.php';
 require_once __DIR__ . '/../services/pdfService.php';
+require_once __DIR__ . '/../services/invoiceMath.php';
 
 class InvoiceController {
     private function assertAppointmentInClinic($db, $appointmentId, $clinicId, $clientId = null) {
@@ -41,54 +42,13 @@ class InvoiceController {
     }
 
     private function calculateTotals($items, $discountPercent = 0, $taxPercent = 0, $previousBalance = 0, $amountPaid = 0) {
-        $parsedItems = is_array($items) ? $items : (json_decode($items, true) ?: []);
-        $subtotal = 0;
-
-        if ($discountPercent < 0 || $discountPercent > 100 || $taxPercent < 0 || $taxPercent > 100) {
-            send_error('Discount and tax percentages must be between 0 and 100', 400);
+        // Math lives in services/invoiceMath.php (pure + unit-tested);
+        // this wrapper just maps validation failures to 400 responses.
+        try {
+            return pf_invoice_totals($items, $discountPercent, $taxPercent, $previousBalance, $amountPaid);
+        } catch (InvalidArgumentException $e) {
+            send_error($e->getMessage(), 400);
         }
-
-        foreach ($parsedItems as &$item) {
-            $qty = intval($item['qty'] ?? 1);
-            $unitPrice = floatval($item['unitPrice'] ?? $item['price'] ?? 0);
-            if ($qty <= 0 || $unitPrice < 0) {
-                send_error('Invoice item quantity must be positive and unit price cannot be negative', 400);
-            }
-            $item['qty'] = $qty;
-            $item['unitPrice'] = $unitPrice;
-            if (empty($item['description']) && !empty($item['name'])) {
-                $item['description'] = $item['name'];
-            }
-            $subtotal += ($qty * $unitPrice);
-        }
-
-        $discountAmt = ($subtotal * floatval($discountPercent)) / 100;
-        $taxAmt = (($subtotal - $discountAmt) * floatval($taxPercent)) / 100;
-        $total = $subtotal - $discountAmt + $taxAmt;
-        $grandTotal = $total + floatval($previousBalance);
-        $paid = floatval($amountPaid);
-        if ($paid < 0 || $paid > $grandTotal) {
-            send_error('Amount paid cannot be negative or exceed the invoice total', 400);
-        }
-        $balanceDue = max(0.0, $grandTotal - $paid);
-        $status = 'pending';
-        if ($balanceDue <= 0) {
-            $status = 'paid';
-        } else if ($paid > 0) {
-            $status = 'partial';
-        }
-
-        return [
-            'items' => $parsedItems,
-            'subtotal' => $subtotal,
-            'discount' => $discountAmt,
-            'tax' => $taxAmt,
-            'total' => $total,
-            'grandTotal' => $grandTotal,
-            'amountPaid' => $paid,
-            'balanceDue' => $balanceDue,
-            'status' => $status
-        ];
     }
 
     private function recomputeClientTotals($db, $clinicId, $clientId) {
