@@ -194,6 +194,40 @@ window.PF = (function () {
     { id: 'multi', name: 'Multi-Branch Groups', icon: 'building', desc: 'One login across locations with per-branch staff, calendars and reporting.' },
   ];
 
+  // ---- Interface showcase screens ---------------------------------------
+  // Each tab renders a UI mockup + the registry features it demonstrates.
+  const SCREENS = [
+    { id: 'dashboard', name: 'Dashboard', blurb: 'Your whole clinic at a glance — today\'s appointments, revenue, dues and staff, live.', features: ['reports', 'appointments', 'financials', 'dues'] },
+    { id: 'appointments', name: 'Appointments', blurb: 'A clean scheduling calendar with reminders, reschedule and conflict detection.', features: ['appointments', 'reception', 'ai-reminders'] },
+    { id: 'billing', name: 'Billing', blurb: 'Professional invoices with your bank details, flexible discounts and instant PDF.', features: ['billing', 'dues', 'packages'] },
+    { id: 'patients', name: 'Patients', blurb: 'Complete records, clinical charting and secure documents — searchable in seconds.', features: ['records', 'clinical', 'documents'] },
+    { id: 'automation', name: 'AI & WhatsApp', blurb: 'Reminders, reactivation, reviews and an AI receptionist — working 24/7.', features: ['whatsapp', 'ai-receptionist', 'reviews', 'reactivation'] },
+  ];
+
+  // ---- Security & compliance (for the security page) --------------------
+  const SECURITY = [
+    { icon: 'lock', title: 'Encryption everywhere', desc: 'All traffic is encrypted (HTTPS/TLS). Sensitive secrets like AI keys are encrypted at rest with AES-256.' },
+    { icon: 'shield', title: 'Complete tenant isolation', desc: 'Every clinic\'s data is fully separated. Queries are scoped per clinic — one clinic can never see another\'s data.' },
+    { icon: 'idcard', title: 'Role-based access (RBAC)', desc: 'Owners, managers, doctors, reception and accountants each see exactly what they should — enforced on every request.' },
+    { icon: 'image', title: 'Signed file access', desc: 'Patient photos and documents are never public. They\'re served only through short-lived, signed links that expire.' },
+    { icon: 'database', title: 'Automated backups', desc: 'The database is backed up nightly with encrypted offsite copies and self-heal recovery — your data is never lost.' },
+    { icon: 'folder', title: 'Audit trail', desc: 'Sensitive actions — deletes, refunds, admin access — are logged with who, what and when.' },
+    { icon: 'check', title: 'Login protection', desc: 'Passwords are hashed with bcrypt, logins are rate-limited per user and IP, and sessions use rotating tokens.' },
+    { icon: 'globe', title: 'Your data is yours', desc: 'Export your data anytime. No lock-in. Retained for 90 days after expiry so renewing restores everything.' },
+  ];
+
+  // ---- AI capabilities (for the AI showcase page) -----------------------
+  const AI_CAPS = [
+    { icon: 'robot', title: 'AI Receptionist', tag: 'Live', desc: 'A per-clinic AI with its own persona, knowledge base and memory that answers patient questions around the clock.' },
+    { icon: 'bell', title: 'Smart Reminders', tag: 'Live', desc: 'Precise 24-hour and 2-hour WhatsApp reminders that dramatically cut no-shows — fully automatic.' },
+    { icon: 'refresh', title: 'Patient Reactivation', tag: 'Live', desc: 'Timed WhatsApp sequences win back patients who haven\'t visited in months.' },
+    { icon: 'stars', title: 'Review Generation', tag: 'Live', desc: 'Happy patients are automatically asked for a Google review after their visit.' },
+    { icon: 'clock', title: 'Recall Campaigns', tag: 'Live', desc: 'Automatic recalls for cleanings and follow-ups based on each patient\'s last visit.' },
+    { icon: 'chat', title: 'AI Reply Suggestions', tag: 'Live', desc: 'Smart, on-brand reply drafts for your WhatsApp inbox — a personal touch with zero effort.' },
+    { icon: 'sparkles', title: 'AI Treatment Notes', tag: 'Soon', desc: 'Turn shorthand into structured clinical notes automatically.' },
+    { icon: 'chart', title: 'Predictive Insights', tag: 'Soon', desc: 'Forecast no-shows, revenue and which patients are about to lapse — before they do.' },
+  ];
+
   // ---- Derived helpers ---------------------------------------------------
   function featuresForPlan(planId) { return FEATURES.filter(f => f.plans.includes(planId)); }
   function featuresByCategory(planId) {
@@ -204,10 +238,12 @@ window.PF = (function () {
   }
   function fmtPrice(n) { return 'PKR ' + n.toLocaleString('en-US'); }
 
+  function featureById(id) { return FEATURES.find(f => f.id === id); }
+
   return {
     PLANS, CATEGORIES, FEATURES, STATS, CHANGELOG, ROADMAP, ROADMAP_STATUSES,
-    FAQS, USE_CASES,
-    featuresForPlan, featuresByCategory, fmtPrice,
+    FAQS, USE_CASES, SCREENS, SECURITY, AI_CAPS,
+    featuresForPlan, featuresByCategory, fmtPrice, featureById,
     planList: Object.values(PLANS),
   };
 })();

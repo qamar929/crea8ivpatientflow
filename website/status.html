@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>System Status — PatientFlow</title>
+<meta name="description" content="Live PatientFlow system status — API, portals and automation uptime.">
+<meta name="robots" content="index, follow">
+<link rel="canonical" href="https://crea8ivmedia.com/patientflow/status.html">
+<meta name="theme-color" content="#FE6A09">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css">
+<link rel="stylesheet" href="css/pf-pages.css">
+<style>
+  .st-row { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:18px 22px; border:1px solid var(--line); border-radius:var(--radius); background:var(--glass); margin-bottom:12px; }
+  .st-row h3 { font-size:15.5px; font-weight:700; }
+  .st-row p { font-size:12.5px; color:var(--muted); margin-top:2px; }
+  .st-badge { display:inline-flex; align-items:center; gap:8px; font-size:13px; font-weight:700; padding:7px 14px; border-radius:999px; }
+  .st-badge .d { width:9px; height:9px; border-radius:50%; }
+  .st-ok { background:rgba(37,211,102,.14); color:#34d67f; } .st-ok .d { background:#25D366; box-shadow:0 0 0 3px rgba(37,211,102,.18); }
+  .st-down { background:rgba(239,68,68,.14); color:#ff6b6b; } .st-down .d { background:#ff5f57; }
+  .st-wait { background:rgba(139,147,167,.14); color:var(--muted); } .st-wait .d { background:#8b93a7; }
+  .st-hero-badge { display:inline-flex; align-items:center; gap:10px; padding:10px 18px; border-radius:999px; font-weight:700; }
+</style>
+</head>
+<body>
+<header class="site-header">
+  <div class="container nav">
+    <a class="brand" href="index.html"><img class="brand-logo" src="logo.png" alt="PatientFlow — by Crea8iv Media"></a>
+    <button class="nav-toggle" aria-label="Toggle menu">☰</button>
+    <nav class="nav-links">
+      <a href="index.html">Home</a>
+      <a href="features.html">Features</a>
+      <a href="pricing.html">Pricing</a>
+      <a href="roadmap.html">Roadmap</a>
+      <a href="whats-new.html">What's New</a>
+      <a href="contact.html">Contact</a>
+    </nav>
+    <a class="nav-cta" href="demo.html">Book Demo</a>
+  </div>
+</header>
+
+<main>
+  <section class="pkg-hero">
+    <div class="container reveal">
+      <span class="pf-eyebrow">System Status</span>
+      <h1 class="pf-h2" style="margin-top:16px">PatientFlow <span class="pf-grad-text">Status</span></h1>
+      <div id="overall" class="st-hero-badge st-wait" style="margin-top:18px"><span class="d" style="width:10px;height:10px;border-radius:50%;background:#8b93a7"></span> Checking systems…</div>
+    </div>
+  </section>
+
+  <section class="pf-section" style="padding-top:20px">
+    <div class="container" style="max-width:760px">
+      <div class="st-row"><div><h3>API</h3><p>Core application programming interface</p></div><span id="st-api" class="st-badge st-wait"><span class="d"></span> Checking…</span></div>
+      <div class="st-row"><div><h3>Clinic Portals</h3><p>Web portals for every clinic</p></div><span id="st-portal" class="st-badge st-wait"><span class="d"></span> Checking…</span></div>
+      <div class="st-row"><div><h3>Marketing Site</h3><p>patientflow public website</p></div><span id="st-web" class="st-badge st-ok"><span class="d"></span> Operational</span></div>
+      <div class="st-row"><div><h3>Automation &amp; Reminders</h3><p>Scheduled WhatsApp reminders and recalls</p></div><span id="st-auto" class="st-badge st-ok"><span class="d"></span> Operational</span></div>
+      <p style="color:var(--faint);font-size:12.5px;margin-top:18px;text-align:center">Status refreshes automatically. Last checked: <span id="st-time">—</span></p>
+    </div>
+  </section>
+</main>
+
+<footer class="site-footer">
+  <div class="container footer-grid">
+    <div>
+      <a class="brand" href="index.html"><img class="brand-logo" src="logo.png" alt="PatientFlow — by Crea8iv Media"></a>
+      <p class="blurb">Patient retention software that turns your existing database into predictable monthly revenue.</p>
+    </div>
+    <div><h4>Product</h4><a href="features.html">Features</a><a href="pricing.html">Pricing</a><a href="use-cases.html">Use Cases</a><a href="ai-showcase.html">AI &amp; Automation</a><a href="roadmap.html">Roadmap</a><a href="whats-new.html">What's New</a></div>
+    <div><h4>Get Started</h4><a href="demo.html">Book a Demo</a><a href="register.html">Register Clinic</a><a href="contact.html">Contact Us</a></div>
+    <div><h4>Company</h4><a href="https://crea8ivmedia.com" target="_blank" rel="noopener">Crea8iv Media</a><a href="security.html">Security</a><a href="status.html">Status</a><a href="contact.html">Support</a></div>
+  </div>
+  <div class="container footer-bottom">
+    <span>© 2026 PatientFlow by Crea8iv Media. All rights reserved.</span>
+    <span>Built with ❤️ in Pakistan</span>
+  </div>
+</footer>
+
+<script>
+(function () {
+  var API = (location.hostname === 'localhost' || location.hostname === '127.0.0.1')
+    ? 'https://crea8ivmedia.com/app/api/v1' : 'https://crea8ivmedia.com/app/api/v1';
+  function set(id, ok, label) {
+    var el = document.getElementById(id);
+    el.className = 'st-badge ' + (ok ? 'st-ok' : 'st-down');
+    el.innerHTML = '<span class="d"></span> ' + label;
+  }
+  function check() {
+    fetch(API + '/health', { cache: 'no-store' })
+      .then(function (r) { return r.ok ? r.json() : Promise.reject(); })
+      .then(function (d) {
+        var ok = d && d.status === 'ok';
+        set('st-api', ok, ok ? 'Operational' : 'Degraded');
+        set('st-portal', ok, ok ? 'Operational' : 'Degraded');
+        var overall = document.getElementById('overall');
+        overall.className = 'st-hero-badge ' + (ok ? 'st-ok' : 'st-down');
+        overall.innerHTML = '<span class="d" style="width:10px;height:10px;border-radius:50%"></span> ' + (ok ? 'All systems operational' : 'Some systems degraded');
+      })
+      .catch(function () {
+        set('st-api', false, 'Unreachable'); set('st-portal', false, 'Unreachable');
+        var overall = document.getElementById('overall');
+        overall.className = 'st-hero-badge st-down';
+        overall.innerHTML = '<span class="d" style="width:10px;height:10px;border-radius:50%"></span> Systems unreachable';
+      })
+      .finally(function () { document.getElementById('st-time').textContent = new Date().toLocaleTimeString(); });
+  }
+  check(); setInterval(check, 30000);
+})();
+</script>
+<script src="js/site.js"></script>
+</body>
+</html>

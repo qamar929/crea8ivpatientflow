@@ -198,6 +198,89 @@
       }));
     },
 
+    // Interface showcase — <div data-pf="showcase"> (tabs + UI mockups + features)
+    showcase(el) {
+      const sidebar = (active) => {
+        const nav = [['dashboard', 'gauge', 'Dashboard'], ['appointments', 'calendar', 'Appointments'], ['billing', 'receipt', 'Billing'], ['patients', 'users', 'Patients'], ['automation', 'whatsapp', 'AI Hub']];
+        return `<aside class="pf-app__side"><div class="pf-app__brand"><span></span>PatientFlow</div>${nav.map(([id, ic, nm]) => `<div class="pf-app__nav ${active === id ? 'on' : ''}">${icon(ic)}<span>${nm}</span></div>`).join('')}</aside>`;
+      };
+      const main = {
+        dashboard: `<div class="pf-app__top"><div class="pf-app__title">Dashboard</div><span class="pf-app__pill">Live</span></div>
+          <div class="pf-app__stats">
+            <div class="pf-card pf-app__stat"><div class="k">Today</div><div class="v">14</div></div>
+            <div class="pf-card pf-app__stat"><div class="k">Collected</div><div class="v up">PKR 184k</div></div>
+            <div class="pf-card pf-app__stat"><div class="k">Outstanding</div><div class="v or">PKR 42k</div></div>
+            <div class="pf-card pf-app__stat"><div class="k">Patients</div><div class="v">1,240</div></div>
+          </div>
+          <div class="pf-card"><div style="font-weight:700;margin-bottom:6px">Revenue trend</div>
+            <div class="pf-chartrow"><div class="pf-bars">${[38, 52, 44, 66, 58, 78, 72, 90].map(h => `<i style="height:${h}%"></i>`).join('')}</div>
+            <div class="pf-legend"><div><span class="mut">This month</span><b>PKR 1.9M</b></div><div><span class="mut">Last month</span><b>PKR 1.6M</b></div><div><span class="mut">Growth</span><b style="color:#12a150">+18%</b></div></div></div></div>`,
+        appointments: `<div class="pf-app__top"><div class="pf-app__title">Appointments</div><span class="pf-app__pill">Today · 14</span></div>
+          <div class="pf-rows">
+            ${[['09:00', 'Ahmed Waqar', 'Scaling & Polish', 'g', 'Confirmed'], ['10:30', 'Sara Malik', 'Root Canal', 'b', 'In chair'], ['11:15', 'Bilal Khan', 'Consultation', 'o', 'Waiting'], ['12:00', 'Hina Raza', 'Whitening', 'g', 'Confirmed'], ['13:30', 'Usman Ali', 'Follow-up', 'g', 'Confirmed']].map(([t, n, s, c, tag]) => `<div class="pf-row"><div class="pf-av">${t.slice(0, 2)}</div><div><div class="nm">${n}</div><div class="sub">${t} · ${s}</div></div><span class="pf-tag ${c}">${tag}</span></div>`).join('')}
+          </div>`,
+        billing: `<div class="pf-app__top"><div class="pf-app__title">Invoice · TSE-1042</div><span class="pf-app__pill">Paid</span></div>
+          <div class="pf-card pf-inv">
+            <div class="pf-inv__line"><span>Scaling & Polishing ×1</span><b>PKR 6,000</b></div>
+            <div class="pf-inv__line"><span>Composite Filling ×2</span><b>PKR 9,000</b></div>
+            <div class="pf-inv__line"><span>Discount (10%)</span><b style="color:#12a150">− PKR 1,500</b></div>
+            <div class="pf-inv__total"><span>Total</span><span>PKR 13,500</span></div>
+            <div class="pf-inv__pay"><div class="h">Payment details</div>
+              <div class="r"><span>Bank</span><b>Meezan Bank</b></div>
+              <div class="r"><span>Account</span><b>0123-4567890123</b></div>
+              <div class="r"><span>IBAN</span><b>PK00 MEZN 0000 0123 4567</b></div></div>
+          </div>`,
+        patients: `<div class="pf-app__top"><div class="pf-app__title">Patients</div><span class="pf-app__pill">1,240</span></div>
+          <div class="pf-rows">
+            ${[['AW', 'Ahmed Waqar', 'PT-0153 · 0332-070050', 'g', 'Active'], ['SM', 'Sara Malik', 'PT-0154 · 0301-224510', 'b', 'New'], ['BK', 'Bilal Khan', 'PT-0148 · 0345-778120', 'o', 'Due'], ['HR', 'Hina Raza', 'PT-0140 · 0322-991233', 'g', 'Active']].map(([av, n, s, c, tag]) => `<div class="pf-row"><div class="pf-av">${av}</div><div><div class="nm">${n}</div><div class="sub">${s}</div></div><span class="pf-tag ${c}">${tag}</span></div>`).join('')}
+          </div>`,
+        automation: `<div class="pf-app__top"><div class="pf-app__title">AI &amp; WhatsApp</div><span class="pf-app__pill">Automated</span></div>
+          <div class="pf-chat">
+            <div class="pf-bub in"><div class="who">AI Receptionist</div>Hi Ahmed! This is a reminder for your appointment tomorrow at 9:00 AM. Reply 1 to confirm.</div>
+            <div class="pf-bub out">1 ✓</div>
+            <div class="pf-bub in"><div class="who">AI Receptionist</div>Confirmed! See you tomorrow 🦷</div>
+          </div>
+          <div style="display:grid;gap:6px;margin-top:10px">
+            <div class="pf-auto"><span class="st"></span><b>Reminders</b><span class="mut">128 sent today</span></div>
+            <div class="pf-auto"><span class="st"></span><b>Reactivation</b><span class="mut">17 replies</span></div>
+            <div class="pf-auto"><span class="st"></span><b>Review requests</b><span class="mut">9 ★ this week</span></div>
+          </div>`,
+      };
+      const win = (id) => `<div class="pf-win"><div class="pf-win__bar"><span class="pf-win__dot"></span><span class="pf-win__dot"></span><span class="pf-win__dot"></span><span class="pf-win__url">app.yourclinic.com/${id}</span></div><div class="pf-app">${sidebar(id)}<div class="pf-app__main">${main[id]}</div></div></div>`;
+      const infoPanel = (s) => `<div class="pf-sc__info"><h3>${esc(s.name)}</h3><p>${esc(s.blurb)}</p><div class="pf-sc__feats">${s.features.map(fid => { const f = PF.featureById(fid); return f ? `<div class="pf-sc__feat">${icon(f.icon)}<div><strong>${esc(f.name)}</strong><p>${esc(f.desc)}</p></div></div>` : ''; }).join('')}</div></div>`;
+
+      el.innerHTML = `
+        <div class="pf-sc__tabs">${PF.SCREENS.map((s, i) => `<button class="pf-sc__tab ${i === 0 ? 'is-on' : ''}" data-screen="${s.id}">${icon(s.id === 'automation' ? 'whatsapp' : s.id === 'billing' ? 'receipt' : s.id === 'patients' ? 'users' : s.id === 'appointments' ? 'calendar' : 'gauge')}${esc(s.name)}</button>`).join('')}</div>
+        <div class="pf-sc__stage"><div class="pf-sc__win">${win(PF.SCREENS[0].id)}</div>${infoPanel(PF.SCREENS[0])}</div>`;
+      const stage = el.querySelector('.pf-sc__stage');
+      el.querySelectorAll('.pf-sc__tab').forEach(tab => tab.addEventListener('click', () => {
+        el.querySelectorAll('.pf-sc__tab').forEach(t => t.classList.remove('is-on'));
+        tab.classList.add('is-on');
+        const s = PF.SCREENS.find(x => x.id === tab.dataset.screen);
+        stage.innerHTML = `<div class="pf-sc__win">${win(s.id)}</div>${infoPanel(s)}`;
+      }));
+    },
+
+    // Security cards — <div data-pf="security">
+    security(el) {
+      el.innerHTML = PF.SECURITY.map(s => `
+        <article class="pf-fcard">
+          <div class="pf-fcard__ic">${icon(s.icon)}</div>
+          <h3>${esc(s.title)}</h3>
+          <p>${esc(s.desc)}</p>
+        </article>`).join('');
+    },
+
+    // AI capabilities — <div data-pf="aicaps">
+    aicaps(el) {
+      el.innerHTML = PF.AI_CAPS.map(c => `
+        <article class="pf-fcard">
+          <div class="pf-fcard__ic">${icon(c.icon)}</div>
+          <h3>${esc(c.title)} <span class="pf-badge pf-badge--${c.tag === 'Live' ? 'security' : 'ai'}" style="vertical-align:middle">${c.tag}</span></h3>
+          <p>${esc(c.desc)}</p>
+        </article>`).join('');
+    },
+
     // Roadmap board — <div data-pf="roadmap">
     roadmap(el) {
       el.innerHTML = PF.ROADMAP_STATUSES.map(st => {
