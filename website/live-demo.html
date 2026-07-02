@@ -121,6 +121,10 @@
 
 <script>
 (function () {
+  // Guarantee the demo content is visible (don't depend on the scroll-reveal
+  // observer, which this page's script set doesn't reliably trigger).
+  document.querySelectorAll('.reveal').forEach(function (el) { el.classList.add('in'); });
+
   var API = 'https://crea8ivmedia.com/app/api/v1';
   var PORTAL = 'https://crea8ivmedia.com/clinic/demo-dental/dashboard';
   var iframe = document.getElementById('demo-iframe');
